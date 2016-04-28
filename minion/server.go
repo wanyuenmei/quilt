@@ -55,6 +55,7 @@ func (s server) GetMinionConfig(cts context.Context,
 		cfg.ID = m.MinionID
 		cfg.Role = pb.MinionConfig_Role(m.Role)
 		cfg.PrivateIP = m.PrivateIP
+		cfg.PublicIP = m.PublicIP
 		cfg.Spec = m.Spec
 		cfg.Provider = m.Provider
 		cfg.Size = m.Size
@@ -84,6 +85,7 @@ func (s server) SetMinionConfig(ctx context.Context,
 		minion.MinionID = msg.ID
 		minion.Role = db.Role(msg.Role)
 		minion.PrivateIP = msg.PrivateIP
+		minion.PublicIP = msg.PublicIP
 		minion.Spec = msg.Spec
 		minion.Provider = msg.Provider
 		minion.Size = msg.Size
