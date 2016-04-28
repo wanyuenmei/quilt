@@ -8,6 +8,7 @@ type Minion struct {
 	MinionID  string
 	Role      Role
 	PrivateIP string
+	PublicIP  string
 	Spec      string
 
 	Provider string

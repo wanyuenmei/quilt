@@ -78,7 +78,7 @@ func campaign(conn db.Conn, store consensus.Store) {
 			continue
 		}
 
-		IP := minions[0].PrivateIP
+		IP := minions[0].PublicIP
 		if IP == "" {
 			continue
 		}
