@@ -579,7 +579,7 @@ func ovsExecArgs(id, ip, leader string) []string {
 	return []string{"ovs-vsctl", "set", "Open_vSwitch", ".",
 		fmt.Sprintf("external_ids:ovn-remote=\"tcp:%s:6640\"", leader),
 		fmt.Sprintf("external_ids:ovn-encap-ip=%s", ip),
-		"external_ids:ovn-encap-type=\"geneve\"",
+		"external_ids:ovn-encap-type=\"stt\"",
 		fmt.Sprintf("external_ids:api_server=\"http://%s:9000\"", leader),
 		fmt.Sprintf("external_ids:system-id=\"di-%s\"", id),
 		"--", "add-br", "di-int",

@@ -13,13 +13,22 @@ func cloudConfigUbuntu(keys []string, ubuntuVersion string) string {
 	cloudConfig := `#!/bin/bash
 
 initialize_ovs() {
+	apt-get -y update
+	apt-get -y install build-essential linux-headers-4.2.0-35-generic
+	wget http://openvswitch.org/releases/openvswitch-2.5.0.tar.gz
+	tar -xf openvswitch-2.5.0.tar.gz
+	cd openvswitch-2.5.0
+	./configure --with-linux=/lib/modules/4.2.0-35-generic/build
+	rm -rf /lib/modules/4.2.0-35-generic/kernel/net/openvswitch/*
+	make
+	make modules_install
+
 	cat <<- EOF > /etc/systemd/system/ovs.service
 	[Unit]
 	Description=OVS
 
 	[Service]
 	ExecStart=/sbin/modprobe openvswitch
-	ExecStartPost=/sbin/modprobe vport_geneve
 
 	[Install]
 	WantedBy=multi-user.target

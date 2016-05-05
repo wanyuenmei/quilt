@@ -236,7 +236,7 @@ func (sv *supervisor) updateWorker(IP string, leaderIP string, etcdIPs []string)
 	err := sv.dk.Exec(Ovsvswitchd, "ovs-vsctl", "set", "Open_vSwitch", ".",
 		fmt.Sprintf("external_ids:ovn-remote=\"tcp:%s:6640\"", leaderIP),
 		fmt.Sprintf("external_ids:ovn-encap-ip=%s", IP),
-		"external_ids:ovn-encap-type=\"geneve\"",
+		"external_ids:ovn-encap-type=\"stt\"",
 		fmt.Sprintf("external_ids:api_server=\"http://%s:9000\"", leaderIP),
 		fmt.Sprintf("external_ids:system-id=\"di-%s\"", minions[0].MinionID),
 		"--", "add-br", "di-int",
