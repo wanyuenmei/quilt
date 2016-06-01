@@ -125,7 +125,7 @@ func (dk Client) Run(opts RunOptions) (string, error) {
 	}
 
 	if err = dk.StartContainer(id, &hc); err != nil {
-		dk.removeID(id) // Remove the container to avoid a zombie.
+		dk.RemoveID(id) // Remove the container to avoid a zombie.
 		return "", err
 	}
 
@@ -234,20 +234,11 @@ func (dk Client) Remove(name string) error {
 		return err
 	}
 
-	log.WithFields(log.Fields{
-		"name": name,
-		"id":   id,
-	}).Info("Remove container.")
-	return dk.removeID(id)
+	return dk.RemoveID(id)
 }
 
 // RemoveID stops and deletes the container with the given ID.
 func (dk Client) RemoveID(id string) error {
-	log.WithField("id", id).Info("Remove Container.")
-	return dk.removeID(id)
-}
-
-func (dk Client) removeID(id string) error {
 	err := dk.RemoveContainer(dkc.RemoveContainerOptions{ID: id, Force: true})
 	if err != nil {
 		return err
