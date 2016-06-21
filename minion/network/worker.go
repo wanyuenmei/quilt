@@ -145,37 +145,38 @@ func runWorker(conn db.Conn, dk docker.Client) {
 	}
 	defer odb.Close()
 
-	var labels []db.Label
-	var containers []db.Container
-	var connections []db.Connection
+	// XXX: By doing all the work within a transaction, we (kind of) guarantee that
+	// containers won't be removed while we're in the process of setting them up.
+	// Not ideal, but for now it's good enough.
 	conn.Transact(func(view db.Database) error {
-		containers = view.SelectFromContainer(func(c db.Container) bool {
+		containers := view.SelectFromContainer(func(c db.Container) bool {
 			return c.DockerID != "" && c.IP != "" && c.Mac != "" &&
 				c.Pid != 0
 		})
-		labels = view.SelectFromLabel(func(l db.Label) bool {
+		labels := view.SelectFromLabel(func(l db.Label) bool {
 			return l.IP != ""
 		})
-		connections = view.SelectFromConnection(nil)
+		connections := view.SelectFromConnection(nil)
+
+		updateNamespaces(containers)
+		updateVeths(containers)
+		updateNAT(containers, connections)
+		updatePorts(odb, containers)
+
+		if exists, err := linkExists("", quiltBridge); exists {
+			updateDefaultGw(odb)
+			updateOpenFlow(dk, odb, containers, labels, connections)
+		} else if err != nil {
+			log.WithError(err).Error("failed to check if link exists")
+		}
+		updateNameservers(dk, containers)
+		updateContainerIPs(containers, labels)
+		updateRoutes(containers)
+		updateEtcHosts(dk, containers, labels, connections)
+		updateLoopback(containers)
+
 		return nil
 	})
-
-	updateNamespaces(containers)
-	updateVeths(containers)
-	updateNAT(containers, connections)
-	updatePorts(odb, containers)
-
-	if exists, err := linkExists("", quiltBridge); exists {
-		updateDefaultGw(odb)
-		updateOpenFlow(dk, odb, containers, labels, connections)
-	} else if err != nil {
-		log.WithError(err).Error("failed to check if link exists")
-	}
-	updateNameservers(dk, containers)
-	updateContainerIPs(containers, labels)
-	updateRoutes(containers)
-	updateEtcHosts(dk, containers, labels, connections)
-	updateLoopback(containers)
 }
 
 // If a namespace in the path is detected as invalid and conflicts with
