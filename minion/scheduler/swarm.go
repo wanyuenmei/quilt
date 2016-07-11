@@ -39,7 +39,7 @@ func (s swarm) boot(dbcs []db.Container, placements []db.Placement,
 		for dbc := range bootChn {
 			labels := makeLabels(dbc, connections)
 			env := makeEnv(dbc, placements)
-			err := s.dk.Run(docker.RunOptions{
+			_, err := s.dk.Run(docker.RunOptions{
 				Image:  dbc.Image,
 				Args:   dbc.Command,
 				Env:    env,

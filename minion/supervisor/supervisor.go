@@ -240,7 +240,9 @@ func (sv *supervisor) tagWorker(provider, region, size string) {
 		Labels:      tags,
 		NetworkMode: "host",
 	}
-	if err := sv.dk.Run(ro); err != nil {
+
+	_, err := sv.dk.Run(ro)
+	if err != nil {
 		log.WithError(err).Warn("Failed to tag minion.")
 	}
 }
@@ -358,7 +360,8 @@ func (sv *supervisor) run(name string, args ...string) {
 		ro.VolumesFrom = []string{Ovsdb}
 	}
 
-	if err := sv.dk.Run(ro); err != nil {
+	_, err = sv.dk.Run(ro)
+	if err != nil {
 		log.WithError(err).Warnf("Failed to run %s.", name)
 	}
 }

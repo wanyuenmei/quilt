@@ -60,7 +60,7 @@ type ContainerSlice []Container
 
 // A Client to the local docker daemon.
 type Client interface {
-	Run(opts RunOptions) error
+	Run(opts RunOptions) (string, error)
 	Exec(name string, cmd ...string) error
 	ExecVerbose(name string, cmd ...string) ([]byte, error)
 	Remove(name string) error
@@ -110,14 +110,14 @@ func New(sock string) Client {
 	return docker{client, &sync.Mutex{}, map[string]struct{}{}}
 }
 
-func (dk docker) Run(opts RunOptions) error {
+func (dk docker) Run(opts RunOptions) (string, error) {
 	if opts.Name != "" {
 		_, err := dk.getID(opts.Name)
 		if err == errNoSuchContainer {
 			// Only log the first time we attempt to boot.
 			log.Infof("Start Container: %s", opts.Name)
 		} else if err != nil {
-			return err
+			return "", err
 		}
 	}
 
@@ -129,18 +129,18 @@ func (dk docker) Run(opts RunOptions) error {
 	}
 	id, err := dk.create(opts.Name, opts.Image, opts.Args, opts.Labels, opts.Env, &hc)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if err = dk.StartContainer(id, &hc); err != nil {
 		if _, ok := err.(*dkc.ContainerAlreadyRunning); ok {
-			return nil
+			return id, nil
 		}
 		dk.removeID(id) // Remove the container to avoid a zombie.
-		return err
+		return "", err
 	}
 
-	return nil
+	return id, nil
 }
 
 func (dk docker) Exec(name string, cmd ...string) error {

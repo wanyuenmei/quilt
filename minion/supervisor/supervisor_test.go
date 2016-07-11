@@ -475,14 +475,14 @@ type fakeDocker struct {
 	lswitches map[string]bool
 }
 
-func (f fakeDocker) Run(opts docker.RunOptions) error {
+func (f fakeDocker) Run(opts docker.RunOptions) (string, error) {
 	validateImage(opts.Name)
 	if _, ok := f.running[opts.Name]; ok {
-		return nil
+		return "", nil
 	}
 
 	f.running[opts.Name] = opts.Args
-	return nil
+	return "", nil
 }
 
 func (f fakeDocker) Exec(image string, cmd ...string) error {
