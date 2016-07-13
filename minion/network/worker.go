@@ -31,11 +31,6 @@ const (
 	innerMTU  int    = 1400
 )
 
-const (
-	// ovsPort parameters
-	ifaceTypePatch string = "patch"
-)
-
 // This represents a network namespace
 type nsInfo struct {
 	ns  string
@@ -65,19 +60,6 @@ type route struct {
 }
 
 type routeSlice []route
-
-// This represents a OVS port and its default interface
-type ovsPort struct {
-	name   string
-	bridge string
-
-	patch       bool // Is the interface of type patch?
-	peer        string
-	attachedMAC string
-	ifaceID     string
-}
-
-type ovsPortSlice []ovsPort
 
 // This represents a rule in the iptables
 type ipRule struct {
@@ -503,9 +485,8 @@ func generateTargetNatRules(containers []db.Container,
 }
 
 // There certain exceptions, as certain ports will never be deleted.
-func updatePorts(odb ovsdb.Ovsdb, containers []db.Container) {
+func updatePorts(odb ovsdb.Client, containers []db.Container) {
 	// An Open vSwitch patch port is referred to as a "port".
-
 	targetPorts := generateTargetPorts(containers)
 	currentPorts, err := generateCurrentPorts(odb)
 	if err != nil {
@@ -517,187 +498,90 @@ func updatePorts(odb ovsdb.Ovsdb, containers []db.Container) {
 		return struct {
 			name, bridge string
 		}{
-			name:   val.(ovsPort).name,
-			bridge: val.(ovsPort).bridge,
+			name:   val.(ovsdb.Interface).Name,
+			bridge: val.(ovsdb.Interface).Bridge,
 		}
 	}
 
 	pairs, lefts, rights := join.HashJoin(currentPorts, targetPorts, key, key)
 
 	for _, l := range lefts {
-		if l.(ovsPort).name == l.(ovsPort).bridge {
-			// The "bridge" port for the bridge should never be deleted
+		if l.(ovsdb.Interface).Type == ovsdb.InterfaceTypeGeneve ||
+			l.(ovsdb.Interface).Type == ovsdb.InterfaceTypeInternal {
+			// The "bridge" port and the geneve port should never be deleted.
 			continue
 		}
-		if err := delPort(odb, l.(ovsPort)); err != nil {
+		if err := odb.DeleteInterface(l.(ovsdb.Interface)); err != nil {
 			log.WithError(err).Error("failed to delete openflow port")
 			continue
 		}
 	}
 	for _, r := range rights {
-		if err := addPort(odb, r.(ovsPort)); err != nil {
+		if err := addPort(odb, r.(ovsdb.Interface)); err != nil {
 			log.WithError(err).Error("failed to add openflow port")
 			continue
 		}
 	}
 	for _, p := range pairs {
-		if err := modPort(odb, p.L.(ovsPort), p.R.(ovsPort)); err != nil {
+		l := p.L.(ovsdb.Interface)
+		r := p.R.(ovsdb.Interface)
+		if err := modPort(odb, l, r); err != nil {
 			log.WithError(err).Error("failed to modify openflow port")
 			continue
 		}
 	}
 }
 
-func generateTargetPorts(containers []db.Container) ovsPortSlice {
-	var configs ovsPortSlice
+func generateTargetPorts(containers []db.Container) ovsdb.InterfaceSlice {
+	var configs ovsdb.InterfaceSlice
 	for _, dbc := range containers {
 		_, vethOut := veths(dbc.DockerID)
 		peerBr, peerQuilt := patchPorts(dbc.DockerID)
-		configs = append(configs, ovsPort{
-			name:   vethOut,
-			bridge: quiltBridge,
+		configs = append(configs, ovsdb.Interface{
+			Name:   vethOut,
+			Bridge: quiltBridge,
 		})
-		configs = append(configs, ovsPort{
-			name:   peerQuilt,
-			bridge: quiltBridge,
-			patch:  true,
-			peer:   peerBr,
+		configs = append(configs, ovsdb.Interface{
+			Name:   peerQuilt,
+			Bridge: quiltBridge,
+			Type:   ovsdb.InterfaceTypePatch,
+			Peer:   peerBr,
 		})
-		configs = append(configs, ovsPort{
-			name:        peerBr,
-			bridge:      ovnBridge,
-			patch:       true,
-			peer:        peerQuilt,
-			attachedMAC: dbc.Mac,
-			ifaceID:     dbc.IP,
+		configs = append(configs, ovsdb.Interface{
+			Name:        peerBr,
+			Bridge:      ovnBridge,
+			Type:        ovsdb.InterfaceTypePatch,
+			Peer:        peerQuilt,
+			AttachedMAC: dbc.Mac,
+			IfaceID:     dbc.IP,
 		})
 	}
 	return configs
 }
 
-func generateCurrentPorts(odb ovsdb.Ovsdb) (ovsPortSlice, error) {
-	var configs ovsPortSlice
-	for _, bridge := range []string{quiltBridge, ovnBridge} {
-		ports, err := odb.ListOFPorts(bridge)
-		if err != nil {
-			return nil, fmt.Errorf("error listing ports on bridge %s: %s",
-				bridge, err)
-		}
-		for _, port := range ports {
-			cfg, err := populatePortConfig(odb, bridge, port)
-			if err != nil {
-				return nil, fmt.Errorf(
-					"error populating port config: %s", err)
-			}
-			configs = append(configs, *cfg)
-		}
-	}
-	return configs, nil
+func generateCurrentPorts(odb ovsdb.Client) (ovsdb.InterfaceSlice, error) {
+	return odb.ListInterfaces()
 }
 
-// XXX This should actually be done at the level of the ovsdb wrapper.
-// As in, you should only have to get the row once, and then populate a
-// struct with all necessary fields and have them be picked out into here
-func populatePortConfig(odb ovsdb.Ovsdb, bridge, port string) (
-	*ovsPort, error) {
-	config := &ovsPort{
-		name:   port,
-		bridge: bridge,
+func addPort(odb ovsdb.Client, iface ovsdb.Interface) error {
+	if err := odb.CreateInterface(iface.Bridge, iface.Name); err != nil {
+		log.WithError(err).Warning("error creating openflow port")
 	}
-
-	iface, err := odb.GetDefaultOFInterface(port)
-	if err != nil {
-		return nil, err
-	}
-
-	itype, err := odb.GetOFInterfaceType(iface)
-	if err != nil && !ovsdb.IsExist(err) {
-		return nil, err
-	} else if err == nil {
-		switch itype {
-		case "patch":
-			config.patch = true
-		}
-	}
-
-	peer, err := odb.GetOFInterfacePeer(iface)
-	if err != nil && !ovsdb.IsExist(err) {
-		return nil, err
-	} else if err == nil {
-		config.peer = peer
-	}
-
-	attachedMAC, err := odb.GetOFInterfaceAttachedMAC(iface)
-	if err != nil && !ovsdb.IsExist(err) {
-		return nil, err
-	} else if err == nil {
-		config.attachedMAC = attachedMAC
-	}
-
-	ifaceID, err := odb.GetOFInterfaceIfaceID(iface)
-	if err != nil && !ovsdb.IsExist(err) {
-		return nil, err
-	} else if err == nil {
-		config.ifaceID = ifaceID
-	}
-	return config, nil
+	return odb.ModifyInterface(iface)
 }
 
-func delPort(odb ovsdb.Ovsdb, config ovsPort) error {
-	if err := odb.DeleteOFPort(config.bridge, config.name); err != nil {
-		return fmt.Errorf("error deleting openflow port: %s", err)
+func modPort(odb ovsdb.Client, current ovsdb.Interface, target ovsdb.Interface) error {
+	if current.Type != target.Type ||
+		current.Peer != target.Peer ||
+		current.AttachedMAC != target.AttachedMAC ||
+		current.IfaceID != target.IfaceID {
+		return odb.ModifyInterface(target)
 	}
+
 	return nil
 }
 
-func addPort(odb ovsdb.Ovsdb, config ovsPort) error {
-	if err := odb.CreateOFPort(config.bridge, config.name); err != nil {
-		return fmt.Errorf("error creating openflow port: %s", err)
-	}
-
-	dummyPort := ovsPort{name: config.name, bridge: config.bridge}
-	if err := modPort(odb, dummyPort, config); err != nil {
-		return err
-	}
-	return nil
-}
-
-func modPort(odb ovsdb.Ovsdb, current ovsPort, target ovsPort) error {
-	if current.patch != target.patch && target.patch {
-		err := odb.SetOFInterfaceType(target.name, ifaceTypePatch)
-		if err != nil {
-			return fmt.Errorf("error setting interface %s to type %s: %s",
-				target.name, ifaceTypePatch, err)
-		}
-	}
-
-	if current.peer != target.peer && target.peer != "" {
-		err := odb.SetOFInterfacePeer(target.name, target.peer)
-		if err != nil {
-			return fmt.Errorf("error setting interface %s with peer %s: %s",
-				target.name, target.peer, err)
-		}
-	}
-
-	if current.attachedMAC != target.attachedMAC && target.attachedMAC != "" {
-		err := odb.SetOFInterfaceAttachedMAC(target.name, target.attachedMAC)
-		if err != nil {
-			return fmt.Errorf("error setting interface %s with mac %s: %s",
-				target.name, target.attachedMAC, err)
-		}
-	}
-
-	if current.ifaceID != target.ifaceID && target.ifaceID != "" {
-		err := odb.SetOFInterfaceIfaceID(target.name, target.ifaceID)
-		if err != nil {
-			return fmt.Errorf("error setting interface %s with id %s: %s",
-				target.name, target.ifaceID, err)
-		}
-	}
-	return nil
-}
-
-func updateDefaultGw(odb ovsdb.Ovsdb) {
+func updateDefaultGw(odb ovsdb.Client) {
 	currMac, err := getMac("", quiltBridge)
 	if err != nil {
 		log.WithError(err).Errorf("failed to get MAC for %s", quiltBridge)
@@ -878,7 +762,7 @@ func generateCurrentRoutes(namespace string) (routeSlice, error) {
 // bridge.  The Openflow tables are organized as follows.
 //
 //     - Table 0 will check for packets destined to an ip address of a label with MAC
-//     0A:00:00:00:00:00 (obtained by OVN faking out arp) and use the OF mulipath action
+//     0A:00:00:00:00:00 (obtained by OVN faking out arp) and use the OF multipath action
 //     to balance load packets across n links where n is the number of containers
 //     implementing the label.  This result is stored in NXM_NX_REG0. This is done using
 //     a symmetric l3/4 hash, so transport connections should remain intact.
@@ -888,7 +772,7 @@ func generateCurrentRoutes(namespace string) (routeSlice, error) {
 //
 // XXX: The multipath action doesn't perform well.  We should migrate away from it
 // choosing datapath recirculation instead.
-func updateOpenFlow(dk docker.Client, odb ovsdb.Ovsdb, containers []db.Container,
+func updateOpenFlow(dk docker.Client, odb ovsdb.Client, containers []db.Container,
 	labels []db.Label, connections []db.Connection) {
 	targetOF, err := generateTargetOpenFlow(dk, odb, containers, labels, connections)
 	if err != nil {
@@ -955,7 +839,7 @@ func generateCurrentOpenFlow(dk docker.Client) (OFRuleSlice, error) {
 // The target flows must be in the same format as the output from ovs-ofctl
 // dump-flows. To achieve this, we have some rather ugly hacks that handle
 // a few special cases.
-func generateTargetOpenFlow(dk docker.Client, odb ovsdb.Ovsdb,
+func generateTargetOpenFlow(dk docker.Client, odb ovsdb.Client,
 	containers []db.Container, labels []db.Label,
 	connections []db.Connection) (OFRuleSlice, error) {
 
@@ -970,13 +854,23 @@ func generateTargetOpenFlow(dk docker.Client, odb ovsdb.Ovsdb,
 		_, peerQuilt := patchPorts(dbc.DockerID)
 		dbcMac := dbc.Mac
 
-		ofQuilt, err := odb.GetOFPortNo(peerQuilt)
+		ifaces, err := odb.ListInterfaces()
 		if err != nil {
+			return nil, err
+		}
+
+		ifaceMap := make(map[string]int)
+		for _, iface := range ifaces {
+			ifaceMap[iface.Name] = iface.OFPort
+		}
+
+		ofQuilt, ok := ifaceMap[peerQuilt]
+		if !ok {
 			continue
 		}
 
-		ofVeth, err := odb.GetOFPortNo(vethOut)
-		if err != nil {
+		ofVeth, ok := ifaceMap[vethOut]
+		if !ok {
 			continue
 		}
 
@@ -1562,14 +1456,6 @@ func (iprs ipRuleSlice) Get(ii int) interface{} {
 
 func (iprs ipRuleSlice) Len() int {
 	return len(iprs)
-}
-
-func (ovsps ovsPortSlice) Get(ii int) interface{} {
-	return ovsps[ii]
-}
-
-func (ovsps ovsPortSlice) Len() int {
-	return len(ovsps)
 }
 
 func (rs routeSlice) Get(ii int) interface{} {

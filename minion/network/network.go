@@ -73,26 +73,27 @@ func runMaster(conn db.Conn) {
 		return
 	}
 
-	ovsdb, err := ovsdb.Open()
+	ovsdbClient, err := ovsdb.Open()
 	if err != nil {
 		log.WithError(err).Error("Failed to connect to OVSDB.")
 		return
 	}
-	defer ovsdb.Close()
+	defer ovsdbClient.Close()
 
-	ovsdb.CreateSwitch(lSwitch)
-	lportSlice, err := ovsdb.ListPorts(lSwitch)
+	ovsdbClient.CreateLogicalSwitch(lSwitch)
+	lports, err := ovsdbClient.ListLogicalPorts(lSwitch)
 	if err != nil {
 		log.WithError(err).Error("Failed to list OVN ports.")
 		return
 	}
 
-	// The garbageMap starts of containing every logical port in OVN.  As we find
+	// The garbageMap starts off containing every logical port in OVN.  As we find
 	// that these ports are still useful, they're deleted from garbageMap until only
-	// leftover garbage ports are remaining.  These are then deleted.
-	garbageMap := make(map[string]struct{})
-	for _, lport := range lportSlice {
-		garbageMap[lport.Name] = struct{}{}
+	// leftover garbage ports are remaining. These leftover logical ports are then
+	// deleted from ovsdb.
+	garbageMap := make(map[string]ovsdb.LPort)
+	for _, lport := range lports {
+		garbageMap[lport.Name] = lport
 	}
 
 	for _, dbl := range labels {
@@ -108,9 +109,10 @@ func runMaster(conn db.Conn) {
 		log.WithFields(log.Fields{
 			"IP": dbl.IP,
 		}).Info("New logical port.")
-		err := ovsdb.CreatePort(lSwitch, dbl.IP, labelMac, dbl.IP)
-		if err != nil {
-			log.WithError(err).Warnf("Failed to create port %s.", dbl.IP)
+
+		if err := ovsdbClient.CreateLogicalPort(lSwitch, dbl.Label, labelMac,
+			dbl.IP); err != nil {
+			log.WithError(err).Warnf("Failed to create port %s.", dbl.Label)
 		}
 	}
 
@@ -123,8 +125,9 @@ func runMaster(conn db.Conn) {
 		log.WithFields(log.Fields{
 			"IP": dbc.IP,
 		}).Info("New logical port.")
-		err := ovsdb.CreatePort("quilt", dbc.IP, dbc.Mac, dbc.IP)
-		if err != nil {
+
+		if err := ovsdbClient.CreateLogicalPort(lSwitch, dbc.IP, dbc.Mac,
+			dbc.IP); err != nil {
 			log.WithFields(log.Fields{
 				"error": err,
 				"name":  dbc.IP,
@@ -134,9 +137,9 @@ func runMaster(conn db.Conn) {
 
 	// Ports still in the map don't have a corresponding label otherwise they would
 	// have been deleted in the preceding loop.
-	for lport := range garbageMap {
-		log.Infof("Delete logical port %s.", lport)
-		if err := ovsdb.DeletePort(lSwitch, lport); err != nil {
+	for _, lport := range garbageMap {
+		log.Infof("Delete logical port %s.", lport.Name)
+		if err := ovsdbClient.DeleteLogicalPort(lSwitch, lport); err != nil {
 			log.WithError(err).Warn("Failed to delete logical port.")
 		}
 	}
@@ -205,7 +208,7 @@ func updateACLs(connections []db.Connection, labels []db.Label,
 		}
 	}
 
-	acls := make(map[ovsdb.AclCore]struct{})
+	coreACLs := make(map[ovsdb.AclCore]struct{})
 
 	// Drop all ip traffic by default.
 	new := ovsdb.AclCore{
@@ -213,14 +216,14 @@ func updateACLs(connections []db.Connection, labels []db.Label,
 		Match:     "ip",
 		Action:    "drop",
 		Direction: "to-lport"}
-	acls[new] = struct{}{}
+	coreACLs[new] = struct{}{}
 
 	new = ovsdb.AclCore{
 		Priority:  0,
 		Match:     "ip",
 		Action:    "drop",
 		Direction: "from-lport"}
-	acls[new] = struct{}{}
+	coreACLs[new] = struct{}{}
 
 	for match := range matchSet {
 		new = ovsdb.AclCore{
@@ -228,34 +231,31 @@ func updateACLs(connections []db.Connection, labels []db.Label,
 			Direction: "to-lport",
 			Action:    "allow",
 			Match:     match}
-		acls[new] = struct{}{}
+		coreACLs[new] = struct{}{}
 
 		new = ovsdb.AclCore{
 			Priority:  1,
 			Direction: "from-lport",
 			Action:    "allow",
 			Match:     match}
-		acls[new] = struct{}{}
+		coreACLs[new] = struct{}{}
 	}
 
 	for _, acl := range ovsdbACLs {
 		core := acl.Core
-		if _, ok := acls[core]; ok {
-			delete(acls, core)
+		if _, ok := coreACLs[core]; ok {
+			delete(coreACLs, core)
 			continue
 		}
 
-		err := ovsdbClient.DeleteACL(lSwitch, core.Direction, core.Priority,
-			core.Match)
-		if err != nil {
+		if err := ovsdbClient.DeleteACL(lSwitch, acl); err != nil {
 			log.WithError(err).Warn("Error deleting ACL")
 		}
 	}
 
-	for acl := range acls {
-		err := ovsdbClient.CreateACL(lSwitch, acl.Direction, acl.Priority,
-			acl.Match, acl.Action, false)
-		if err != nil {
+	for aclCore := range coreACLs {
+		if err := ovsdbClient.CreateACL(lSwitch, aclCore.Direction,
+			aclCore.Priority, aclCore.Match, aclCore.Action); err != nil {
 			log.WithError(err).Warn("Error adding ACL")
 		}
 	}
