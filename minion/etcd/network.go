@@ -13,10 +13,15 @@ import (
 	"github.com/NetSys/quilt/join"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/coreos/etcd/client"
 )
 
-const labelDir = "/minion/labels"
-const containerDir = "/minion/containers"
+const (
+	minionDir       = "/minion"
+	labelToIPStore  = minionDir + "/labelIP"
+	containerStore  = minionDir + "/container"
+	dockerToIPStore = minionDir + "/dockerIP"
+)
 
 // XXX: This really shouldn't live in here.  It's just a temporary measure, soon we'll
 // disentangle the etcd logic from the IP allocation logic.  At that point, we can ditch
@@ -27,15 +32,27 @@ const gatewayIP = "10.0.0.1"
 // Nondeterminism is hard to test.
 var rand32 = rand.Uint32
 
-// A directory containers the first and seceond level of a Tree requested from the
-// etcd store.
-type directory map[string]map[string]string
+// Keeping all the store data types in a struct makes it much less verbose to pass them
+// around while operating on them
+type storeData struct {
+	containers []storeContainer
+	dockerIPs  map[string]string
+	multiHost  map[string]string
+}
+
+type storeContainer struct {
+	DockerID string
+	Command  []string
+	Labels   []string
+	Env      map[string]string
+}
+
+type storeContainerSlice []storeContainer
 
 // wakeChan collapses the various channels these functions wait on into a single
 // channel. Multiple redundant pings will be coalesced into a single message.
 func wakeChan(conn db.Conn, store Store) chan struct{} {
-	labelWatch := store.Watch(labelDir, 1*time.Second)
-	containerWatch := store.Watch(labelDir, 1*time.Second)
+	minionWatch := store.Watch(minionDir, 1*time.Second)
 	trigg := conn.TriggerTick(30, db.MinionTable, db.ContainerTable, db.LabelTable,
 		db.EtcdTable).C
 
@@ -43,14 +60,13 @@ func wakeChan(conn db.Conn, store Store) chan struct{} {
 	go func() {
 		for {
 			select {
-			case <-labelWatch:
-			case <-containerWatch:
+			case <-minionWatch:
 			case <-trigg:
 			}
 
 			select {
 			case c <- struct{}{}:
-			default: // There's a notification in queue no need for another.
+			default: // There's a notification in queue, no need for another.
 			}
 		}
 	}()
@@ -58,67 +74,290 @@ func wakeChan(conn db.Conn, store Store) chan struct{} {
 	return c
 }
 
-func runNetworkWorker(conn db.Conn, store Store) {
-	// If the directories don't exist, create them so we may watch them.  If they
-	// exist already these will return an error that we won't log, but that's ok
-	// cause the loop will error too.
-	store.Mkdir(labelDir)
-	store.Mkdir(containerDir)
-
+func runNetwork(conn db.Conn, store Store) {
+	createMinionDir(store)
 	for range wakeChan(conn, store) {
-		labelDir, err := getDirectory(store, labelDir)
-		containerDir, err2 := getDirectory(store, containerDir)
-		if err2 != nil {
-			err = err2
-		}
-
+		// If the etcd read failed, we only want to update the db if it
+		// failed because a key was missing (has not been created yet).
+		// In all other cases, we skip this iteration.
+		etcdData, err := readEtcd(store)
 		if err != nil {
-			log.WithError(err).Warn("Failed to read from cluster store.")
-			continue
+			etcdErr, ok := err.(client.Error)
+			if !ok || etcdErr.Code != client.ErrorCodeKeyNotFound {
+				log.WithError(err).Error("Etcd transaction failed.")
+				continue
+			}
+			log.WithError(err).Info()
 		}
 
+		leader := false
+		var containers []db.Container
 		conn.Transact(func(view db.Database) error {
-			readContainerTransact(view, containerDir)
-			readLabelTransact(view, labelDir)
+			leader = view.EtcdLeader()
+			containers = view.SelectFromContainer(func(c db.Container) bool {
+				return c.DockerID != ""
+			})
+
+			// It would likely be more efficient to perform the etcd write
+			// outside of the DB transact. But, if we perform the writes
+			// after the transact, there is no way to ensure that the writes
+			// were successful before updating the DB with the information
+			// produced by the updateEtcd* functions (not considering the
+			// etcd writes they perform).
+			if leader {
+				etcdData, err = updateEtcd(store, etcdData, containers)
+				if err != nil {
+					log.WithError(err).Error("Etcd update failed.")
+					return nil
+				}
+			}
+
+			updateDBContainers(view, etcdData)
+			updateDBLabels(view, etcdData)
 			return nil
 		})
 	}
 }
 
-func readContainerTransact(view db.Database, dir directory) {
+func createMinionDir(store Store) {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		err := store.Mkdir(minionDir)
+		if err == nil {
+			return
+		}
+
+		// If the directory already exists, no need to create it
+		etcdErr, ok := err.(client.Error)
+		if ok && etcdErr.Code == client.ErrorCodeNodeExist {
+			log.WithError(etcdErr).Info()
+			return
+		}
+
+		log.WithError(err).Warn()
+		<-ticker.C
+	}
+}
+
+func readEtcd(store Store) (storeData, error) {
+	containers, err := store.Get(containerStore)
+	dockerIPs, err2 := store.Get(dockerToIPStore)
+	if err2 != nil {
+		err = err2
+	}
+
+	labels, err3 := store.Get(labelToIPStore)
+	if err3 != nil {
+		err = err3
+	}
+
+	etcdContainerSlice := []storeContainer{}
+	dockerMap := map[string]string{}
+	multiHostMap := map[string]string{}
+
+	// Failed store reads will just be skipped by Unmarshal, which is fine
+	// since an error is returned
+	json.Unmarshal([]byte(containers), &etcdContainerSlice)
+	json.Unmarshal([]byte(dockerIPs), &dockerMap)
+	json.Unmarshal([]byte(labels), &multiHostMap)
+
+	return storeData{etcdContainerSlice, dockerMap, multiHostMap}, err
+}
+
+func updateEtcd(s Store, etcdData storeData, containers []db.Container) (storeData,
+	error) {
+
+	if etcdData, err := updateEtcdContainer(s, etcdData, containers); err != nil {
+		return etcdData, err
+	}
+
+	if etcdData, err := updateEtcdDocker(s, etcdData, containers); err != nil {
+		return etcdData, err
+	}
+
+	if etcdData, err := updateEtcdLabel(s, etcdData, containers); err != nil {
+		return etcdData, err
+	}
+
+	return etcdData, nil
+}
+
+func updateEtcdContainer(s Store, etcdData storeData, containers []db.Container) (
+	storeData, error) {
+
+	dbContainerSlice := []storeContainer{}
+	for _, c := range containers {
+		sc := storeContainer{
+			DockerID: c.DockerID,
+			Command:  c.Command,
+			Labels:   c.Labels,
+			Env:      c.Env,
+		}
+		dbContainerSlice = append(dbContainerSlice, sc)
+	}
+	sort.Sort(storeContainerSlice(dbContainerSlice))
+
+	dbContainers, _ := json.Marshal(dbContainerSlice)
+	jsonContainers, _ := json.Marshal(etcdData.containers)
+	if string(dbContainers) == string(jsonContainers) {
+		return etcdData, nil
+	}
+
+	if err := s.Set(containerStore, string(dbContainers)); err != nil {
+		return etcdData, err
+	}
+
+	etcdData.containers = dbContainerSlice
+	return etcdData, nil
+}
+
+func updateEtcdDocker(s Store, etcdData storeData, containers []db.Container) (storeData,
+	error) {
+
+	newDockerMap := map[string]string{}
+	for _, c := range containers {
+		newDockerMap[c.DockerID] = ""
+	}
+
+	// Etcd is the source of truth for IPs, so sync the DB and ensure that it is up
+	// to date. It's simpler to update the db since it may have containers that etcd
+	// doesn't know about.
+	for id, ip := range etcdData.dockerIPs {
+		if _, ok := newDockerMap[id]; ok {
+			newDockerMap[id] = ip
+		}
+	}
+	syncIPs(newDockerMap, net.IPv4(10, 0, 0, 0))
+
+	if stringMapEquals(etcdData.dockerIPs, newDockerMap) {
+		return etcdData, nil
+	}
+
+	dbDockerIP, _ := json.Marshal(newDockerMap)
+	if err := s.Set(dockerToIPStore, string(dbDockerIP)); err != nil {
+		return etcdData, err
+	}
+
+	etcdData.dockerIPs = newDockerMap
+	return etcdData, nil
+}
+
+func updateEtcdLabel(s Store, etcdData storeData, containers []db.Container) (storeData,
+	error) {
+
+	// Collect a map of labels to all of the containers that have that label.
+	labelContainers := map[string][]db.Container{}
+	for _, c := range containers {
+		for _, l := range c.Labels {
+			labelContainers[l] = append(labelContainers[l], c)
+		}
+	}
+
+	newMultiHosts := map[string]string{}
+
+	// Gather the multihost containers and set the IPs of non-multihost containers
+	// at the same time. The single host IPs are retrieved from the map of container
+	// IPs that updateEtcdDocker created.
+	for label, cs := range labelContainers {
+		if len(cs) > 1 {
+			newMultiHosts[label] = ""
+		}
+	}
+
+	// Etcd is the source of truth for IPs. If the label exists in both etcd and the
+	// db and it is a multihost label, then assign it the IP that etcd has.
+	// Otherwise, it stays unassigned and syncIPs will take care of it.
+	for id := range newMultiHosts {
+		if ip, ok := etcdData.multiHost[id]; ok {
+			newMultiHosts[id] = ip
+		}
+	}
+
+	// No need to sync the SingleHost IPs, since they get their IPs from the dockerIP
+	// map, which was already synced in updateEtcdDocker
+	syncIPs(newMultiHosts, net.IPv4(10, 1, 0, 0))
+
+	if stringMapEquals(newMultiHosts, etcdData.multiHost) {
+		return etcdData, nil
+	}
+
+	newLabelJSON, _ := json.Marshal(newMultiHosts)
+	if err := s.Set(labelToIPStore, string(newLabelJSON)); err != nil {
+		return etcdData, err
+	}
+
+	etcdData.multiHost = newMultiHosts
+	return etcdData, nil
+}
+
+func updateDBContainers(view db.Database, etcdData storeData) {
 	minion, err := view.MinionSelf()
 	worker := err == nil && minion.Role == db.Worker
 
-	for _, container := range view.SelectFromContainer(nil) {
-		container.IP = ""
-		var labels []string
-		if children, ok := dir[container.DockerID]; ok {
-			json.Unmarshal([]byte(children["Labels"]), &labels)
+	etcdKey := func(sc interface{}) interface{} {
+		return sc.(storeContainer).DockerID
+	}
+	dbKey := func(c interface{}) interface{} {
+		return c.(db.Container).DockerID
+	}
 
-			container.IP = children["IP"]
-			ip := net.ParseIP(container.IP).To4()
+	pairs, dbcs, _ := join.HashJoin(db.ContainerSlice(view.SelectFromContainer(nil)),
+		storeContainerSlice(etcdData.containers), dbKey, etcdKey)
+
+	// If etcd hasn't heard of the container, clear its IP
+	for _, dbc := range dbcs {
+		c := dbc.(db.Container)
+		c.IP = ""
+		view.Commit(c)
+	}
+
+	for _, pair := range pairs {
+		dbc := pair.L.(db.Container)
+		dbc.IP = ""
+
+		// Workers get their info from Etcd
+		if worker {
+			etcdc := pair.R.(storeContainer)
+			dbc.Labels = etcdc.Labels
+			dbc.Command = etcdc.Command
+			dbc.Env = etcdc.Env
+		}
+
+		// Workers and masters get their IP from Etcd
+		if storeIP, ok := etcdData.dockerIPs[dbc.DockerID]; ok {
+			dbc.IP = storeIP
+			ip := net.ParseIP(storeIP).To4()
 			if ip != nil {
-				container.Mac = fmt.Sprintf("02:00:%02x:%02x:%02x:%02x",
+				dbc.Mac = fmt.Sprintf("02:00:%02x:%02x:%02x:%02x",
 					ip[0], ip[1], ip[2], ip[3])
 			}
 		}
 
-		if worker {
-			// Masters get their labels from the policy, workers from the
-			// etcd store.
-			container.Labels = labels
-		}
-
-		view.Commit(container)
+		view.Commit(dbc)
 	}
 }
 
-func readLabelTransact(view db.Database, dir directory) {
-	lKey := func(val interface{}) interface{} {
+func updateDBLabels(view db.Database, etcdData storeData) {
+	// Gather all of the label keys and the IPs for single host labels
+	labelIPs := map[string]string{}
+	labelKeys := join.StringSlice{}
+	for _, c := range etcdData.containers {
+		for _, l := range c.Labels {
+			labelKeys = append(labelKeys, l)
+			if _, ok := etcdData.multiHost[l]; !ok {
+				labelIPs[l] = etcdData.dockerIPs[c.DockerID]
+			}
+		}
+	}
+
+	labelKeyFunc := func(val interface{}) interface{} {
 		return val.(db.Label).Label
 	}
+
 	pairs, dbls, dirKeys := join.HashJoin(db.LabelSlice(view.SelectFromLabel(nil)),
-		join.StringSlice(dir.keys()), lKey, nil)
+		labelKeys, labelKeyFunc, nil)
 
 	for _, dbl := range dbls {
 		view.Remove(dbl.(db.Label))
@@ -131,186 +370,28 @@ func readLabelTransact(view db.Database, dir directory) {
 	for _, pair := range pairs {
 		dbl := pair.L.(db.Label)
 		dbl.Label = pair.R.(string)
-		dbl.IP = dir[dbl.Label]["IP"]
-		_, dbl.MultiHost = dir[dbl.Label]["MultiHost"]
+		if _, ok := etcdData.multiHost[dbl.Label]; ok {
+			dbl.IP = etcdData.multiHost[dbl.Label]
+			dbl.MultiHost = true
+		} else {
+			dbl.IP = labelIPs[dbl.Label]
+			dbl.MultiHost = false
+		}
+
 		view.Commit(dbl)
 	}
 }
 
-func runNetworkMaster(conn db.Conn, store Store) {
-	for range wakeChan(conn, store) {
-		leader := false
-		var containers []db.Container
-		conn.Transact(func(view db.Database) error {
-			leader = view.EtcdLeader()
-			containers = view.SelectFromContainer(nil)
-			return nil
-		})
-
-		if !leader {
-			continue
-		}
-
-		if err := writeStoreContainers(store, containers); err != nil {
-			log.WithError(err).Warning("Failed to update containers in ETCD")
-		}
-
-		writeStoreLabels(store, containers)
-	}
-}
-
-func writeStoreContainers(store Store, containers []db.Container) error {
-	var ids []string
-	for _, container := range containers {
-		if container.DockerID != "" {
-			ids = append(ids, container.DockerID)
-		}
-	}
-
-	store.Mkdir(containerDir)
-	dir, err := getDirectory(store, containerDir)
-	if err != nil {
-		return err
-	}
-
-	syncDir(store, dir, containerDir, ids)
-	syncIPs(store, dir, containerDir, net.IPv4(10, 0, 0, 0))
-	syncLabels(store, dir, containerDir, containers)
-
-	return nil
-}
-
-func writeStoreLabels(store Store, containers []db.Container) error {
-	store.Mkdir(labelDir)
-	dir, err := getDirectory(store, labelDir)
-	if err != nil {
-		return err
-	}
-
-	var ids []string
-	for _, c := range containers {
-		for _, l := range c.Labels {
-			ids = append(ids, l)
-		}
-	}
-
-	syncDir(store, dir, labelDir, ids)
-
-	// Labels that point to a single container don't need IPs separate from their
-	// constituent container IP.  Thus the following code marks those labels, by the
-	// absence of the `MultiHost` file in the etcd store, and sets their IP to
-	// whatever is found in the container table.
-
-	// Map from each label to the containers that implement it.
-	labelMap := map[string][]db.Container{}
-	for _, dbc := range containers {
-		for _, label := range dbc.Labels {
-			labelMap[label] = append(labelMap[label], dbc)
-		}
-	}
-
-	// Mark labels as MultiHost if they have more than one container.
-	for label, dbcs := range labelMap {
-		isMH := len(dbcs) > 1
-		if _, ok := dir[label]["MultiHost"]; ok == isMH {
-			continue
-		}
-
-		var err error
-		path := fmt.Sprintf("%s/%s/MultiHost", labelDir, label)
-		if isMH {
-			dir[label]["MultiHost"] = "true"
-			err = store.Set(path, "true")
-		} else {
-			delete(dir[label], "MultiHost")
-			err = store.Delete(path)
-		}
-
-		if err != nil {
-			log.WithFields(log.Fields{
-				"label": label,
-				"error": err,
-			}).Warn("Failed to change MultiHost key.")
-		}
-	}
-
-	// Set the IPs of the non-MultiHost containers.
-	for label, dbcs := range labelMap {
-		if len(dbcs) != 1 {
-			continue
-		}
-
-		dbc := dbcs[0]
-		if dbc.IP == "" || dir[label]["IP"] == dbc.IP {
-			continue
-		}
-
-		path := fmt.Sprintf("%s/%s/IP", labelDir, label)
-		if err := store.Set(path, dbc.IP); err != nil {
-			log.WithFields(log.Fields{
-				"label": label,
-				"IP":    dbc.IP,
-				"error": err,
-			}).Warn("etcd store failed set label IP.")
-		}
-	}
-
-	// Remove the non-MultiHost containers from `dir` to avoid confusing syncIPs.
-	for label, mp := range dir {
-		if _, ok := mp["MultiHost"]; !ok {
-			delete(dir, label)
-		}
-	}
-
-	syncIPs(store, dir, labelDir, net.IPv4(10, 1, 0, 0))
-	return nil
-}
-
-func syncDir(store Store, dir directory, path string, idsArg []string) {
-	_, dirKeys, ids := join.HashJoin(join.StringSlice(dir.keys()),
-		join.StringSlice(idsArg), nil, nil)
-
-	var etcdLog string
-	for _, dirKey := range dirKeys {
-		id := dirKey.(string)
-		keyPath := fmt.Sprintf("%s/%s", path, id)
-		err := store.Delete(keyPath)
-		if err != nil {
-			etcdLog = fmt.Sprintf("Failed to delete %s: %s", keyPath, err)
-		}
-		delete(dir, id)
-	}
-
-	for _, idElem := range ids {
-		id := idElem.(string)
-		if _, ok := dir[id]; ok {
-			continue
-		}
-
-		key := fmt.Sprintf("%s/%s", path, id)
-		if err := store.Mkdir(key); err != nil {
-			etcdLog = fmt.Sprintf("Failed to create dir %s: %s", key, err)
-			continue
-		}
-		dir[id] = map[string]string{}
-	}
-
-	// Etcd failure leads to a bunch of useless errors.  Therefore we only log once.
-	if etcdLog != "" {
-		log.Error(etcdLog)
-	}
-}
-
-// syncIPs() takes a directory and creates an IP node for every entry that's missing
-// one.
-func syncIPs(store Store, dir directory, path string, prefixIP net.IP) {
+// syncIPs takes a map of IDs to IPs and creates an IP address for every entry that's
+// missing one.
+func syncIPs(ipMap map[string]string, prefixIP net.IP) {
 	prefix := binary.BigEndian.Uint32(prefixIP.To4())
 	mask := uint32(0xffff0000)
 
 	var unassigned []string
 	ipSet := map[uint32]struct{}{}
-	for k, m := range dir {
-		ip := parseIP(m["IP"], prefix, mask)
+	for k, ipString := range ipMap {
+		ip := parseIP(ipString, prefix, mask)
 		if ip != 0 {
 			ipSet[ip] = struct{}{}
 		} else {
@@ -320,88 +401,20 @@ func syncIPs(store Store, dir directory, path string, prefixIP net.IP) {
 
 	// Don't assign the IP of the default gateway
 	ipSet[parseIP(gatewayIP, prefix, mask)] = struct{}{}
-	var etcdLog string
 	for _, k := range unassigned {
 		ip32 := randomIP(ipSet, prefix, mask)
-		ipPath := fmt.Sprintf("%s/%s/IP", path, k)
 		if ip32 == 0 {
 			log.Errorf("Failed to allocate IP for %s.", k)
-			store.Delete(ipPath)
-			delete(dir[k], "IP")
+			ipMap[k] = ""
 			continue
 		}
 
 		b := make([]byte, 4)
 		binary.BigEndian.PutUint32(b, ip32)
 
-		ipStr := net.IP(b).String()
-		if err := store.Set(ipPath, ipStr); err != nil {
-			etcdLog = fmt.Sprintf("Failed to set key %s: %s", ipPath, err)
-			continue
-		}
-
-		dir[k]["IP"] = ipStr
+		ipMap[k] = net.IP(b).String()
 		ipSet[ip32] = struct{}{}
 	}
-
-	// Etcd failure leads to a bunch of useless errors.  Therefore we only log once.
-	if etcdLog != "" {
-		log.Error(etcdLog)
-	}
-}
-
-func syncLabels(store Store, dir directory, path string,
-	containers []db.Container) {
-
-	idLabelMap := map[string][]string{}
-	for _, container := range containers {
-		if container.DockerID != "" {
-			idLabelMap[container.DockerID] = container.Labels
-		}
-	}
-
-	for id, children := range dir {
-		labels := idLabelMap[id]
-		if labels == nil {
-			labels = []string{}
-		}
-		sort.Sort(sort.StringSlice(labels))
-
-		jsByte, err := json.Marshal(labels)
-		if err != nil {
-			panic("Not Reached")
-		}
-		js := string(jsByte)
-
-		if js == children["Labels"] {
-			continue
-		}
-
-		key := fmt.Sprintf("%s/%s/Labels", path, id)
-		if err := store.Set(key, js); err != nil {
-			log.WithField("path", path).Error("Failed to set label key.")
-			continue
-		}
-		dir[id]["Labels"] = js
-	}
-}
-
-func getDirectory(store Store, path string) (directory, error) {
-	tree, err := store.GetTree(path)
-	if err != nil {
-		return nil, err
-	}
-
-	dir := make(directory)
-	for _, l1 := range tree.Children {
-		childMap := make(map[string]string)
-		for _, l2 := range l1.Children {
-			childMap[l2.Key] = l2.Value
-		}
-		dir[l1.Key] = childMap
-	}
-
-	return dir, nil
 }
 
 func parseIP(ipStr string, prefix, mask uint32) uint32 {
@@ -431,10 +444,42 @@ func randomIP(conflicts map[uint32]struct{}, prefix, mask uint32) uint32 {
 	return 0
 }
 
-func (dir directory) keys() []string {
-	var keys []string
-	for key := range dir {
-		keys = append(keys, key)
+func stringMapEquals(first, second map[string]string) bool {
+	if len(first) != len(second) {
+		return false
 	}
-	return keys
+	for k, f := range first {
+		if s, ok := second[k]; !ok || f != s {
+			return false
+		}
+	}
+	return true
+}
+
+func stringSliceEquals(first, second []string) bool {
+	if len(first) != len(second) {
+		return false
+	}
+	for i, s := range first {
+		if s != second[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func (cs storeContainerSlice) Len() int {
+	return len(cs)
+}
+
+func (cs storeContainerSlice) Less(i, j int) bool {
+	return cs[i].DockerID < cs[j].DockerID
+}
+
+func (cs storeContainerSlice) Swap(i, j int) {
+	cs[i], cs[j] = cs[j], cs[i]
+}
+
+func (cs storeContainerSlice) Get(i int) interface{} {
+	return cs[i]
 }

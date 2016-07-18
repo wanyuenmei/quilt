@@ -17,15 +17,21 @@ import (
 // specifically that we don't respect ttl a the moment.
 type mock struct {
 	*sync.Mutex
-	root Tree
+	root   Tree
+	writes *int
+	reads  *int
 }
 
 // NewMock creates a new mock etcd store for use of the unit tests.
 func NewMock() Store {
-	m := mock{}
+	m := mock{writes: new(int), reads: new(int)}
 	m.Mutex = &sync.Mutex{}
 	m.root.Children = make(map[string]Tree)
 	return m
+}
+
+func newTestMock() mock {
+	return NewMock().(mock)
 }
 
 func (m mock) Watch(path string, rateLimit time.Duration) chan struct{} {
@@ -60,6 +66,7 @@ func (m mock) Create(path, value string, ttl time.Duration) error {
 }
 
 func (m mock) create(path, value string, ttl time.Duration) error {
+	*m.writes++
 	tree, node, err := m.createPrefix(path)
 	if err != nil {
 		return err
@@ -80,6 +87,7 @@ func (m mock) Update(path, value string, ttl time.Duration) error {
 }
 
 func (m mock) update(path, value string, ttl time.Duration) error {
+	*m.writes++
 	tree, node, err := m.createPrefix(path)
 	if err != nil {
 		return err
@@ -130,6 +138,7 @@ func (m mock) GetTree(path string) (Tree, error) {
 }
 
 func (m mock) getTree(path string) (Tree, error) {
+	*m.reads++
 	if path == "/" {
 		return m.root, nil
 	}

@@ -8,6 +8,5 @@ func Run(conn db.Conn) {
 	<-store.BootWait()
 
 	go runElection(conn, store)
-	go runNetworkMaster(conn, store)
-	runNetworkWorker(conn, store)
+	runNetwork(conn, store)
 }
