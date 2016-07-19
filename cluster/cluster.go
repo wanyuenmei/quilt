@@ -34,14 +34,18 @@ func Run(conn db.Conn) {
 			dbCluster, err = db.GetCluster()
 			return err
 		})
+		if err != nil {
+			continue
+		}
 
-		if err == nil && clst.namespace != dbCluster.Namespace {
-			if clst != nil {
-				clst.fm.stop()
-				clst.trigger.Stop()
-			}
+		if clst == nil {
 			clst = newCluster(conn, dbCluster.Namespace)
-			go clst.listen()
+		}
+
+		if clst != nil && clst.namespace != dbCluster.Namespace {
+			clst.fm.stop()
+			clst.trigger.Stop()
+			clst = newCluster(conn, dbCluster.Namespace)
 		}
 	}
 }
@@ -64,6 +68,7 @@ func newCluster(conn db.Conn, namespace string) *cluster {
 		}
 	}
 
+	go clst.listen()
 	return clst
 }
 
