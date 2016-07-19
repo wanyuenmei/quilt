@@ -79,7 +79,7 @@ func DefaultRegion(m db.Machine) db.Machine {
 	case "Google":
 		region = "us-east1-b"
 	case "Azure":
-		region = "Central US"
+		region = "centralus"
 	case "Vagrant":
 	default:
 		panic(fmt.Sprintf("Unknown Cloud Provider: %s", m.Provider))

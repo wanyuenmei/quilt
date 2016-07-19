@@ -33,7 +33,7 @@ func TestDefaultRegion(t *testing.T) {
 
 	m.Region = ""
 	m.Provider = "Azure"
-	exp = "Central US"
+	exp = "centralus"
 	m = DefaultRegion(m)
 	if m.Region != exp {
 		t.Errorf("expected %s, found %s", exp, m.Region)
