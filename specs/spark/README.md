@@ -4,16 +4,11 @@ boot time. Specifically, we'll be running the SparkPI example to calculate the
 value of π on our Quilt Spark cluster.
 
 ## Configuring QUILT_PATH
-Quilt uses the `QUILT_PATH` environment variable to locate packages.
+Quilt uses the `QUILT_PATH` environment variable to locate packages. See the
+[Stitch language spec](../../docs/Stitch.md#quilt_path) for instructions on
+setting up your `QUILT_PATH`.
 
-Execute the following export commands in your terminal to allow Quilt to locate
-Quilt Spark:
-```bash
-quilt=$GOPATH/src/github.com/NetSys/quilt
-export QUILT_PATH=$quilt/specs:$quilt/specs/spark:$quilt/specs/zookeeper
-```
-It would be a good idea to add these commands to your `.bashrc` (or appropriate
-dotfile) so that they don't have to be run again.
+To fetch the specs that come with `quilt`, execute `quilt get github.com/NetSys/quilt`.
 
 ## SparkPi
 The example SparkPi program distributes the computationally-intensive task of
@@ -40,7 +35,7 @@ If you are sharing a computing cluster with others, it would be a good idea to
 change `(define Namespace "CHANGE_ME")` to a different name.
 
 ### Build `sparkPI.spec`
-Execute `quilt run $GOPATH/github.com/NetSys/Quilt/specs/spark/sparkPI.spec` to
+Execute `quilt run github.com/NetSys/quilt/specs/spark/sparkPI.spec` to
 build this Stitch specification.
 
 Quilt will now begin provisioning several VMs on your cloud provider. Five VMs
@@ -93,7 +88,7 @@ containers are still being downloaded.
 ### Recovering Pi
 Once our Master Spark container is up, we can connect to it to find the results of
 our SparkPi job! The results are located in the log of the Master container. In
-the output above, our Master container's name is `ip-172-31-7-86/jovial_poincare`.
+the output above, our Master container's name is `ip-172-31-8-88/berserk_ptolemy`.
 
 Execute `swarm logs <MASTER_CONTAINER_NAME>`. After
 scrolling through Spark's info logging, we will find the result of SparkPi:
