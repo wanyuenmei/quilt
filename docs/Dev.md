@@ -121,18 +121,15 @@ image, and not the default Quilt minion image.  To do that, follow these steps:
 
 1. Create a new empty repository on your favorite registry -
 [docker hub](https://hub.docker.com/) for example.
-2. Modify `minionImage` in [cloud_config.go](provider/cloud_config.go) to point to your repo.
+2. Modify `quiltImage` in [cloud_config.go](../cluster/provider/cloud_config.go) to point to your repo.
 3. Create a `.mk` file (for example: `local.mk`) to override variables
-defined in [Makefile](Makefile). Set `REPO` to your own repository
+defined in [Makefile](../Makefile). Set `REPO` to your own repository
 (for example: `REPO = sample_repo`) inside the `.mk` file you created.
 4. Create the docker image: `make docker-build-minion`
-   * Since Docker requires certain Linux features, you can't run Docker
-   natively on OS X or other non-Linux boxes. A simple workaround is Docker's
-   [Docker Quickstart Terminal](https://docs.docker.com/mac/step_one/) which
-   provides you with a simple way to set up an appropriate environment.
+   * Docker for Mac and Windows is in beta. See the
+   [docs](https://docs.docker.com/) for install instructions.
 5. Sign in to your image registry using `docker login`.
-6. Push your image: `make docker-push-minion`. There is also a combined
-make target called `make docker-minion` which builds and pushes.
+6. Push your image: `make docker-push-minion`.
 
 After the above setup, you're good to go - just remember to build and push your
 image first, whenever you want to run the `minion` with your latest changes.
