@@ -10,6 +10,6 @@
 (define AdminACL (list "local"))
 
 (let ((cfg (list (provider "Amazon")
-		 (githubKey "<YOUR_GITHUB_USERNAME>"))))
+		 (githubKey "YOUR_GITHUB_USERNAME"))))
      (makeList 1 (machine (role "Master") cfg))
      (makeList count (machine (role "Worker") cfg)))

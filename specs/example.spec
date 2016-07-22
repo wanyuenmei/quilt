@@ -10,7 +10,7 @@
 
 // We will apply this configuration to each VM.
 (define machineCfg (list (provider Provider)
-                         (githubKey "ejj"))) // Change Me.
+                         (githubKey "YOUR_GITHUB_USERNAME"))) // Change Me.
 
 // Declare Master and Worker Machines.
 (makeList 1 (machine (role "Master") machineCfg))

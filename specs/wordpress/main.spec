@@ -27,7 +27,7 @@
           (region "us-west-2")
           (size "m4.large")
           (diskSize 32)
-          (githubKey "nlsun"))))
+          (githubKey "YOUR_GITHUB_USERNAME"))))
 
 (let ((prefix "di")
       (nMemcached 2)

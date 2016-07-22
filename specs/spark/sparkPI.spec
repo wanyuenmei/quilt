@@ -25,7 +25,7 @@
 		 (region "us-west-1")
 		 (size "m4.2xlarge")
 		 (diskSize 32)
-		 (githubKey "<YOUR_GITHUB_USERNAME>"))))
+		 (githubKey "YOUR_GITHUB_USERNAME"))))
      (makeList 1 (machine (role "Master") cfg))
      (makeList (+ 1 nWorker) (machine (role "Worker") cfg)))
 

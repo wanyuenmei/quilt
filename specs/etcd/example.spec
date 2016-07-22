@@ -14,6 +14,6 @@
   (cpu 2)
   (ram 2)
   (diskSize 32)
-  (githubKey "<YOUR_GITHUB_USERNAME>"))))
+  (githubKey "YOUR_GITHUB_USERNAME"))))
     (makeList 1 (machine (role "Master") cfg))
     (makeList nWorker (machine (role "Worker") cfg)))
