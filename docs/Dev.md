@@ -112,10 +112,13 @@ To generate the protobufs simply call:
     make generate
 
 ## Dependencies
-We use [Godep](https://github.com/tools/godep) as dependency vendoring tool. To add a
-new dependency, make sure `GO15VENDOREXPERIMENT` is set to 1, then run:
+We use [Godep](https://github.com/tools/godep) as dependency vendoring tool. If you are
+using Go 1.6 or later versions, to add or to update dependencies, check out
+[here](https://github.com/tools/godep#add-a-dependency). If you are using Go 1.5, to
+add a new dependency, make sure `GO15VENDOREXPERIMENT` is set to 1, then run:
 
-1. `godep restore` to install the package versions specified in `Godeps/Godeps.json` to your `$GOPATH`
+1. `godep restore` to install the package versions specified in `Godeps/Godeps.json`
+to your `$GOPATH`
 2. Run `go get foo/bar`
 3. Edit your code to import foo/bar
 4. Run `godep save ./...`
@@ -126,7 +129,8 @@ image, and not the default Quilt minion image.  To do that, follow these steps:
 
 1. Create a new empty repository on your favorite registry -
 [docker hub](https://hub.docker.com/) for example.
-2. Modify `quiltImage` in [cloud_config.go](../cluster/provider/cloud_config.go) to point to your repo.
+2. Modify `quiltImage` in [cloud_config.go](../cluster/provider/cloud_config.go) to
+point to your repo.
 3. Create a `.mk` file (for example: `local.mk`) to override variables
 defined in [Makefile](../Makefile). Set `REPO` to your own repository
 (for example: `REPO = sample_repo`) inside the `.mk` file you created.
