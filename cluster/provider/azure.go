@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/NetSys/quilt/constants"
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/join"
 	"github.com/NetSys/quilt/stitch"
@@ -247,10 +248,7 @@ func (clst *azureCluster) Stop(machines []Machine) error {
 
 func (clst *azureCluster) ChooseSize(ram stitch.Range, cpu stitch.Range,
 	maxPrice float64) string {
-	// XXX: Use ExtraLarge by default because we haven't scraped the CPU and RAM
-	// information yet.
-
-	return "ExtraLarge"
+	return pickBestSize(constants.AzureDescriptions, ram, cpu, maxPrice)
 }
 
 func (clst *azureCluster) loadCredentials() (*azureCredentials, error) {
