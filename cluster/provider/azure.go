@@ -21,7 +21,6 @@ import (
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/Azure/azure-sdk-for-go/arm/resources/resources"
 	"github.com/Azure/azure-sdk-for-go/arm/storage"
-	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 
 	uuid "github.com/satori/go.uuid"
@@ -42,74 +41,13 @@ const (
 	vnetSubnetAddressPrefix = "10.0.0.0/8"
 )
 
-// This is simply a wrapper around all the Azure calls. This makes it very easy to mock
-// during testing or as needed.
-type azureAPI interface {
-	ifaceCreate(rgName string, ifaceName string, param network.Interface,
-		cancel <-chan struct{}) (result autorest.Response, err error)
-	ifaceDelete(rgName string, ifaceName string, cancel <-chan struct{}) (
-		result autorest.Response, err error)
-	ifaceGet(rgName string, ifaceName string, expand string) (
-		result network.Interface, err error)
-
-	publicIPCreate(rgName string, pipAddrName string, param network.PublicIPAddress,
-		cancel <-chan struct{}) (result autorest.Response, err error)
-	publicIPDelete(rgName string, pipAddrName string, cancel <-chan struct{}) (
-		result autorest.Response, err error)
-	publicIPGet(rgName string, pipAddrName string, expand string) (
-		result network.PublicIPAddress, err error)
-
-	securityGroupCreate(rgName string, nsgName string, param network.SecurityGroup,
-		cancel <-chan struct{}) (result autorest.Response, err error)
-	securityGroupList(rgName string) (result network.SecurityGroupListResult,
-		err error)
-
-	securityRuleCreate(rgName string, nsgName string, ruleName string,
-		ruleParam network.SecurityRule, cancel <-chan struct{}) (
-		result autorest.Response, err error)
-	securityRuleDelete(rgName string, nsgName string, ruleName string,
-		cancel <-chan struct{}) (result autorest.Response, err error)
-	securityRuleList(rgName string, nsgName string) (
-		result network.SecurityRuleListResult, err error)
-
-	vnetCreate(rgName string, vnName string, param network.VirtualNetwork,
-		cancel <-chan struct{}) (result autorest.Response, err error)
-	vnetList(rgName string) (result network.VirtualNetworkListResult, err error)
-
-	rgCreate(rgName string, param resources.ResourceGroup) (
-		result resources.ResourceGroup, err error)
-	rgDelete(rgName string, cancel <-chan struct{}) (result autorest.Response,
-		err error)
-
-	storageListByRg(rgName string) (result storage.AccountListResult, err error)
-	storageCheckName(accountName storage.AccountCheckNameAvailabilityParameters) (
-		result storage.CheckNameAvailabilityResult, err error)
-	storageCreate(rgName string, accountName string,
-		param storage.AccountCreateParameters, cancel <-chan struct{}) (
-		result autorest.Response, err error)
-	storageGet(rgName string, accountName string) (result storage.Account, err error)
-
-	vmCreate(rgName string, vmName string, param compute.VirtualMachine,
-		cancel <-chan struct{}) (result autorest.Response, err error)
-	vmDelete(rgName string, vmName string, cancel <-chan struct{}) (
-		result autorest.Response, err error)
-	vmList(rgName string) (result compute.VirtualMachineListResult, err error)
-}
-
-type azureClient struct {
-	ifaceClient    network.InterfacesClient
-	publicIPClient network.PublicIPAddressesClient
-	secGroupClient network.SecurityGroupsClient
-	secRulesClient network.SecurityRulesClient
-	vnetClient     network.VirtualNetworksClient
-	rgClient       resources.GroupsClient
-	storageClient  storage.AccountsClient
-	vmClient       compute.VirtualMachinesClient
-}
-
 type azureCluster struct {
 	azureClient    azureAPI
 	namespace      string
+	subscriptionID string
+}
+
+type azureCredentials struct {
 	clientID       string
 	clientSecret   string
 	tenantID       string
@@ -126,48 +64,17 @@ func (clst *azureCluster) Connect(namespace string) error {
 	}
 	clst.namespace = namespace
 
-	if err := clst.loadCredentials(); err != nil {
-		return errors.New("failed to load Azure credentials")
-	}
-
-	oauthConfig, err := azure.PublicCloud.OAuthConfigForTenant(clst.tenantID)
+	cred, err := clst.loadCredentials()
 	if err != nil {
-		return errors.New("failed to configure OAuthConfig for tenant")
+		return nil
 	}
+	clst.subscriptionID = cred.subscriptionID
 
-	spt, err := azure.NewServicePrincipalToken(*oauthConfig, clst.clientID,
-		clst.clientSecret, azure.PublicCloud.ResourceManagerEndpoint)
+	spt, err := clst.generateOAuthToken(cred)
 	if err != nil {
-		return err
+		return nil
 	}
-
-	client := azureClient{}
-
-	client.ifaceClient = network.NewInterfacesClient(clst.subscriptionID)
-	client.ifaceClient.Authorizer = spt
-
-	client.publicIPClient = network.NewPublicIPAddressesClient(clst.subscriptionID)
-	client.publicIPClient.Authorizer = spt
-
-	client.secGroupClient = network.NewSecurityGroupsClient(clst.subscriptionID)
-	client.secGroupClient.Authorizer = spt
-
-	client.secRulesClient = network.NewSecurityRulesClient(clst.subscriptionID)
-	client.secRulesClient.Authorizer = spt
-
-	client.vnetClient = network.NewVirtualNetworksClient(clst.subscriptionID)
-	client.vnetClient.Authorizer = spt
-
-	client.rgClient = resources.NewGroupsClient(clst.subscriptionID)
-	client.rgClient.Authorizer = spt
-
-	client.storageClient = storage.NewAccountsClient(clst.subscriptionID)
-	client.storageClient.Authorizer = spt
-
-	client.vmClient = compute.NewVirtualMachinesClient(clst.subscriptionID)
-	client.vmClient.Authorizer = spt
-
-	clst.azureClient = client
+	clst.azureClient = newAzureClient(clst.subscriptionID, spt)
 
 	return clst.configureResourceGroup()
 }
@@ -342,51 +249,64 @@ func (clst *azureCluster) ChooseSize(ram stitch.Range, cpu stitch.Range,
 	maxPrice float64) string {
 	// XXX: Use ExtraLarge by default because we haven't scraped the CPU and RAM
 	// information yet.
+
 	return "ExtraLarge"
 }
 
-func (clst *azureCluster) loadCredentials() error {
+func (clst *azureCluster) loadCredentials() (*azureCredentials, error) {
 	u, err := user.Current()
 	if err != nil {
-		return errors.New("unable to determine current user")
+		return nil, errors.New("unable to determine current user")
 	}
 
 	dir := u.HomeDir + credentialsPath
 	f, err := os.Open(dir)
 	if err != nil {
-		return errors.New("unable to open Azure credentials at " + dir)
+		return nil, errors.New("unable to open Azure credentials at " + dir)
 	}
 	defer f.Close()
 
 	b, err := ioutil.ReadAll(f)
 	if err != nil {
-		return errors.New("unable to read " + dir)
+		return nil, errors.New("unable to read " + dir)
 	}
 
-	cred := map[string]string{}
-	if err = json.Unmarshal(b, &cred); err != nil {
-		return errors.New(dir + " contains invalid JSON")
+	credMap := map[string]string{}
+	if err = json.Unmarshal(b, &credMap); err != nil {
+		return nil, errors.New(dir + " contains invalid JSON")
 	}
 
 	var ok bool
+	cred := azureCredentials{}
 
-	if clst.clientID, ok = cred["clientID"]; !ok {
-		return errors.New(dir + " contains invalid clientID")
+	if cred.clientID, ok = credMap["clientID"]; !ok {
+		return nil, errors.New(dir + " contains invalid clientID")
 	}
 
-	if clst.clientSecret, ok = cred["clientSecret"]; !ok {
-		return errors.New(dir + " contains invalid clientSecret")
+	if cred.clientSecret, ok = credMap["clientSecret"]; !ok {
+		return nil, errors.New(dir + " contains invalid clientSecret")
 	}
 
-	if clst.tenantID, ok = cred["tenantID"]; !ok {
-		return errors.New(dir + " contains invalid tenantID")
+	if cred.tenantID, ok = credMap["tenantID"]; !ok {
+		return nil, errors.New(dir + " contains invalid tenantID")
 	}
 
-	if clst.subscriptionID, ok = cred["subscriptionID"]; !ok {
-		return errors.New(dir + " contains invalid subscriptionID")
+	if cred.subscriptionID, ok = credMap["subscriptionID"]; !ok {
+		return nil, errors.New(dir + " contains invalid subscriptionID")
 	}
 
-	return nil
+	return &cred, nil
+}
+
+func (clst *azureCluster) generateOAuthToken(cred *azureCredentials) (
+	*azure.ServicePrincipalToken, error) {
+	oauthConfig, err := azure.PublicCloud.OAuthConfigForTenant(cred.tenantID)
+	if err != nil {
+		return nil, errors.New("failed to configure OAuthConfig for tenant")
+	}
+
+	return azure.NewServicePrincipalToken(*oauthConfig, cred.clientID,
+		cred.clientSecret, azure.PublicCloud.ResourceManagerEndpoint)
 }
 
 func (clst *azureCluster) configureResourceGroup() error {
@@ -453,8 +373,8 @@ func (clst *azureCluster) configureStorageAccount(location string) (storage.Acco
 	}
 
 	cancel := make(chan struct{})
-	if _, err := clst.azureClient.storageCreate(resourceGroupName, storageName, param,
-		cancel); err != nil {
+	if _, err := clst.azureClient.storageCreate(resourceGroupName, storageName,
+		param, cancel); err != nil {
 		return storageAccount, err
 	}
 
@@ -930,124 +850,4 @@ func (slice securityRuleSlice) Len() int {
 // stringPtr returns a pointer to the passed string.
 func stringPtr(s string) *string {
 	return &s
-}
-
-// Wrapper for all used Azure functions.
-func (client azureClient) ifaceCreate(rgName string, ifaceName string,
-	param network.Interface, cancel <-chan struct{}) (result autorest.Response,
-	err error) {
-	return client.ifaceClient.CreateOrUpdate(rgName, ifaceName, param, cancel)
-}
-
-func (client azureClient) ifaceDelete(rgName string, ifaceName string,
-	cancel <-chan struct{}) (result autorest.Response, err error) {
-	return client.ifaceClient.Delete(rgName, ifaceName, cancel)
-}
-
-func (client azureClient) ifaceGet(rgName string, ifaceName string, expand string) (
-	result network.Interface, err error) {
-	return client.ifaceClient.Get(rgName, ifaceName, expand)
-}
-
-func (client azureClient) publicIPCreate(rgName string, pipAddrName string,
-	param network.PublicIPAddress, cancel <-chan struct{}) (result autorest.Response,
-	err error) {
-	return client.publicIPClient.CreateOrUpdate(rgName, pipAddrName, param, cancel)
-}
-
-func (client azureClient) publicIPDelete(rgName string, pipAddrName string,
-	cancel <-chan struct{}) (result autorest.Response, err error) {
-	return client.publicIPClient.Delete(rgName, pipAddrName, cancel)
-}
-
-func (client azureClient) publicIPGet(rgName string, pipAddrName string, expand string) (
-	result network.PublicIPAddress, err error) {
-	return client.publicIPClient.Get(rgName, pipAddrName, expand)
-}
-
-func (client azureClient) securityGroupCreate(rgName string, nsgName string,
-	param network.SecurityGroup, cancel <-chan struct{}) (result autorest.Response,
-	err error) {
-	return client.secGroupClient.CreateOrUpdate(rgName, nsgName, param, cancel)
-}
-
-func (client azureClient) securityGroupList(rgName string) (
-	result network.SecurityGroupListResult, err error) {
-	return client.secGroupClient.List(rgName)
-}
-
-func (client azureClient) securityRuleCreate(rgName string, nsgName string,
-	ruleName string, ruleParam network.SecurityRule, cancel <-chan struct{}) (
-	result autorest.Response, err error) {
-	return client.secRulesClient.CreateOrUpdate(rgName, nsgName, ruleName,
-		ruleParam, cancel)
-}
-
-func (client azureClient) securityRuleDelete(rgName string, nsgName string,
-	ruleName string, cancel <-chan struct{}) (result autorest.Response, err error) {
-	return client.secRulesClient.Delete(rgName, nsgName, ruleName, cancel)
-}
-
-func (client azureClient) securityRuleList(rgName string, nsgName string) (
-	result network.SecurityRuleListResult, err error) {
-	return client.secRulesClient.List(rgName, nsgName)
-}
-
-func (client azureClient) vnetCreate(rgName string, vnName string,
-	param network.VirtualNetwork, cancel <-chan struct{}) (result autorest.Response,
-	err error) {
-	return client.vnetClient.CreateOrUpdate(rgName, vnName, param, cancel)
-}
-
-func (client azureClient) vnetList(rgName string) (
-	result network.VirtualNetworkListResult, err error) {
-	return client.vnetClient.List(rgName)
-}
-
-func (client azureClient) rgCreate(rgName string, param resources.ResourceGroup) (
-	result resources.ResourceGroup, err error) {
-	return client.rgClient.CreateOrUpdate(rgName, param)
-}
-
-func (client azureClient) rgDelete(rgName string, cancel <-chan struct{}) (
-	result autorest.Response, err error) {
-	return client.rgClient.Delete(rgName, cancel)
-}
-
-func (client azureClient) storageListByRg(rgName string) (
-	result storage.AccountListResult, err error) {
-	return client.storageClient.ListByResourceGroup(rgName)
-}
-
-func (client azureClient) storageCheckName(
-	accountName storage.AccountCheckNameAvailabilityParameters) (
-	result storage.CheckNameAvailabilityResult, err error) {
-	return client.storageClient.CheckNameAvailability(accountName)
-}
-
-func (client azureClient) storageCreate(rgName string, accountName string,
-	param storage.AccountCreateParameters, cancel <-chan struct{}) (
-	result autorest.Response, err error) {
-	return client.storageClient.Create(rgName, accountName, param, cancel)
-}
-
-func (client azureClient) storageGet(rgName string, accountName string) (
-	result storage.Account, err error) {
-	return client.storageClient.GetProperties(rgName, accountName)
-}
-
-func (client azureClient) vmCreate(rgName string, vmName string,
-	param compute.VirtualMachine, cancel <-chan struct{}) (result autorest.Response,
-	err error) {
-	return client.vmClient.CreateOrUpdate(rgName, vmName, param, cancel)
-}
-
-func (client azureClient) vmDelete(rgName string, vmName string,
-	cancel <-chan struct{}) (result autorest.Response, err error) {
-	return client.vmClient.Delete(rgName, vmName, cancel)
-}
-
-func (client azureClient) vmList(rgName string) (result compute.VirtualMachineListResult,
-	err error) {
-	return client.vmClient.List(rgName)
 }
