@@ -75,7 +75,6 @@ func wakeChan(conn db.Conn, store Store) chan struct{} {
 }
 
 func runNetwork(conn db.Conn, store Store) {
-	createMinionDir(store)
 	for range wakeChan(conn, store) {
 		// If the etcd read failed, we only want to update the db if it
 		// failed because a key was missing (has not been created yet).
@@ -116,28 +115,6 @@ func runNetwork(conn db.Conn, store Store) {
 			updateDBLabels(view, etcdData)
 			return nil
 		})
-	}
-}
-
-func createMinionDir(store Store) {
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		err := store.Mkdir(minionDir)
-		if err == nil {
-			return
-		}
-
-		// If the directory already exists, no need to create it
-		etcdErr, ok := err.(client.Error)
-		if ok && etcdErr.Code == client.ErrorCodeNodeExist {
-			log.WithError(etcdErr).Info()
-			return
-		}
-
-		log.WithError(err).Warn()
-		<-ticker.C
 	}
 }
 
