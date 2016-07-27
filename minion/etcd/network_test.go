@@ -463,6 +463,9 @@ func testUpdateDBLabels(t *testing.T, view db.Database) {
 	lip := map[string]string{}
 
 	for _, l := range view.SelectFromLabel(nil) {
+		if _, ok := lip[l.Label]; ok {
+			t.Errorf("Duplicate labels in the DB: %s", l.Label)
+		}
 		lip[l.Label] = l.IP
 	}
 

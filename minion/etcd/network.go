@@ -86,7 +86,7 @@ func runNetwork(conn db.Conn, store Store) {
 				log.WithError(err).Error("Etcd transaction failed.")
 				continue
 			}
-			log.WithError(err).Info()
+			log.WithError(err).Debug()
 		}
 
 		leader := false
@@ -319,10 +319,10 @@ func updateDBContainers(view db.Database, etcdData storeData) {
 func updateDBLabels(view db.Database, etcdData storeData) {
 	// Gather all of the label keys and the IPs for single host labels
 	labelIPs := map[string]string{}
-	labelKeys := join.StringSlice{}
+	labelKeys := map[string]struct{}{}
 	for _, c := range etcdData.containers {
 		for _, l := range c.Labels {
-			labelKeys = append(labelKeys, l)
+			labelKeys[l] = struct{}{}
 			if _, ok := etcdData.multiHost[l]; !ok {
 				labelIPs[l] = etcdData.dockerIPs[c.DockerID]
 			}
@@ -333,8 +333,13 @@ func updateDBLabels(view db.Database, etcdData storeData) {
 		return val.(db.Label).Label
 	}
 
+	labelKeySlice := join.StringSlice{}
+	for l := range labelKeys {
+		labelKeySlice = append(labelKeySlice, l)
+	}
+
 	pairs, dbls, dirKeys := join.HashJoin(db.LabelSlice(view.SelectFromLabel(nil)),
-		labelKeys, labelKeyFunc, nil)
+		labelKeySlice, labelKeyFunc, nil)
 
 	for _, dbl := range dbls {
 		view.Remove(dbl.(db.Label))
