@@ -29,6 +29,11 @@ install:
 check: format-check
 	go test $(PACKAGES)
 
+clean:
+	go clean -x $(PACKAGES)
+	rm -f *.cov.coverprofile
+	rm -f *.cov.html
+
 COV_SKIP= /minion/pb /minion/pprofile /constants /scripts
 
 COV_PKG = $(subst github.com/NetSys/quilt,,$(PACKAGES))
