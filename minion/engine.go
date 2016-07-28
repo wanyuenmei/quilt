@@ -149,9 +149,10 @@ func queryContainers(spec stitch.Stitch) []db.Container {
 	containers := map[int]*db.Container{}
 	for _, c := range spec.QueryContainers() {
 		containers[c.ID] = &db.Container{
-			Command: c.Command,
-			Image:   c.Image,
-			Env:     c.Env,
+			StitchID: c.ID,
+			Command:  c.Command,
+			Image:    c.Image,
+			Env:      c.Env,
 		}
 	}
 
@@ -180,7 +181,11 @@ func updateContainers(view db.Database, spec stitch.Stitch) {
 			return -1
 		}
 
-		return util.EditDistance(left.Labels, right.Labels)
+		score := util.EditDistance(left.Labels, right.Labels)
+		if left.StitchID != right.StitchID {
+			score++
+		}
+		return score
 	}
 
 	pairs, news, dbcs := join.Join(queryContainers(spec),
@@ -206,6 +211,7 @@ func updateContainers(view db.Database, spec stitch.Stitch) {
 		dbc.Command = newc.Command
 		dbc.Image = newc.Image
 		dbc.Env = newc.Env
+		dbc.StitchID = newc.StitchID
 		view.Commit(dbc)
 	}
 }

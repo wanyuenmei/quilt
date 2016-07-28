@@ -42,6 +42,7 @@ type storeData struct {
 
 type storeContainer struct {
 	DockerID string
+	StitchID int
 	Command  []string
 	Labels   []string
 	Env      map[string]string
@@ -168,6 +169,7 @@ func updateEtcdContainer(s Store, etcdData storeData, containers []db.Container)
 	for _, c := range containers {
 		sc := storeContainer{
 			DockerID: c.DockerID,
+			StitchID: c.StitchID,
 			Command:  c.Command,
 			Labels:   c.Labels,
 			Env:      c.Env,
@@ -300,6 +302,7 @@ func updateDBContainers(view db.Database, etcdData storeData) {
 			dbc.Labels = etcdc.Labels
 			dbc.Command = etcdc.Command
 			dbc.Env = etcdc.Env
+			dbc.StitchID = etcdc.StitchID
 		}
 
 		// Workers and masters get their IP from Etcd
