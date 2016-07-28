@@ -300,8 +300,6 @@ func updateDBContainers(view db.Database, etcdData storeData) {
 		if worker {
 			etcdc := pair.R.(storeContainer)
 			dbc.Labels = etcdc.Labels
-			dbc.Command = etcdc.Command
-			dbc.Env = etcdc.Env
 			dbc.StitchID = etcdc.StitchID
 		}
 

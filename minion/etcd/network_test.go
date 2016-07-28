@@ -416,27 +416,6 @@ func testUpdateDBContainers(t *testing.T, view db.Database) {
 	if !eq(labelMap, expLabelMap) {
 		t.Error(spew.Sprintf("Found %s, Expected: %s", labelMap, expLabelMap))
 	}
-
-	expCommandMap := map[string][]string{
-		"a": {"echo", "hi"},
-		"b": {"echo", "bye"},
-		"c": nil,
-	}
-
-	if !eq(commandMap, expCommandMap) {
-		t.Error(spew.Sprintf("Found %s, Expected: %s", commandMap,
-			expCommandMap))
-	}
-
-	expEnvMap := map[string]map[string]string{
-		"a": {"GOPATH": "~/gocode"},
-		"b": {"GOPATH": "~"},
-		"c": nil,
-	}
-
-	if !eq(envMap, expEnvMap) {
-		t.Error(spew.Sprintf("Found %s, Expected: %s", envMap, expEnvMap))
-	}
 }
 
 func TestUpdateDBLabels(t *testing.T) {
