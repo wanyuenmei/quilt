@@ -7,6 +7,7 @@ LINE_LENGTH_EXCLUDE=./constants/awsConstants.go \
 		    ./cluster/provider/cloud_config.go \
 		    ./minion/network/link_test.go \
 		    ./minion/pb/pb.pb.go \
+		    ./api/pb/pb.pb.go
 
 REPO = quilt
 DOCKER = docker
@@ -26,7 +27,7 @@ clean:
 	rm -f *.cov.coverprofile cluster/*.cov.coverprofile minion/*.cov.coverprofile specs/*.cov.coverprofile
 	rm -f *.cov.html cluster/*.cov.html minion/*.cov.html specs/*.cov.html
 
-COV_SKIP= /minion/pb /minion/pprofile /constants /scripts
+COV_SKIP= /minion/pb /minion/pprofile /api/pb /constants /scripts
 
 COV_PKG = $(subst github.com/NetSys/quilt,,$(PACKAGES))
 coverage: $(addsuffix .cov, $(filter-out $(COV_SKIP), $(COV_PKG)))
@@ -53,7 +54,7 @@ format-check:
 lint: format
 	cd -P . && go vet $(PACKAGES)
 	for package in $(PACKAGES) ; do \
-		if [[ $$package != *minion/pb* ]] ; then \
+		if [[ $$package != *minion/pb* && $$package != *api/pb* ]] ; then \
 			golint -min_confidence .25 $$package ; \
 		fi \
 	done

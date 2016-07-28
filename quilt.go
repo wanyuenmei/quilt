@@ -13,11 +13,14 @@ import (
 	"text/scanner"
 	"time"
 
+	"github.com/NetSys/quilt/api"
+	"github.com/NetSys/quilt/api/server"
 	"github.com/NetSys/quilt/cluster"
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/engine"
 	"github.com/NetSys/quilt/inspect"
 	"github.com/NetSys/quilt/minion"
+	"github.com/NetSys/quilt/quiltctl"
 	"github.com/NetSys/quilt/stitch"
 	"github.com/NetSys/quilt/util"
 
@@ -35,9 +38,11 @@ func main() {
 	log.SetFormatter(util.Formatter{})
 
 	flag.Usage = func() {
-		fmt.Println("Usage: quilt [inspect <stitch> | run <stitch> | minion" +
-			" | stop <namespace> | get <import_path>]" +
-			" [-log-level=<level> | -l=<level>]")
+		fmt.Println("Usage: quilt " +
+			"[-log-level=<level> | -l=<level> | -H=<listen_address>] " +
+			"[inspect <stitch> | run <stitch> | minion | " +
+			"stop <namespace> | get <import_path> | " +
+			"machines | containers]")
 		fmt.Println("\nWhen provided a stitch, quilt takes responsibility\n" +
 			"for deploying it as specified.  Alternatively, quilt may be\n" +
 			"instructed to stop all deployments in a given namespace,\n" +
@@ -49,6 +54,8 @@ func main() {
 
 	var logLevel = flag.String("log-level", "info", "level to set logger to")
 	flag.StringVar(logLevel, "l", "info", "level to set logger to")
+	var lAddr = flag.String("H", api.DefaultSocket,
+		"Socket to listen for API requests on.")
 	flag.Parse()
 
 	level, err := parseLogLevel(*logLevel)
@@ -64,23 +71,28 @@ func main() {
 		usage()
 	}
 
-	switch flag.Arg(0) {
-	case "run":
+	subcommand := flag.Arg(0)
+	switch {
+	case subcommand == "run":
 		go configLoop(conn, flag.Arg(1))
-	case "stop":
+	case subcommand == "stop":
 		stop(conn, flag.Arg(1))
-	case "get":
+	case subcommand == "get":
 		getSpec(flag.Arg(1))
-	case "inspect":
+	case subcommand == "inspect":
 		inspect.Main(flag.Args())
 		return
-	case "minion":
+	case subcommand == "minion":
 		minion.Run()
+		return
+	case quiltctl.HasSubcommand(subcommand):
+		quiltctl.Run(flag.Args())
 		return
 	default:
 		usage()
 	}
 
+	go server.Run(conn, *lAddr)
 	cluster.Run(conn)
 }
 
