@@ -63,7 +63,7 @@ INFO [Jun  8 10:44:10.523] New connection.
 ```
 
 Once you see the "New connection" message, you can connect to the Machines with the command
-`ssh quilt@<PUBLIC_IP>`.
+`quilt ssh <MACHINE_NUM>`, or manually with `ssh quilt@<PUBLIC_IP>`.
 
 ### Inspect Docker Containers
 Docker Swarm has a global view of all the containers in the cluster.  To make

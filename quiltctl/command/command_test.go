@@ -2,6 +2,7 @@ package command
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/spf13/afero"
@@ -162,6 +163,46 @@ func TestStopFlags(t *testing.T) {
 	expNamespace := "namespace"
 	checkStopParsing(t, []string{"-namespace", expNamespace}, expNamespace, nil)
 	checkStopParsing(t, []string{expNamespace}, expNamespace, nil)
+}
+
+func checkSSHParsing(t *testing.T, args []string, expMachine int,
+	expSSHArgs []string, expErr error) {
+
+	sshCmd := SSH{}
+	err := sshCmd.Parse(args)
+
+	if expErr != nil {
+		if err.Error() != expErr.Error() {
+			t.Errorf("Expected error %s, but got %s",
+				expErr.Error(), err.Error())
+		}
+		return
+	}
+
+	if err != nil {
+		t.Errorf("Unexpected error when parsing ssh args: %s", err.Error())
+		return
+	}
+
+	if sshCmd.targetMachine != expMachine {
+		t.Errorf("Expected ssh command to parse target machine %d, but got %d",
+			expMachine, sshCmd.targetMachine)
+	}
+
+	if !reflect.DeepEqual(sshCmd.sshArgs, expSSHArgs) {
+		t.Errorf("Expected ssh command to parse SSH args %v, but got %v",
+			expSSHArgs, sshCmd.sshArgs)
+	}
+}
+
+func TestSSHFlags(t *testing.T) {
+	t.Parallel()
+
+	checkSSHParsing(t, []string{"1"}, 1, []string{}, nil)
+	sshArgs := []string{"-i", "~/.ssh/key"}
+	checkSSHParsing(t, append([]string{"1"}, sshArgs...), 1, sshArgs, nil)
+	checkSSHParsing(t, []string{}, 0, nil,
+		errors.New("must specify a target machine"))
 }
 
 type mockClient struct {
