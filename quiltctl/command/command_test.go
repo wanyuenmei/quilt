@@ -29,7 +29,7 @@ func TestMachineOutput(t *testing.T) {
 	t.Parallel()
 
 	res := machinesStr([]db.Machine{{ID: 1, Role: db.Master, PublicIP: "8.8.8.8"}})
-	exp := "Machine-1{Role=Master, PublicIP=8.8.8.8}\n"
+	exp := "Machine-1{Role=Master, PublicIP=8.8.8.8, Connected=false}\n"
 	if res != exp {
 		t.Errorf("Expected machine command to print %s, but got %s.", exp, res)
 	}

@@ -80,6 +80,7 @@ func (fm *foreman) init() {
 		for _, m := range fm.minions {
 			if m.connected {
 				m.machine.Role = db.PBToRole(m.config.Role)
+				m.machine.Connected = m.connected
 				view.Commit(m.machine)
 			}
 		}
@@ -111,6 +112,14 @@ func (fm *foreman) runOnce() {
 		connected := err == nil
 		if connected && !m.connected {
 			log.WithField("machine", m.machine).Info("New connection.")
+		}
+
+		if connected != m.machine.Connected {
+			fm.conn.Transact(func(view db.Database) error {
+				m.machine.Connected = connected
+				view.Commit(m.machine)
+				return nil
+			})
 		}
 
 		m.connected = connected
