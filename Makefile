@@ -31,8 +31,8 @@ check: format-check
 
 clean:
 	go clean -x $(PACKAGES)
-	rm -f *.cov.coverprofile
-	rm -f *.cov.html
+	rm -f *.cov.coverprofile cluster/*.cov.coverprofile minion/*.cov.coverprofile specs/*.cov.coverprofile
+	rm -f *.cov.html cluster/*.cov.html minion/*.cov.html specs/*.cov.html
 
 COV_SKIP= /minion/pb /minion/pprofile /constants /scripts
 
