@@ -19,10 +19,11 @@ func TestUpdateEtcdContainers(t *testing.T) {
 	conn := db.New()
 	var containers []db.Container
 	conn.Transact(func(view db.Database) error {
-		for i := 0; i < 3; i++ {
+		for i := 2; i < 5; i++ {
 			c := view.InsertContainer()
 			si := strconv.Itoa(i)
 			c.DockerID = si
+			c.IP = fmt.Sprintf("10.0.0.%s", si)
 			c.Command = []string{"echo", si}
 			c.Labels = []string{"red", "blue"}
 			c.Env = map[string]string{"i": si}
@@ -33,10 +34,11 @@ func TestUpdateEtcdContainers(t *testing.T) {
 	})
 
 	cs := []storeContainer{}
-	for i := 0; i < 3; i++ {
+	for i := 2; i < 5; i++ {
 		si := strconv.Itoa(i)
 		storeTemp := storeContainer{
 			DockerID: si,
+			IP:       fmt.Sprintf("10.0.0.%s", si),
 			Command:  []string{"echo", si},
 			Labels:   []string{"red", "blue"},
 			Env:      map[string]string{"i": si},
@@ -73,17 +75,42 @@ func TestUpdateEtcdContainers(t *testing.T) {
 			*store.writes))
 	}
 
-	// simulate etcd having out of date information
+	for i := range cs {
+		if cs[i].DockerID == "3" {
+			cs[i].IP = "10.0.0.7"
+		}
+	}
+	// simulate etcd having out of date information, except the IP
 	badEtcdSlice := []storeContainer{}
-	for i := 1; i < 4; i++ {
+	for i := 2; i < 6; i++ {
 		si := strconv.Itoa(i)
 		badEtcd := storeContainer{
-			Command: []string{"echo", si},
-			Labels:  []string{"red", "blue"},
-			Env:     map[string]string{"i": si},
+			DockerID: si,
+			Command:  []string{"echo", si},
+			Labels:   []string{"red", "blue"},
+			Env:      map[string]string{"i": si},
 		}
+		if i == 3 {
+			si = "7"
+		}
+		badEtcd.IP = fmt.Sprintf("10.0.0.%s", si)
 		badEtcdSlice = append(badEtcdSlice, badEtcd)
 	}
+
+	// add a new container with a bad ip to test ip syncing
+	badEtcdSlice = append(badEtcdSlice, storeContainer{
+		DockerID: "8",
+		IP:       "10.0.0.0",
+	})
+	cs = append(cs, storeContainer{DockerID: "8", IP: "10.0.0.0"})
+	conn.Transact(func(view db.Database) error {
+		c := view.InsertContainer()
+		c.DockerID = "8"
+		c.IP = "junk"
+		view.Commit(c)
+		containers = append([]db.Container{c}, containers...)
+		return nil
+	})
 
 	badTestContainers, _ := json.Marshal(badEtcdSlice)
 	err = store.Set(containerStore, string(badTestContainers))
@@ -92,6 +119,16 @@ func TestUpdateEtcdContainers(t *testing.T) {
 	}
 
 	*store.writes = 0
+	nextRand := uint32(0)
+	rand32 = func() uint32 {
+		ret := nextRand
+		nextRand++
+		return ret
+	}
+
+	defer func() {
+		rand32 = rand.Uint32
+	}()
 	etcdData, _ = readEtcd(store)
 	etcdData, _ = updateEtcdContainer(store, etcdData, containers)
 
@@ -104,122 +141,12 @@ func TestUpdateEtcdContainers(t *testing.T) {
 	json.Unmarshal([]byte(resultContainers), &resultSlice)
 
 	if !eq(cs, resultSlice) {
-		t.Error(spew.Sprintf("Expected change to etcd store. Got %v,"+
-			" expected %v.", resultSlice, cs))
+		t.Error(spew.Sprintf("Expected change to etcd store.\nGot      %v"+
+			"\nExpected %v.", resultSlice, cs))
 	}
 
 	if !eq(cs, etcdData.containers) {
-		fmt.Println("ahhhh")
-		fmt.Println(cs)
-		fmt.Println(etcdData.containers)
 		t.Error("updateEtcdContainer did change the storeData struct")
-	}
-
-	// if etcd and the db don't agree, there should be exactly 1 write
-	if *store.writes != 1 {
-		t.Error(spew.Sprintf("Expected a single write to etcd. Found %d.",
-			*store.writes))
-	}
-}
-
-func TestUpdateEtcdDocker(t *testing.T) {
-	store := newTestMock()
-	store.Mkdir(minionDir)
-	conn := db.New()
-	var containers []db.Container
-	conn.Transact(func(view db.Database) error {
-		for i := 2; i < 5; i++ {
-			c := view.InsertContainer()
-			si := strconv.Itoa(i)
-			c.DockerID = si
-			c.IP = spew.Sprintf("10.0.0.%s", si)
-			view.Commit(c)
-		}
-		containers = view.SelectFromContainer(nil)
-		return nil
-	})
-
-	dockerMap := map[string]string{}
-	for i := 2; i < 5; i++ {
-		dockerMap[strconv.Itoa(i)] = spew.Sprintf("10.0.0.%d", i)
-	}
-
-	testDocker, _ := json.Marshal(dockerMap)
-	err := store.Set(dockerToIPStore, string(testDocker))
-	if err != nil {
-		t.Fatal("Failed to write to store.")
-	}
-
-	*store.writes = 0
-	etcdData, _ := readEtcd(store)
-	etcdData, _ = updateEtcdDocker(store, etcdData, containers)
-
-	resultDocker, err := store.Get(dockerToIPStore)
-	if err != nil {
-		t.Fatal("Failed to read from store")
-	}
-
-	resultMap := map[string]string{}
-	json.Unmarshal([]byte(resultDocker), &resultMap)
-
-	if !eq(dockerMap, resultMap) {
-		t.Error(spew.Sprintf("Unexpected change to etcd store. Got %v,"+
-			" expected %v.", resultMap, dockerMap))
-	}
-
-	// etcd and the db agree, there should be no writes
-	if *store.writes != 0 {
-		t.Error(spew.Sprintf("Unexpected writes (%d) to etcd store.",
-			*store.writes))
-	}
-
-	containers = append(containers, db.Container{DockerID: "0", IP: "junk"})
-
-	// simulate etcd having different information
-	diffEtcdMap := map[string]string{}
-	for i := 2; i < 4; i++ {
-		diffEtcdMap[strconv.Itoa(i)] = spew.Sprintf("10.0.0.%d", i)
-	}
-	diffEtcdMap["4"] = "10.0.0.7"
-
-	diffTestDocker, _ := json.Marshal(diffEtcdMap)
-	err = store.Set(dockerToIPStore, string(diffTestDocker))
-	if err != nil {
-		t.Fatalf("Failed to write to store.")
-	}
-
-	*store.writes = 0
-	etcdData, _ = readEtcd(store)
-	nextRand := uint32(0)
-	rand32 = func() uint32 {
-		ret := nextRand
-		nextRand++
-		return ret
-	}
-
-	defer func() {
-		rand32 = rand.Uint32
-	}()
-
-	etcdData, _ = updateEtcdDocker(store, etcdData, containers)
-
-	resultDocker, err = store.Get(dockerToIPStore)
-	if err != nil {
-		t.Fatal("Failed to read from store.")
-	}
-
-	resultMap = map[string]string{}
-	json.Unmarshal([]byte(resultDocker), &resultMap)
-
-	dockerMap["4"] = "10.0.0.7"
-	dockerMap["0"] = "10.0.0.0"
-	if !eq(dockerMap, resultMap) {
-		t.Error(spew.Sprintf("Expected change to etcd store. Got %v,"+
-			" expected %v.", resultMap, dockerMap))
-	}
-
-	if !eq(dockerMap, etcdData.dockerIPs) {
-		t.Error("updateEtcdDocker did not change storeData struct")
 	}
 
 	// if etcd and the db don't agree, there should be exactly 1 write
@@ -253,15 +180,8 @@ func TestUpdateEtcdLabel(t *testing.T) {
 		t.Fatal("Failed to write to store.")
 	}
 
-	dockerIPMap := map[string]string{
-		"2": "10.1.0.2",
-		"3": "10.1.0.3",
-		"4": "10.1.0.4",
-	}
-
 	*store.writes = 0
 	etcdData, _ := readEtcd(store)
-	etcdData.dockerIPs = dockerIPMap
 	etcdData, _ = updateEtcdLabel(store, etcdData, containers)
 
 	resultLabels, err := store.Get(labelToIPStore)
@@ -292,9 +212,6 @@ func TestUpdateEtcdLabel(t *testing.T) {
 		return nil
 	})
 
-	// delete knowledge of label 2 so it gets synced
-	delete(dockerIPMap, "2")
-
 	// Label 2 is now multhost, so if etcd knows that, it should get etcd's ip
 	labelStruct["2"] = "10.1.0.11"
 	testLabel, _ = json.Marshal(labelStruct)
@@ -309,7 +226,6 @@ func TestUpdateEtcdLabel(t *testing.T) {
 
 	*store.writes = 0
 	etcdData, _ = readEtcd(store)
-	etcdData.dockerIPs = dockerIPMap
 	nextRand := uint32(0)
 	rand32 = func() uint32 {
 		ret := nextRand
@@ -374,18 +290,19 @@ func testUpdateDBContainers(t *testing.T, view db.Database) {
 	cs := storeContainerSlice{
 		{
 			DockerID: "a",
+			IP:       "1.1.1.1",
 			Command:  []string{"echo", "hi"},
 			Labels:   []string{"red", "blue"},
 			Env:      map[string]string{"GOPATH": "~/gocode"},
 		}, {
 			DockerID: "b",
+			IP:       "2.2.2.2",
 			Command:  []string{"echo", "bye"},
 			Labels:   []string{"blue", "green"},
 			Env:      map[string]string{"GOPATH": "~"},
 		}}
-	dockerIP := map[string]string{"a": "1.1.1.1", "b": "2.2.2.2"}
 
-	updateDBContainers(view, storeData{containers: cs, dockerIPs: dockerIP})
+	updateDBContainers(view, storeData{containers: cs})
 
 	ipMap := map[string]string{}
 	labelMap := map[string][]string{}
@@ -429,15 +346,21 @@ func TestUpdateDBLabels(t *testing.T) {
 func testUpdateDBLabels(t *testing.T, view db.Database) {
 	labelStruct := map[string]string{"a": "10.0.0.2"}
 	containerSlice := []storeContainer{
-		{DockerID: "hi", Labels: []string{"a", "b"}},
-		{DockerID: "bye", Labels: []string{"a"}},
+		{
+			DockerID: "hi",
+			Labels:   []string{"a", "b"},
+			IP:       "10.0.0.3",
+		},
+		{
+			DockerID: "bye",
+			Labels:   []string{"a"},
+			IP:       "10.0.0.4",
+		},
 	}
-	dockerIPMap := map[string]string{"hi": "10.0.0.3", "bye": "10.0.0.4"}
 
 	updateDBLabels(view, storeData{
 		containers: containerSlice,
 		multiHost:  labelStruct,
-		dockerIPs:  dockerIPMap,
 	})
 	lip := map[string]string{}
 
