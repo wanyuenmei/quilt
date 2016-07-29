@@ -358,16 +358,13 @@ func (dk docker) create(name, image string, args []string, labels map[string]str
 }
 
 func (dk docker) getID(name string) (string, error) {
-	containers, err := dk.list(nil, true)
+	containers, err := dk.list(map[string][]string{"name": {name}}, true)
 	if err != nil {
 		return "", err
 	}
 
-	name = "/" + name
-	for _, c := range containers {
-		if name == c.Name {
-			return c.ID, nil
-		}
+	if len(containers) > 0 {
+		return containers[0].ID, nil
 	}
 
 	return "", errNoSuchContainer
