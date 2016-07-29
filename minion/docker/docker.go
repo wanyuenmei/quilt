@@ -111,16 +111,6 @@ func New(sock string) Client {
 }
 
 func (dk docker) Run(opts RunOptions) (string, error) {
-	if opts.Name != "" {
-		_, err := dk.getID(opts.Name)
-		if err == errNoSuchContainer {
-			// Only log the first time we attempt to boot.
-			log.Infof("Start Container: %s", opts.Name)
-		} else if err != nil {
-			return "", err
-		}
-	}
-
 	hc := dkc.HostConfig{
 		NetworkMode: opts.NetworkMode,
 		PidMode:     opts.PidMode,

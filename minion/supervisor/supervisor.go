@@ -228,6 +228,16 @@ func (sv *supervisor) tagWorker(provider, region, size string) {
 	if sv.provider != provider || sv.region != region || sv.size != size {
 		sv.Remove(QuiltTag)
 	}
+
+	isRunning, err := sv.dk.IsRunning(QuiltTag)
+	if err != nil {
+		log.WithError(err).Warnf("Could not check QuiltTag running status")
+		return
+	}
+	if isRunning {
+		return
+	}
+
 	tags := map[string]string{
 		docker.SystemLabel("provider"): provider,
 		docker.SystemLabel("region"):   region,
@@ -241,7 +251,7 @@ func (sv *supervisor) tagWorker(provider, region, size string) {
 		NetworkMode: "host",
 	}
 
-	_, err := sv.dk.Run(ro)
+	_, err = sv.dk.Run(ro)
 	if err != nil {
 		log.WithError(err).Warn("Failed to tag minion.")
 	}
@@ -360,6 +370,7 @@ func (sv *supervisor) run(name string, args ...string) {
 		ro.VolumesFrom = []string{Ovsdb}
 	}
 
+	log.Infof("Start Container: %s", name)
 	_, err = sv.dk.Run(ro)
 	if err != nil {
 		log.WithError(err).Warnf("Failed to run %s.", name)
