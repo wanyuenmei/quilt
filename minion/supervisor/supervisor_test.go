@@ -4,23 +4,24 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/minion/docker"
 	"github.com/davecgh/go-spew/spew"
-	dkc "github.com/fsouza/go-dockerclient"
 )
 
 func TestNone(t *testing.T) {
 	ctx := initTest()
 
-	if len(ctx.fd.running) > 0 {
-		t.Errorf("fd.running = %s; want <empty>", spew.Sdump(ctx.fd.running))
+	if len(ctx.fd.running()) > 0 {
+		t.Errorf("fd.running = %s; want <empty>", spew.Sdump(ctx.fd.running()))
 	}
 
-	if len(ctx.fd.exec) > 0 {
-		t.Errorf("fd.exec = %s; want <empty>", spew.Sdump(ctx.fd.exec))
+	exec := ctx.fd.GetExec()
+	if len(exec) > 0 {
+		t.Errorf("exec = %s; want <empty>", spew.Sdump(exec))
 	}
 
 	ctx.conn.Transact(func(view db.Database) error {
@@ -35,12 +36,13 @@ func TestNone(t *testing.T) {
 	})
 	ctx.run()
 
-	if len(ctx.fd.running) > 0 {
-		t.Errorf("fd.running = %s; want <none>", spew.Sdump(ctx.fd.running))
+	if len(ctx.fd.running()) > 0 {
+		t.Errorf("fd.running = %s; want <none>", spew.Sdump(ctx.fd.running()))
 	}
 
-	if len(ctx.fd.exec) > 0 {
-		t.Errorf("fd.exec = %s; want <none>", spew.Sdump(ctx.fd.exec))
+	exec = ctx.fd.GetExec()
+	if len(exec) > 0 {
+		t.Errorf("exec = %s; want <empty>", spew.Sdump(exec))
 	}
 }
 
@@ -65,13 +67,14 @@ func TestMaster(t *testing.T) {
 		Ovsdb: {"ovsdb-server"},
 		Swarm: swarmArgsMaster(ip),
 	}
-	if !reflect.DeepEqual(ctx.fd.running, exp) {
-		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running),
+	if !reflect.DeepEqual(ctx.fd.running(), exp) {
+		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running()),
 			spew.Sdump(exp))
 	}
 
-	if len(ctx.fd.exec) > 0 {
-		t.Errorf("fd.exec = %s\n\nwant <empty>", spew.Sdump(ctx.fd.exec))
+	exec := ctx.fd.GetExec()
+	if len(exec) > 0 {
+		t.Errorf("exec = %s; want <empty>", spew.Sdump(exec))
 	}
 
 	/* Change IP, etcd IPs, and become the leader. */
@@ -96,12 +99,13 @@ func TestMaster(t *testing.T) {
 		Swarm:     swarmArgsMaster(ip),
 		Ovnnorthd: {"ovn-northd"},
 	}
-	if !reflect.DeepEqual(ctx.fd.running, exp) {
-		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running),
+	if !reflect.DeepEqual(ctx.fd.running(), exp) {
+		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running()),
 			spew.Sdump(exp))
 	}
-	if len(ctx.fd.exec) > 0 {
-		t.Errorf("fd.exec = %s\n\nwant <empty>", spew.Sdump(ctx.fd.exec))
+	exec = ctx.fd.GetExec()
+	if len(exec) > 0 {
+		t.Errorf("exec = %s; want <empty>", spew.Sdump(exec))
 	}
 
 	/* Lose leadership. */
@@ -118,12 +122,13 @@ func TestMaster(t *testing.T) {
 		Ovsdb: {"ovsdb-server"},
 		Swarm: swarmArgsMaster(ip),
 	}
-	if !reflect.DeepEqual(ctx.fd.running, exp) {
-		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running),
+	if !reflect.DeepEqual(ctx.fd.running(), exp) {
+		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running()),
 			spew.Sdump(exp))
 	}
-	if len(ctx.fd.exec) > 0 {
-		t.Errorf("fd.exec = %s\n\nwant <empty>", spew.Sdump(ctx.fd.exec))
+	exec = ctx.fd.GetExec()
+	if len(exec) > 0 {
+		t.Errorf("exec = %s; want <empty>", spew.Sdump(exec))
 	}
 }
 
@@ -148,12 +153,13 @@ func TestWorker(t *testing.T) {
 		Ovsdb:       {"ovsdb-server"},
 		Ovsvswitchd: {"ovs-vswitchd"},
 	}
-	if !reflect.DeepEqual(ctx.fd.running, exp) {
-		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running),
+	if !reflect.DeepEqual(ctx.fd.running(), exp) {
+		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running()),
 			spew.Sdump(exp))
 	}
-	if len(ctx.fd.exec) > 0 {
-		t.Errorf("fd.exec = %s\n\nwant <empty>", spew.Sdump(ctx.fd.exec))
+	exec := ctx.fd.GetExec()
+	if len(exec) > 0 {
+		t.Errorf("exec = %s; want <empty>", spew.Sdump(exec))
 	}
 
 	leaderIP := "5.6.7.8"
@@ -178,17 +184,17 @@ func TestWorker(t *testing.T) {
 		Swarm:         swarmArgsWorker(ip),
 		QuiltTag:      nil,
 	}
-	if !reflect.DeepEqual(ctx.fd.running, exp) {
-		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running),
+	if !reflect.DeepEqual(ctx.fd.running(), exp) {
+		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running()),
 			spew.Sdump(exp))
 	}
 
 	exp = map[string][]string{
 		Ovsvswitchd: ovsExecArgs(ip, leaderIP),
 	}
-	if !reflect.DeepEqual(ctx.fd.exec, exp) {
-		t.Errorf("fd.exec = %s\n\nwant %s", spew.Sdump(ctx.fd.exec),
-			spew.Sdump(exp))
+	exec = ctx.fd.GetExec()
+	if !reflect.DeepEqual(exec, exp) {
+		t.Errorf("fd.exec = %s\n\nwant %s", spew.Sdump(exec), spew.Sdump(exp))
 	}
 }
 
@@ -218,20 +224,20 @@ func TestChange(t *testing.T) {
 		Swarm:         swarmArgsWorker(ip),
 		QuiltTag:      nil,
 	}
-	if !reflect.DeepEqual(ctx.fd.running, exp) {
-		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running),
+	if !reflect.DeepEqual(ctx.fd.running(), exp) {
+		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running()),
 			spew.Sdump(exp))
 	}
 
 	exp = map[string][]string{
 		Ovsvswitchd: ovsExecArgs(ip, leaderIP),
 	}
-	if !reflect.DeepEqual(ctx.fd.exec, exp) {
-		t.Errorf("fd.exec = %s\n\nwant %s", spew.Sdump(ctx.fd.exec),
-			spew.Sdump(exp))
+	exec := ctx.fd.GetExec()
+	if !reflect.DeepEqual(exec, exp) {
+		t.Errorf("fd.exec = %s\n\nwant %s", spew.Sdump(exec), spew.Sdump(exp))
 	}
 
-	delete(ctx.fd.exec, Ovsvswitchd)
+	ctx.fd.md.ResetExec()
 	ctx.conn.Transact(func(view db.Database) error {
 		m, _ := view.MinionSelf()
 		m.Role = db.Master
@@ -245,12 +251,13 @@ func TestChange(t *testing.T) {
 		Ovsdb: {"ovsdb-server"},
 		Swarm: swarmArgsMaster(ip),
 	}
-	if !reflect.DeepEqual(ctx.fd.running, exp) {
-		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running),
+	if !reflect.DeepEqual(ctx.fd.running(), exp) {
+		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running()),
 			spew.Sdump(exp))
 	}
-	if len(ctx.fd.exec) > 0 {
-		t.Errorf("fd.exec = %s\n\nwant <empty>", spew.Sdump(ctx.fd.exec))
+	exec = ctx.fd.GetExec()
+	if len(exec) > 0 {
+		t.Errorf("fd.exec = %s\n\nwant <empty>", spew.Sdump(exec))
 	}
 
 	ctx.conn.Transact(func(view db.Database) error {
@@ -269,17 +276,17 @@ func TestChange(t *testing.T) {
 		Swarm:         swarmArgsWorker(ip),
 		QuiltTag:      nil,
 	}
-	if !reflect.DeepEqual(ctx.fd.running, exp) {
-		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running),
+	if !reflect.DeepEqual(ctx.fd.running(), exp) {
+		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running()),
 			spew.Sdump(exp))
 	}
 
 	exp = map[string][]string{
 		Ovsvswitchd: ovsExecArgs(ip, leaderIP),
 	}
-	if !reflect.DeepEqual(ctx.fd.exec, exp) {
-		t.Errorf("fd.exec = %s\n\nwant %s", spew.Sdump(ctx.fd.exec),
-			spew.Sdump(exp))
+	exec = ctx.fd.GetExec()
+	if !reflect.DeepEqual(exec, exp) {
+		t.Errorf("fd.exec = %s\n\nwant %s", spew.Sdump(exec), spew.Sdump(exp))
 	}
 }
 
@@ -304,8 +311,8 @@ func TestEtcdAdd(t *testing.T) {
 		Ovsdb: {"ovsdb-server"},
 		Swarm: swarmArgsMaster(ip),
 	}
-	if !reflect.DeepEqual(ctx.fd.running, exp) {
-		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running),
+	if !reflect.DeepEqual(ctx.fd.running(), exp) {
+		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running()),
 			spew.Sdump(exp))
 	}
 
@@ -327,8 +334,8 @@ func TestEtcdAdd(t *testing.T) {
 		Ovsdb: {"ovsdb-server"},
 		Swarm: swarmArgsMaster(ip),
 	}
-	if !reflect.DeepEqual(ctx.fd.running, exp) {
-		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running),
+	if !reflect.DeepEqual(ctx.fd.running(), exp) {
+		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running()),
 			spew.Sdump(exp))
 	}
 }
@@ -354,8 +361,8 @@ func TestEtcdRemove(t *testing.T) {
 		Ovsdb: {"ovsdb-server"},
 		Swarm: swarmArgsMaster(ip),
 	}
-	if !reflect.DeepEqual(ctx.fd.running, exp) {
-		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running),
+	if !reflect.DeepEqual(ctx.fd.running(), exp) {
+		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running()),
 			spew.Sdump(exp))
 	}
 
@@ -377,8 +384,8 @@ func TestEtcdRemove(t *testing.T) {
 		Ovsdb: {"ovsdb-server"},
 		Swarm: swarmArgsMaster(ip),
 	}
-	if !reflect.DeepEqual(ctx.fd.running, exp) {
-		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running),
+	if !reflect.DeepEqual(ctx.fd.running(), exp) {
+		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running()),
 			spew.Sdump(exp))
 	}
 }
@@ -442,12 +449,11 @@ type testCtx struct {
 
 func initTest() testCtx {
 	conn := db.New()
-	ctx := testCtx{supervisor{},
-		fakeDocker{make(map[string][]string), make(map[string][]string),
-			make(map[string]bool)},
-		conn, conn.Trigger(db.MinionTable, db.EtcdTable)}
+	md, dk := docker.NewMock()
+	ctx := testCtx{supervisor{}, fakeDocker{dk, md}, conn,
+		conn.Trigger(db.MinionTable, db.EtcdTable)}
 	ctx.sv.conn = ctx.conn
-	ctx.sv.dk = ctx.fd
+	ctx.sv.dk = ctx.fd.Client
 
 	ctx.conn.Transact(func(view db.Database) error {
 		m := view.InsertMinion()
@@ -470,75 +476,30 @@ func (ctx testCtx) run() {
 }
 
 type fakeDocker struct {
-	running   map[string][]string
-	exec      map[string][]string
-	lswitches map[string]bool
+	docker.Client
+	md *docker.MockClient
 }
 
-func (f fakeDocker) Run(opts docker.RunOptions) (string, error) {
-	validateImage(opts.Name)
-	if _, ok := f.running[opts.Name]; ok {
-		return "", nil
+func (f fakeDocker) GetExec() map[string][]string {
+	res := map[string][]string{}
+	for id, cmds := range f.md.Executions {
+		c, err := f.Get(id)
+		if err != nil {
+			continue
+		}
+		res[c.Name] = strings.Split(cmds[0], " ")
 	}
-
-	f.running[opts.Name] = opts.Args
-	return "", nil
+	return res
 }
 
-func (f fakeDocker) Exec(image string, cmd ...string) error {
-	validateImage(image)
-	f.exec[image] = cmd
-	return nil
-}
+func (f fakeDocker) running() map[string][]string {
+	containers, _ := f.List(nil)
 
-func (f fakeDocker) Remove(image string) error {
-	validateImage(image)
-	delete(f.running, image)
-	return nil
-}
-
-func (f fakeDocker) RemoveAll() {
-	for k := range f.running {
-		delete(f.running, k)
+	res := map[string][]string{}
+	for _, c := range containers {
+		res[c.Name] = c.Args
 	}
-}
-
-func (f fakeDocker) Inspect(id string) (*dkc.Container, error) {
-	return &dkc.Container{}, nil
-}
-
-func (f fakeDocker) Pull(image string) error {
-	return nil
-}
-
-func (f fakeDocker) IsRunning(name string) (bool, error) {
-	_, running := f.running[name]
-	return running, nil
-}
-
-func (f fakeDocker) ExecVerbose(name string, cmd ...string) ([]byte, error) {
-	panic("Supervisor does not ExecVerbose()")
-}
-
-func (f fakeDocker) RemoveID(id string) error {
-	panic("Supervisor does not RemoveID()")
-}
-
-func (f fakeDocker) List(filters map[string][]string) ([]docker.Container, error) {
-	panic("Supervisor does not List()")
-}
-
-func (f fakeDocker) Get(id string) (docker.Container, error) {
-	panic("Supervisor does not Get()")
-}
-
-func (f fakeDocker) WriteToContainer(id, src, dst, archiveName string,
-	permission int) error {
-	panic("Supervisor does not WriteToContainer()")
-}
-
-func (f fakeDocker) GetFromContainer(id string, src string) (string, error) {
-	panic("Supervisor does not WriteToContainer()")
+	return res
 }
 
 func swarmArgsMaster(ip string) []string {

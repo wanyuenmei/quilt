@@ -59,18 +59,10 @@ type Container struct {
 type ContainerSlice []Container
 
 // A Client to the local docker daemon.
-type Client interface {
-	Run(opts RunOptions) (string, error)
-	Exec(name string, cmd ...string) error
-	ExecVerbose(name string, cmd ...string) ([]byte, error)
-	Remove(name string) error
-	RemoveID(id string) error
-	Pull(image string) error
-	List(filters map[string][]string) ([]Container, error)
-	Get(id string) (Container, error)
-	WriteToContainer(id, src, dst, archiveName string, permission int) error
-	GetFromContainer(id string, src string) (string, error)
-	IsRunning(name string) (bool, error)
+type Client struct {
+	client
+	*sync.Mutex
+	imageCache map[string]struct{}
 }
 
 // RunOptions changes the behavior of the Run function.
@@ -87,10 +79,17 @@ type RunOptions struct {
 	VolumesFrom []string
 }
 
-type docker struct {
-	*dkc.Client
-	*sync.Mutex
-	imageCache map[string]struct{}
+type client interface {
+	StartContainer(id string, hostConfig *dkc.HostConfig) error
+	CreateExec(opts dkc.CreateExecOptions) (*dkc.Exec, error)
+	StartExec(id string, opts dkc.StartExecOptions) error
+	UploadToContainer(id string, opts dkc.UploadToContainerOptions) error
+	DownloadFromContainer(id string, opts dkc.DownloadFromContainerOptions) error
+	RemoveContainer(opts dkc.RemoveContainerOptions) error
+	PullImage(opts dkc.PullImageOptions, auth dkc.AuthConfiguration) error
+	ListContainers(opts dkc.ListContainersOptions) ([]dkc.APIContainers, error)
+	InspectContainer(id string) (*dkc.Container, error)
+	CreateContainer(dkc.CreateContainerOptions) (*dkc.Container, error)
 }
 
 // New creates client to the docker daemon.
@@ -107,10 +106,11 @@ func New(sock string) Client {
 		break
 	}
 
-	return docker{client, &sync.Mutex{}, map[string]struct{}{}}
+	return Client{client, &sync.Mutex{}, map[string]struct{}{}}
 }
 
-func (dk docker) Run(opts RunOptions) (string, error) {
+// Run creates and starts a new container in accordance RunOptions.
+func (dk Client) Run(opts RunOptions) (string, error) {
 	hc := dkc.HostConfig{
 		NetworkMode: opts.NetworkMode,
 		PidMode:     opts.PidMode,
@@ -130,12 +130,15 @@ func (dk docker) Run(opts RunOptions) (string, error) {
 	return id, nil
 }
 
-func (dk docker) Exec(name string, cmd ...string) error {
+// Exec executes a command within the container with the supplied name.
+func (dk Client) Exec(name string, cmd ...string) error {
 	_, err := dk.ExecVerbose(name, cmd...)
 	return err
 }
 
-func (dk docker) ExecVerbose(name string, cmd ...string) ([]byte, error) {
+// ExecVerbose executes a command within the container with the supplied name.  It also
+// returns the output of that command.
+func (dk Client) ExecVerbose(name string, cmd ...string) ([]byte, error) {
 	id, err := dk.getID(name)
 	if err != nil {
 		return nil, err
@@ -172,7 +175,7 @@ func (dk docker) ExecVerbose(name string, cmd ...string) ([]byte, error) {
 
 // WriteToContainer writes the contents of SRC into the file at path DST on the
 // container with id ID. Overwrites DST if it already exists.
-func (dk docker) WriteToContainer(id, src, dst, archiveName string,
+func (dk Client) WriteToContainer(id, src, dst, archiveName string,
 	permission int) error {
 
 	tarBuf, err := util.ToTar(archiveName, permission, src)
@@ -194,7 +197,7 @@ func (dk docker) WriteToContainer(id, src, dst, archiveName string,
 
 // GetFromContainer returns a string containing the content of the file named
 // SRC on the container with id ID.
-func (dk docker) GetFromContainer(id string, src string) (string, error) {
+func (dk Client) GetFromContainer(id string, src string) (string, error) {
 	var buffIn bytes.Buffer
 	var buffOut bytes.Buffer
 	err := dk.DownloadFromContainer(id, dkc.DownloadFromContainerOptions{
@@ -222,10 +225,11 @@ func (dk docker) GetFromContainer(id string, src string) (string, error) {
 	return buffOut.String(), nil
 }
 
-func (dk docker) Remove(name string) error {
+// Remove stops and deletes the container with the given name.
+func (dk Client) Remove(name string) error {
 	id, err := dk.getID(name)
 	if err != nil {
-		return nil // Can't remove a non-existent container.
+		return err
 	}
 
 	log.WithFields(log.Fields{
@@ -235,12 +239,13 @@ func (dk docker) Remove(name string) error {
 	return dk.removeID(id)
 }
 
-func (dk docker) RemoveID(id string) error {
+// RemoveID stops and deletes the container with the given ID.
+func (dk Client) RemoveID(id string) error {
 	log.WithField("id", id).Info("Remove Container.")
 	return dk.removeID(id)
 }
 
-func (dk docker) removeID(id string) error {
+func (dk Client) removeID(id string) error {
 	err := dk.RemoveContainer(dkc.RemoveContainerOptions{ID: id, Force: true})
 	if err != nil {
 		return err
@@ -249,7 +254,8 @@ func (dk docker) removeID(id string) error {
 	return nil
 }
 
-func (dk docker) Pull(image string) error {
+// Pull retrieves the given docker image from an image cache.
+func (dk Client) Pull(image string) error {
 	dk.Lock()
 	defer dk.Unlock()
 
@@ -267,11 +273,13 @@ func (dk docker) Pull(image string) error {
 	return nil
 }
 
-func (dk docker) List(filters map[string][]string) ([]Container, error) {
+// List returns a slice of all running containers.  The List can be be filtered with the
+// supplied `filters` map.
+func (dk Client) List(filters map[string][]string) ([]Container, error) {
 	return dk.list(filters, false)
 }
 
-func (dk docker) list(filters map[string][]string, all bool) ([]Container, error) {
+func (dk Client) list(filters map[string][]string, all bool) ([]Container, error) {
 	opts := dkc.ListContainersOptions{All: all, Filters: filters}
 	apics, err := dk.ListContainers(opts)
 	if err != nil {
@@ -293,7 +301,8 @@ func (dk docker) list(filters map[string][]string, all bool) ([]Container, error
 	return containers, nil
 }
 
-func (dk docker) Get(id string) (Container, error) {
+// Get returns a Container corresponding to the supplied ID.
+func (dk Client) Get(id string) (Container, error) {
 	c, err := dk.InspectContainer(id)
 	if err != nil {
 		return Container{}, err
@@ -320,7 +329,8 @@ func (dk docker) Get(id string) (Container, error) {
 	}, nil
 }
 
-func (dk docker) IsRunning(name string) (bool, error) {
+// IsRunning returns true if the contianer with the given `name` is running.
+func (dk Client) IsRunning(name string) (bool, error) {
 	containers, err := dk.List(map[string][]string{
 		"name": {name},
 	})
@@ -330,7 +340,7 @@ func (dk docker) IsRunning(name string) (bool, error) {
 	return len(containers) != 0, nil
 }
 
-func (dk docker) create(name, image string, args []string, labels map[string]string,
+func (dk Client) create(name, image string, args []string, labels map[string]string,
 	env map[string]struct{}, hc *dkc.HostConfig) (string, error) {
 	if err := dk.Pull(image); err != nil {
 		return "", err
@@ -357,7 +367,7 @@ func (dk docker) create(name, image string, args []string, labels map[string]str
 	return container.ID, nil
 }
 
-func (dk docker) getID(name string) (string, error) {
+func (dk Client) getID(name string) (string, error) {
 	containers, err := dk.list(map[string][]string{"name": {name}}, true)
 	if err != nil {
 		return "", err
