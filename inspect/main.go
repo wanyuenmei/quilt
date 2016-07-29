@@ -11,7 +11,8 @@ import (
 
 const quiltPath = "QUILT_PATH"
 
-func usage() {
+// Usage prints the usage string for the inspect tool.
+func Usage() {
 	fmt.Fprintln(
 		os.Stderr,
 		`quilt inspect is a tool that helps visualize Stitch specifications.
@@ -20,22 +21,22 @@ Dependencies
  - easy-graph (install Graph::Easy from cpan)
  - graphviz (install from your favorite package manager)`,
 	)
-	os.Exit(1)
 }
 
 // Main is the main function for inspect tool. Helps visualize stitches.
-func Main(opts []string) {
-	if arglen := len(opts); arglen < 3 {
-		fmt.Println("not enough arguments: ", arglen-1)
-		usage()
+func Main(opts []string) int {
+	if arglen := len(opts); arglen < 2 {
+		fmt.Println("not enough arguments: ", arglen)
+		Usage()
+		return 1
 	}
 
-	configPath := opts[1]
+	configPath := opts[0]
 
 	f, err := os.Open(configPath)
 	if err != nil {
 		fmt.Println(err)
-		os.Exit(1)
+		return 1
 	}
 	defer f.Close()
 
@@ -48,21 +49,24 @@ func Main(opts []string) {
 	spec, err := stitch.New(*sc.Init(bufio.NewReader(f)), pathStr, false)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return 1
 	}
 
 	graph, err := stitch.InitializeGraph(spec)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return 1
 	}
 
-	switch opts[2] {
+	switch opts[1] {
 	case "pdf":
 		fallthrough
 	case "ascii":
-		viz(configPath, spec, graph, opts[2])
+		viz(configPath, spec, graph, opts[1])
 	default:
-		usage()
+		Usage()
+		return 1
 	}
+
+	return 0
 }

@@ -1,6 +1,7 @@
 package command
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/NetSys/quilt/db"
@@ -62,4 +63,36 @@ func TestContainerOutput(t *testing.T) {
 	if res != exp {
 		t.Errorf("Expected container command to print %s, but got %s.", exp, res)
 	}
+}
+
+func checkGetParsing(t *testing.T, args []string, expImport string, expErr error) {
+	getCmd := Get{}
+	err := getCmd.Parse(args)
+
+	if expErr != nil {
+		if err.Error() != expErr.Error() {
+			t.Errorf("Expected error %s, but got %s",
+				expErr.Error(), err.Error())
+		}
+		return
+	}
+
+	if err != nil {
+		t.Errorf("Unexpected error when parsing get args: %s", err.Error())
+		return
+	}
+
+	if getCmd.importPath != expImport {
+		t.Errorf("Expected get command to parse arg %s, but got %s",
+			expImport, getCmd.importPath)
+	}
+}
+
+func TestGetFlags(t *testing.T) {
+	t.Parallel()
+
+	expImport := "spec"
+	checkGetParsing(t, []string{"-import", expImport}, expImport, nil)
+	checkGetParsing(t, []string{expImport}, expImport, nil)
+	checkGetParsing(t, []string{}, "", errors.New("no import specified"))
 }

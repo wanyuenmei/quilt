@@ -13,6 +13,8 @@ import (
 var commands = map[string]command.SubCommand{
 	"machines":   &command.Machine{},
 	"containers": &command.Container{},
+	"get":        &command.Get{},
+	"inspect":    &command.Inspect{},
 }
 
 // Run parses and runs the quiltctl subcommand given the command line arguments.

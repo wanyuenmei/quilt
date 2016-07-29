@@ -18,7 +18,6 @@ import (
 	"github.com/NetSys/quilt/cluster"
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/engine"
-	"github.com/NetSys/quilt/inspect"
 	"github.com/NetSys/quilt/minion"
 	"github.com/NetSys/quilt/quiltctl"
 	"github.com/NetSys/quilt/stitch"
@@ -77,11 +76,6 @@ func main() {
 		go configLoop(conn, flag.Arg(1))
 	case subcommand == "stop":
 		stop(conn, flag.Arg(1))
-	case subcommand == "get":
-		getSpec(flag.Arg(1))
-	case subcommand == "inspect":
-		inspect.Main(flag.Args())
-		return
 	case subcommand == "minion":
 		minion.Run()
 		return
@@ -94,14 +88,6 @@ func main() {
 
 	go server.Run(conn, *lAddr)
 	cluster.Run(conn)
-}
-
-func getSpec(importPath string) {
-	if err := stitch.GetSpec(importPath); err != nil {
-		log.Error(err)
-	}
-
-	os.Exit(0)
 }
 
 func stop(conn db.Conn, namespace string) {
