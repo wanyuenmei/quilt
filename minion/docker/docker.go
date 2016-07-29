@@ -123,9 +123,6 @@ func (dk docker) Run(opts RunOptions) (string, error) {
 	}
 
 	if err = dk.StartContainer(id, &hc); err != nil {
-		if _, ok := err.(*dkc.ContainerAlreadyRunning); ok {
-			return id, nil
-		}
 		dk.removeID(id) // Remove the container to avoid a zombie.
 		return "", err
 	}
