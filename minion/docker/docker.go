@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/NetSys/quilt/util"
@@ -86,15 +87,10 @@ type RunOptions struct {
 	VolumesFrom []string
 }
 
-type pullRequest struct {
-	image string
-	done  chan error
-}
-
 type docker struct {
 	*dkc.Client
-
-	pullChan chan pullRequest
+	*sync.Mutex
+	imageCache map[string]struct{}
 }
 
 // New creates client to the docker daemon.
@@ -111,32 +107,7 @@ func New(sock string) Client {
 		break
 	}
 
-	dk := docker{client, make(chan pullRequest)}
-	go pullServer(dk)
-
-	return dk
-}
-
-func pullServer(dk docker) {
-	images := make(map[string]struct{})
-
-	for req := range dk.pullChan {
-		if _, ok := images[req.image]; ok {
-			req.done <- nil
-			continue
-		}
-
-		log.Infof("Pulling docker image %s.", req.image)
-		opts := dkc.PullImageOptions{Repository: string(req.image)}
-		err := dk.PullImage(opts, dkc.AuthConfiguration{})
-
-		if err != nil {
-			log.WithError(err).Errorf("Failed to pull image %s.", req.image)
-		} else {
-			images[req.image] = struct{}{}
-		}
-		req.done <- err
-	}
+	return docker{client, &sync.Mutex{}, map[string]struct{}{}}
 }
 
 func (dk docker) Run(opts RunOptions) error {
@@ -292,9 +263,21 @@ func (dk docker) removeID(id string) error {
 }
 
 func (dk docker) Pull(image string) error {
-	done := make(chan error)
-	dk.pullChan <- pullRequest{image, done}
-	return <-done
+	dk.Lock()
+	defer dk.Unlock()
+
+	if _, ok := dk.imageCache[image]; ok {
+		return nil
+	}
+
+	log.Infof("Pulling docker image %s.", image)
+	opts := dkc.PullImageOptions{Repository: image}
+	if err := dk.PullImage(opts, dkc.AuthConfiguration{}); err != nil {
+		return err
+	}
+
+	dk.imageCache[image] = struct{}{}
+	return nil
 }
 
 func (dk docker) List(filters map[string][]string) ([]Container, error) {
