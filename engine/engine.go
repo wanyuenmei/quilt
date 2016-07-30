@@ -142,10 +142,10 @@ func toDBMachine(machines []stitch.Machine, maxPrice float64) []db.Machine {
 		dbMachines = append(dbMachines, provider.DefaultRegion(m))
 	}
 
-	if !hasMaster && hasWorker {
+	if hasMaster && !hasWorker {
 		log.Warning("A Master was specified but no workers.")
 		return nil
-	} else if hasMaster && !hasWorker {
+	} else if hasWorker && !hasMaster {
 		log.Warning("A Worker was specified but no masters.")
 		return nil
 	}
