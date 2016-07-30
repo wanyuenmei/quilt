@@ -378,8 +378,9 @@ func (sv *supervisor) run(name string, args ...string) {
 }
 
 func (sv *supervisor) Remove(name string) {
-	if err := sv.dk.Remove(name); err != nil {
-		log.WithError(err).Warnf("Failed to remove %s.")
+	err := sv.dk.Remove(name)
+	if err != nil && err != docker.ErrNoSuchContainer {
+		log.WithError(err).Warnf("Failed to remove %s.", name)
 	}
 }
 

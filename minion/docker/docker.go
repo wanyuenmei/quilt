@@ -40,7 +40,9 @@ const (
 	SchedulerLabelPair = SchedulerLabelKey + "=" + SchedulerLabelValue
 )
 
-var errNoSuchContainer = errors.New("container does not exist")
+// ErrNoSuchContainer is the error returned when an operation is requested on a
+// non-existent container.
+var ErrNoSuchContainer = errors.New("container does not exist")
 
 // A Container as returned by the docker client API.
 type Container struct {
@@ -377,7 +379,7 @@ func (dk Client) getID(name string) (string, error) {
 		return containers[0].ID, nil
 	}
 
-	return "", errNoSuchContainer
+	return "", ErrNoSuchContainer
 }
 
 // UserLabel returns the supplied label tagged with the user prefix.

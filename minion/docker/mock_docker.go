@@ -143,7 +143,7 @@ func (dk MockClient) InspectContainer(id string) (*dkc.Container, error) {
 
 	container, ok := dk.Containers[id]
 	if !ok {
-		return nil, errNoSuchContainer
+		return nil, ErrNoSuchContainer
 	}
 
 	return container.Container, nil
