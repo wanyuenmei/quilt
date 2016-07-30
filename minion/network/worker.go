@@ -916,8 +916,8 @@ func updateOpenFlow(dk docker.Client, odb ovsdb.Ovsdb, containers []db.Container
 
 func generateCurrentOpenFlow(dk docker.Client) (OFRuleSlice, error) {
 	args := "ovs-ofctl dump-flows " + quiltBridge
-	stdout, _, err := dk.ExecVerbose(
-		supervisor.Ovsvswitchd, strings.Split(args, " ")...)
+	stdout, err := dk.ExecVerbose(supervisor.Ovsvswitchd,
+		strings.Split(args, " ")...)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to list OpenFlow flows: %s",

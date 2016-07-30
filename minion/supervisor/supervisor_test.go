@@ -516,7 +516,7 @@ func (f fakeDocker) IsRunning(name string) (bool, error) {
 	return running, nil
 }
 
-func (f fakeDocker) ExecVerbose(name string, cmd ...string) ([]byte, []byte, error) {
+func (f fakeDocker) ExecVerbose(name string, cmd ...string) ([]byte, error) {
 	panic("Supervisor does not ExecVerbose()")
 }
 

@@ -61,7 +61,7 @@ type ContainerSlice []Container
 type Client interface {
 	Run(opts RunOptions) error
 	Exec(name string, cmd ...string) error
-	ExecVerbose(name string, cmd ...string) ([]byte, []byte, error)
+	ExecVerbose(name string, cmd ...string) ([]byte, error)
 	Remove(name string) error
 	RemoveID(id string) error
 	Pull(image string) error
@@ -173,14 +173,14 @@ func (dk docker) Run(opts RunOptions) error {
 }
 
 func (dk docker) Exec(name string, cmd ...string) error {
-	_, _, err := dk.ExecVerbose(name, cmd...)
+	_, err := dk.ExecVerbose(name, cmd...)
 	return err
 }
 
-func (dk docker) ExecVerbose(name string, cmd ...string) ([]byte, []byte, error) {
+func (dk docker) ExecVerbose(name string, cmd ...string) ([]byte, error) {
 	id, err := dk.getID(name)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	var inBuff, outBuff bytes.Buffer
@@ -190,7 +190,7 @@ func (dk docker) ExecVerbose(name string, cmd ...string) ([]byte, []byte, error)
 		AttachStdout: true})
 
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	err = dk.StartExec(exec.ID, dkc.StartExecOptions{
@@ -198,7 +198,7 @@ func (dk docker) ExecVerbose(name string, cmd ...string) ([]byte, []byte, error)
 	})
 
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	scanner := bufio.NewScanner(bytes.NewReader(inBuff.Bytes()))
@@ -206,10 +206,10 @@ func (dk docker) ExecVerbose(name string, cmd ...string) ([]byte, []byte, error)
 		outBuff.WriteString(scanner.Text() + "\n")
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return outBuff.Bytes(), outBuff.Bytes(), nil
+	return outBuff.Bytes(), nil
 }
 
 // WriteToContainer writes the contents of SRC into the file at path DST on the
