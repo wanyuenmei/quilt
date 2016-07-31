@@ -412,7 +412,11 @@ func machineAttributeImpl(ctx *evalCtx, args []ast) (ast, error) {
 }
 
 func providerImpl(ctx *evalCtx, args []ast) (ast, error) {
-	return astProvider((args[0].(astString))), nil
+	providerStr, ok := args[0].(astString)
+	if !ok {
+		return nil, fmt.Errorf("provider must be a string: %s", args[0])
+	}
+	return astProvider(providerStr), nil
 }
 
 func roleImpl(ctx *evalCtx, args []ast) (ast, error) {
@@ -432,7 +436,11 @@ func regionImpl(ctx *evalCtx, args []ast) (ast, error) {
 }
 
 func sizeImpl(ctx *evalCtx, args []ast) (ast, error) {
-	return astSize((args[0].(astString))), nil
+	sizeStr, ok := args[0].(astString)
+	if !ok {
+		return nil, fmt.Errorf("size must be a string: %s", args[0])
+	}
+	return astSize(sizeStr), nil
 }
 
 func diskSizeImpl(ctx *evalCtx, args []ast) (ast, error) {
