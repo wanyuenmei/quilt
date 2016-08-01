@@ -12,8 +12,6 @@ import (
 // Run synchronizes state in `conn` with the Etcd cluster.
 func Run(conn db.Conn) {
 	store := NewStore()
-	<-store.BootWait()
-
 	createMinionDir(store)
 
 	go runElection(conn, store)

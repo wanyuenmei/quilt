@@ -188,12 +188,6 @@ func (m mock) createPrefix(path string) (Tree, string, error) {
 	return tree, node, err
 }
 
-func (m mock) BootWait() chan struct{} {
-	chn := make(chan struct{})
-	close(chn)
-	return chn
-}
-
 func splitPath(path string) []string {
 	if path[0] != '/' {
 		// If this was real code, we should just return an error.  Since this is
