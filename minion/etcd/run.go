@@ -24,15 +24,14 @@ func createMinionDir(store Store) {
 		if err == nil {
 			return
 		}
+		log.WithError(err).Debug()
 
 		// If the directory already exists, no need to create it
 		etcdErr, ok := err.(client.Error)
 		if ok && etcdErr.Code == client.ErrorCodeNodeExist {
-			log.WithError(etcdErr).Debug()
 			return
 		}
 
-		log.WithError(err).Warn()
 		time.Sleep(5 * time.Second)
 	}
 }
