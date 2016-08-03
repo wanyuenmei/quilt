@@ -35,7 +35,6 @@ const (
 	imageVersion            = "15.10.201511161"
 	resourceGroupName       = "quilt"
 	resourceGroupLocation   = "centralus"
-	storageType             = "Standard_GRS"
 	subnetName              = "quiltsubnet"
 	nsTag                   = "quilt-namespace"
 	vmTag                   = "quilt-vm"
@@ -442,14 +441,15 @@ func (clst *azureCluster) configureStorageAccount(location string) (storage.Acco
 		return storageAccount, errors.New("storage account is not available")
 	}
 
-	properties := storage.AccountPropertiesCreateParameters{
-		AccountType: storage.AccountType(storageType),
+	sku := storage.Sku{
+		Name: storage.StandardGRS,
+		Tier: storage.Standard,
 	}
 
 	param := storage.AccountCreateParameters{
-		Location:   &location,
-		Properties: &properties,
-		Tags:       &map[string]*string{nsTag: &clst.namespace},
+		Location: &location,
+		Sku:      &sku,
+		Tags:     &map[string]*string{nsTag: &clst.namespace},
 	}
 
 	cancel := make(chan struct{})
