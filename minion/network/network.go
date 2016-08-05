@@ -12,7 +12,6 @@ import (
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/minion/docker"
 	"github.com/NetSys/quilt/minion/ovsdb"
-	"github.com/NetSys/quilt/util"
 
 	log "github.com/Sirupsen/logrus"
 )
@@ -98,36 +97,34 @@ func runMaster(conn db.Conn) {
 			continue
 		}
 
-		if _, ok := garbageMap[dbl.Label]; ok {
-			delete(garbageMap, dbl.Label)
+		if _, ok := garbageMap[dbl.IP]; ok {
+			delete(garbageMap, dbl.IP)
 			continue
 		}
 
 		log.WithFields(log.Fields{
-			"name": dbl.Label,
-			"IP":   dbl.IP,
+			"IP": dbl.IP,
 		}).Info("New logical port.")
-		err := ovsdb.CreatePort(lSwitch, dbl.Label, labelMac, dbl.IP)
+		err := ovsdb.CreatePort(lSwitch, dbl.IP, labelMac, dbl.IP)
 		if err != nil {
-			log.WithError(err).Warnf("Failed to create port %s.", dbl.Label)
+			log.WithError(err).Warnf("Failed to create port %s.", dbl.IP)
 		}
 	}
 
 	for _, dbc := range containers {
-		if _, ok := garbageMap[dbc.DockerID]; ok {
-			delete(garbageMap, dbc.DockerID)
+		if _, ok := garbageMap[dbc.IP]; ok {
+			delete(garbageMap, dbc.IP)
 			continue
 		}
 
 		log.WithFields(log.Fields{
-			"name": util.ShortUUID(dbc.DockerID),
-			"IP":   dbc.IP,
+			"IP": dbc.IP,
 		}).Info("New logical port.")
-		err := ovsdb.CreatePort("quilt", dbc.DockerID, dbc.Mac, dbc.IP)
+		err := ovsdb.CreatePort("quilt", dbc.IP, dbc.Mac, dbc.IP)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"error": err,
-				"name":  dbc.DockerID,
+				"name":  dbc.IP,
 			}).Warn("Failed to create port.")
 		}
 	}

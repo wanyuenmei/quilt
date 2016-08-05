@@ -567,7 +567,7 @@ func generateTargetPorts(containers []db.Container) ovsPortSlice {
 			patch:       true,
 			peer:        peerQuilt,
 			attachedMAC: dbc.Mac,
-			ifaceID:     dbc.DockerID,
+			ifaceID:     dbc.IP,
 		})
 	}
 	return configs
