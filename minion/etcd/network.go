@@ -11,6 +11,7 @@ import (
 
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/join"
+	"github.com/NetSys/quilt/util"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/coreos/etcd/client"
@@ -241,7 +242,7 @@ func updateEtcdLabel(s Store, etcdData storeData, containers []db.Container) (st
 	// map, which was already synced in updateEtcdDocker
 	syncIPs(newMultiHosts, net.IPv4(10, 1, 0, 0))
 
-	if stringMapEquals(newMultiHosts, etcdData.multiHost) {
+	if util.StrStrMapEqual(newMultiHosts, etcdData.multiHost) {
 		return etcdData, nil
 	}
 
@@ -405,30 +406,6 @@ func randomIP(conflicts map[uint32]struct{}, prefix, mask uint32) uint32 {
 	}
 
 	return 0
-}
-
-func stringMapEquals(first, second map[string]string) bool {
-	if len(first) != len(second) {
-		return false
-	}
-	for k, f := range first {
-		if s, ok := second[k]; !ok || f != s {
-			return false
-		}
-	}
-	return true
-}
-
-func stringSliceEquals(first, second []string) bool {
-	if len(first) != len(second) {
-		return false
-	}
-	for i, s := range first {
-		if s != second[i] {
-			return false
-		}
-	}
-	return true
 }
 
 func (cs storeContainerSlice) Len() int {
