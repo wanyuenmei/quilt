@@ -3,6 +3,7 @@ package cluster
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -202,7 +203,8 @@ func (c clientImpl) getMinion() (pb.MinionConfig, error) {
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 	cfg, err := c.GetMinionConfig(ctx, &pb.Request{})
 	if err != nil {
-		if ctx.Err() == nil {
+		if ctx.Err() == nil && !strings.Contains(err.Error(),
+			"transport failure") {
 			log.WithError(err).Error("Failed to get minion config.")
 		}
 		return pb.MinionConfig{}, err
