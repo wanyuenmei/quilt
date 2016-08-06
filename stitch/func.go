@@ -953,7 +953,7 @@ func setImpl(ctx *evalCtx, args []ast) (ast, error) {
 	}
 
 	if _, ok := ctx.binds[ident]; !ok {
-		return nil, fmt.Errorf("undefined varaible: %s", ident)
+		return nil, fmt.Errorf("undefined variable: %s", ident)
 	}
 
 	var err error

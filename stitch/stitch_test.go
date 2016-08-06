@@ -2,7 +2,6 @@ package stitch
 
 import (
 	"fmt"
-	"golang.org/x/tools/go/vcs"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -11,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"text/scanner"
+
+	"golang.org/x/tools/go/vcs"
 
 	"github.com/NetSys/quilt/util"
 
@@ -104,7 +105,7 @@ func TestLet(t *testing.T) {
 func TestSet(t *testing.T) {
 	parseTest(t, "(progn (define a 3) (set a 4) a)", "4")
 
-	runtimeErr(t, "(set a 4)", "1: undefined varaible: a")
+	runtimeErr(t, "(set a 4)", "1: undefined variable: a")
 }
 
 func TestApply(t *testing.T) {

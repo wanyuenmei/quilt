@@ -298,7 +298,7 @@ func TestContainer(t *testing.T) {
 				case "Yellow":
 					yellowCount++
 				default:
-					err := spew.Sprintf("unkonwn label: %s", c)
+					err := spew.Sprintf("unknown label: %s", c)
 					return errors.New(err)
 				}
 			}

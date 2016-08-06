@@ -156,7 +156,7 @@ func (g *Graph) placeNodes() {
 
 		av := g.findAvailabilitySet(node)
 		if av == nil {
-			panic(fmt.Errorf("could not find availabilty set: %s", node))
+			panic(fmt.Errorf("could not find availability set: %s", node))
 		}
 		toMove := av.removeAndCheck(wantExclusives...)
 
