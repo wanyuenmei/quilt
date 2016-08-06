@@ -67,13 +67,13 @@ func (clst *azureCluster) Connect(namespace string) error {
 
 	cred, err := clst.loadCredentials()
 	if err != nil {
-		return nil
+		return err
 	}
 	clst.subscriptionID = cred.subscriptionID
 
 	spt, err := clst.generateOAuthToken(cred)
 	if err != nil {
-		return nil
+		return err
 	}
 	clst.azureClient = newAzureClient(clst.subscriptionID, spt)
 
