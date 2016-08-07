@@ -544,7 +544,8 @@
 		},
 		{
 			"ImportPath": "google.golang.org/grpc/transport",
-			"Rev": "ce6213360cb8fadd0b08f9513406176ec931c5f7"
+			"Comment": "v1.0.0-151-g35896af",
+			"Rev": "35896af9ad39c1fb1b1cd925fe3621be361e3d81"
 		},
 		{
 			"ImportPath": "github.com/dgrijalva/jwt-go",
