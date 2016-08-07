@@ -4,10 +4,7 @@ go:
 - 1.6
 
 install:
-    - go get github.com/davecgh/go-spew/spew
-    - go get github.com/golang/lint/golint
-    - go get github.com/mattn/goveralls
-    - go get github.com/modocache/gover
+    - make go-get
 
 script: ./scripts/build-push.sh
 

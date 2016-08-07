@@ -79,7 +79,10 @@ go-get:
 	    github.com/golang/protobuf/{proto,protoc-gen-go} \
 	    github.com/client9/misspell/cmd/misspell \
 	    github.com/gordonklaus/ineffassign \
+	    github.com/davecgh/go-spew/spew \
 	    github.com/golang/lint/golint \
+	    github.com/mattn/goveralls \
+	    github.com/modocache/gover \
 	    github.com/tools/godep
 
 # BUILD
