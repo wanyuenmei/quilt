@@ -65,6 +65,7 @@ lint: format
 			golint -min_confidence .25 $$package ; \
 		fi \
 	done
+	find . -path ./vendor -prune -o -name '*' | xargs misspell -error
 
 generate:
 	go generate $(PACKAGES)
@@ -75,6 +76,7 @@ providers:
 go-get:
 	go get -v -u \
 	    github.com/golang/protobuf/{proto,protoc-gen-go} \
+	    github.com/client9/misspell/cmd/misspell \
 	    github.com/golang/lint/golint \
 	    github.com/tools/godep
 

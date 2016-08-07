@@ -5,7 +5,7 @@ if [ -f ~/.quilt-tester.conf ] ; then
     source ~/.quilt-tester.conf
 fi
 
-# Try to guess the location of all the files if it's not explicitely set in the conf file
+# Try to guess the location of all the files if it's not explicitly set in the conf file
 if [ -z $TESTER_ROOT ] ; then
     TESTER_ROOT="$(dirname $(readlink -f $0))/.."
 fi

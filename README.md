@@ -68,7 +68,7 @@ some network connections.
     // Allow the webTier to connect to the database on port 1433
     (connect 1433 "webTier" "database")
 
-    // Allow the batch processer to connect to the database on and the webTier via SSH
+    // Allow the batch processor to connect to the database on and the webTier via SSH
     (connect 22 "batch" (list "webTier" "database"))
 
     // Allow all containers in the webTier to connect to each other on any port
