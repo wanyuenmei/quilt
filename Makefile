@@ -72,6 +72,12 @@ generate:
 providers:
 	python3 scripts/gce-descriptions > provider/gceConstants.go
 
+go-get:
+	go get -v -u \
+	    github.com/golang/protobuf/{proto,protoc-gen-go} \
+	    github.com/golang/lint/golint \
+	    github.com/tools/godep
+
 # BUILD
 docker-build-all: docker-build-tester docker-build-minion docker-build-ovs
 

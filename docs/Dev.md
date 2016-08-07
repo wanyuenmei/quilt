@@ -94,6 +94,11 @@ And finally to build the project run:
 
 Or alternatively just "go install" if you're in the repo.
 
+## Build Tools
+
+To do things beyond basic build and install, several additional build tools are
+required.  These can be installed with the `make go-get` target.
+
 ## Protobufs
 If you change any of the proto files, you'll need to regenerate the protobuf
 code.  This requres you to install the protobuf compiler found
