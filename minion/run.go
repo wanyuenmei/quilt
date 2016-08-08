@@ -1,5 +1,4 @@
-//go:generate protoc ./pb/pb.proto --go_out=plugins=grpc:.
-package main
+package minion
 
 import (
 	"time"
@@ -11,18 +10,16 @@ import (
 	"github.com/NetSys/quilt/minion/pprofile"
 	"github.com/NetSys/quilt/minion/scheduler"
 	"github.com/NetSys/quilt/minion/supervisor"
-	"github.com/NetSys/quilt/util"
 
 	log "github.com/Sirupsen/logrus"
 )
 
-func main() {
+// Run blocks executing the minion.
+func Run() {
 	// XXX Uncomment the following line to run the profiler
 	//runProfiler(5 * time.Minute)
 
 	log.Info("Minion Start")
-
-	log.SetFormatter(util.Formatter{})
 
 	conn := db.New()
 	dk := docker.New("unix:///var/run/docker.sock")

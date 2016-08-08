@@ -12,19 +12,11 @@ REPO = quilt
 DOCKER = docker
 SHELL := /bin/bash
 
-.PHONY: all
-all: quilt minion
-
-.PHONY: quilt
-quilt:
+all:
 	cd -P . && go build .
 
-.PHONY: minion
-minion:
-	cd -P . && go build -o ./minion/minion ./minion
-
 install:
-	cd -P . && go install . && go install ./inspect && go install ./minion
+	cd -P . && go install .
 
 check: format-check
 	go test $(PACKAGES)
@@ -85,30 +77,21 @@ go-get:
 	    github.com/modocache/gover \
 	    github.com/tools/godep
 
-# BUILD
-docker-build-all: docker-build-tester docker-build-minion docker-build-ovs
+docker-build-dev:
+	cd -P . && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build . \
+	    && ${DOCKER} build -t ${REPO}/quilt -f Dockerfile.Dev .
 
 docker-build-tester:
 	cd -P quilt-tester && ${DOCKER} build -t ${REPO}/tester .
 
-docker-build-minion:
-	cd -P minion && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build . \
-	 && ${DOCKER} build -t ${REPO}/minion .
-
 docker-build-ovs:
 	cd -P ovs && docker build -t ${REPO}/ovs .
 
-# PUSH
-#
-docker-push-all: docker-push-tester docker-push-minion
-	# We do not push the OVS container as it's built by the automated
-	# docker hub system.
+docker-push-dev:
+	${DOCKER} push ${REPO}/quilt
 
 docker-push-tester:
 	${DOCKER} push ${REPO}/tester
-
-docker-push-minion:
-	${DOCKER} push ${REPO}/minion
 
 docker-push-ovs:
 	${DOCKER} push ${REPO}/ovs

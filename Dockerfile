@@ -15,9 +15,8 @@ RUN VER=1.6.2 \
 && wget https://storage.googleapis.com/golang/go$VER.linux-amd64.tar.gz \
 && gunzip -c go$VER.linux-amd64.tar.gz | tar x \
 && go get -u github.com/NetSys/quilt \
-&& go test github.com/NetSys/quilt github.com/NetSys/quilt/minion \
+&& go test github.com/NetSys/quilt/... \
 && go install github.com/NetSys/quilt \
-&& go install github.com/NetSys/quilt/minion \
 && cp $GOPATH/bin/* /\
 && rm -rf /tmp/build \
 && apk del .build_deps

@@ -73,7 +73,7 @@ initialize_minion() {
 	ExecStart=/usr/bin/docker run --net=host --name=minion --privileged \
 	-v /var/run/docker.sock:/var/run/docker.sock \
 	-v /proc:/hostproc:ro -v /var/run/netns:/var/run/netns:rw %[1]s \
-	/minion
+	/quilt minion
 
 	[Install]
 	WantedBy=multi-user.target

@@ -1,3 +1,4 @@
+//go:generate protoc ./minion/pb/pb.proto --go_out=plugins=grpc:.
 package main
 
 import (
@@ -16,6 +17,7 @@ import (
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/engine"
 	"github.com/NetSys/quilt/inspect"
+	"github.com/NetSys/quilt/minion"
 	"github.com/NetSys/quilt/stitch"
 	"github.com/NetSys/quilt/util"
 
@@ -33,7 +35,7 @@ func main() {
 	log.SetFormatter(util.Formatter{})
 
 	flag.Usage = func() {
-		fmt.Println("Usage: quilt [inspect <stitch> | run <stitch>" +
+		fmt.Println("Usage: quilt [inspect <stitch> | run <stitch> | minion" +
 			" | stop <namespace> | get <import_path>]" +
 			" [-log-level=<level> | -l=<level>]")
 		fmt.Println("\nWhen provided a stitch, quilt takes responsibility\n" +
@@ -57,7 +59,8 @@ func main() {
 	log.SetLevel(level)
 
 	conn := db.New()
-	if len(flag.Args()) != 2 {
+	nArgs := len(flag.Args())
+	if nArgs < 1 || (flag.Arg(0) != "minion" && nArgs < 2) {
 		usage()
 	}
 
@@ -70,6 +73,9 @@ func main() {
 		getSpec(flag.Arg(1))
 	case "inspect":
 		inspect.Main(flag.Args())
+		return
+	case "minion":
+		minion.Run()
 		return
 	default:
 		usage()
