@@ -82,8 +82,8 @@ if docker inspect tester > /dev/null ; then
         docker rm tester 2>&1
 fi
 docker pull $container
-docker run -d -v $TESTER_HOME/.aws:/root/.aws -v /var/www:/var/www -e \
-MY_IP=$ip -e SLACK_CHANNEL="$slack_channel" --name=tester --net=host $container
+docker run -d -v $TESTER_HOME/.aws:/root/.aws -v /var/www:/var/www -v /etc/localtime:/etc/localtime:ro \
+-e MY_IP=$ip -e SLACK_CHANNEL="$slack_channel" --name=tester --net=host $container
 
 echo "Logs at: http://$ip/latest/log"
 exit 0
