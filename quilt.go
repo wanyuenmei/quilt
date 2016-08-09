@@ -29,13 +29,6 @@ import (
 )
 
 func main() {
-	/* XXX: GRPC spews a lot of uselss log message so we tell to eat its logs.
-	 * Once we have more sophistcated logging support, we should enable the log
-	 * messages when in debug mode. */
-	grpclog.SetLogger(l_mod.New(ioutil.Discard, "", 0))
-
-	log.SetFormatter(util.Formatter{})
-
 	flag.Usage = func() {
 		fmt.Println("Usage: quilt " +
 			"[-log-level=<level> | -l=<level> | -H=<listen_address>] " +
@@ -63,6 +56,14 @@ func main() {
 		usage()
 	}
 	log.SetLevel(level)
+	log.SetFormatter(util.Formatter{})
+
+	// GRPC spews a lot of useless log messages so we tell to eat its logs, unless
+	// we are in debug mode
+	grpclog.SetLogger(l_mod.New(ioutil.Discard, "", 0))
+	if level == log.DebugLevel {
+		grpclog.SetLogger(log.StandardLogger())
+	}
 
 	conn := db.New()
 	nArgs := len(flag.Args())
