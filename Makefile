@@ -20,14 +20,19 @@ install:
 	cd -P . && go install .
 
 check: format-check
-	go test $(PACKAGES)
+	# XXX: Hack to make `make check` skip the quilt-tester test scripts.
+	# `test` fails on the these files because they're scripts, and thus
+	# are all in package `main`, and define function `main`.
+	go test $(filter-out %quilt-tester/tests/basic %quilt-tester/tests/spark, $(PACKAGES))
 
 clean:
 	go clean -x $(PACKAGES)
 	rm -f *.cov.coverprofile cluster/*.cov.coverprofile minion/*.cov.coverprofile specs/*.cov.coverprofile
 	rm -f *.cov.html cluster/*.cov.html minion/*.cov.html specs/*.cov.html
 
-COV_SKIP= /minion/pb /minion/pprofile /api/pb /constants /scripts
+COV_SKIP= /minion/pb /minion/pprofile /api/pb /constants /scripts /quilt-tester \
+		  /quilt-tester/tests/basic /quilt-tester/tests/basic/check_docker.go \
+		  /quilt-tester/tests/basic/check_logs.go \
 
 COV_PKG = $(subst github.com/NetSys/quilt,,$(PACKAGES))
 coverage: $(addsuffix .cov, $(filter-out $(COV_SKIP), $(COV_PKG)))
@@ -78,12 +83,23 @@ go-get:
 	    github.com/modocache/gover \
 	    github.com/tools/godep
 
+tests:
+	cd -P quilt-tester && \
+	for suite in tests/* ; do \
+		for f in $$suite/* ; do \
+			if [ $${f: -3} == ".go" ] ; then \
+				CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o $${f%???} $$f ; \
+			fi \
+		done \
+	done
+
 docker-build-dev:
 	cd -P . && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build . \
 	    && ${DOCKER} build -t ${REPO}/quilt -f Dockerfile.Dev .
 
-docker-build-tester:
-	cd -P quilt-tester && ${DOCKER} build -t ${REPO}/tester .
+docker-build-tester: tests
+	cd -P quilt-tester && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/quilt-tester . \
+	&& ${DOCKER} build -t ${REPO}/tester .
 
 docker-build-ovs:
 	cd -P ovs && docker build -t ${REPO}/ovs .

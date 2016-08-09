@@ -1,0 +1,3 @@
+bin/quilt-tester
+tests/basic/check_docker
+tests/basic/check_logs
