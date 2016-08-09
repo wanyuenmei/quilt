@@ -11,6 +11,7 @@ import (
 
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/join"
+	"github.com/NetSys/quilt/minion/network"
 	"github.com/NetSys/quilt/util"
 
 	log "github.com/Sirupsen/logrus"
@@ -22,11 +23,6 @@ const (
 	labelToIPStore = minionDir + "/labelIP"
 	containerStore = minionDir + "/container"
 )
-
-// XXX: This really shouldn't live in here.  It's just a temporary measure, soon we'll
-// disentangle the etcd logic from the IP allocation logic.  At that point, we can ditch
-// this.
-const gatewayIP = "10.0.0.1"
 
 // We store rand.Uint32() in a variable so it's easily mocked out by the unit tests.
 // Nondeterminism is hard to test.
@@ -422,7 +418,7 @@ func syncIPs(ipMap map[string]string, prefixIP net.IP) {
 	}
 
 	// Don't assign the IP of the default gateway
-	ipSet[parseIP(gatewayIP, prefix, mask)] = struct{}{}
+	ipSet[parseIP(network.GatewayIP, prefix, mask)] = struct{}{}
 	for _, k := range unassigned {
 		ip32 := randomIP(ipSet, prefix, mask)
 		if ip32 == 0 {

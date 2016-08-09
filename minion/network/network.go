@@ -20,7 +20,10 @@ const labelMac = "0a:00:00:00:00:00"
 const lSwitch = "quilt"
 const quiltBridge = "quilt-int"
 const ovnBridge = "br-int"
-const gatewayIP = "10.0.0.1"
+
+// GatewayIP is the address of the border router in the logical network.
+const GatewayIP = "10.0.0.1"
+
 const gatewayMAC = "02:00:0a:00:00:01"
 
 // Run blocks implementing the network services.

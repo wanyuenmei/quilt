@@ -720,7 +720,7 @@ func updateDefaultGw(odb ovsdb.Ovsdb) {
 		return
 	}
 
-	targetIPs := []string{gatewayIP + "/8"}
+	targetIPs := []string{GatewayIP + "/8"}
 	if err := updateIPs("", quiltBridge, currIPs, targetIPs); err != nil {
 		log.WithError(err).Errorf("failed to update IPs")
 	}
@@ -810,7 +810,7 @@ func updateRoutes(containers []db.Container) {
 			isDefault: false,
 		},
 		{
-			ip:        gatewayIP,
+			ip:        GatewayIP,
 			dev:       innerVeth,
 			isDefault: true,
 		},
