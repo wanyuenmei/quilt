@@ -26,6 +26,7 @@ func main() {
 	flag.Usage = func() {
 		fmt.Println("Usage: quilt " +
 			"[-log-level=<level> | -l=<level>] [-H=<listen_address>] " +
+			"[log-file=<log_output_file>] " +
 			"[daemon | inspect <stitch> | run <stitch> | minion | " +
 			"stop <namespace> | get <import_path> | " +
 			"machines | containers | ssh <machine>]")
@@ -38,6 +39,7 @@ func main() {
 			"            debug, info, warn, error, fatal or panic.")
 	}
 
+	var logOut = flag.String("log-file", "", "log output file (will be overwritten)")
 	var logLevel = flag.String("log-level", "info", "level to set logger to")
 	flag.StringVar(logLevel, "l", "info", "level to set logger to")
 	var lAddr = flag.String("H", api.DefaultSocket,
@@ -51,6 +53,16 @@ func main() {
 	}
 	log.SetLevel(level)
 	log.SetFormatter(util.Formatter{})
+
+	if *logOut != "" {
+		file, err := os.Create(*logOut)
+		if err != nil {
+			fmt.Printf("Failed to create file %s\n", *logOut)
+			os.Exit(1)
+		}
+		defer file.Close()
+		log.SetOutput(file)
+	}
 
 	// GRPC spews a lot of useless log messages so we tell to eat its logs, unless
 	// we are in debug mode
