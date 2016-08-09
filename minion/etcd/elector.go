@@ -48,7 +48,6 @@ func watchLeader(conn db.Conn, store Store) {
 func campaign(conn db.Conn, store Store) {
 	watch := store.Watch(leaderKey, 1*time.Second)
 	trigg := conn.TriggerTick(electionTTL/2, db.EtcdTable)
-	oldMaster := false
 
 	for {
 		select {
@@ -62,9 +61,6 @@ func campaign(conn db.Conn, store Store) {
 		master := err == nil && minion.Role == db.Master && len(etcdRows) == 1
 
 		if !master {
-			if oldMaster {
-				commitLeader(conn, false, "")
-			}
 			continue
 		}
 
