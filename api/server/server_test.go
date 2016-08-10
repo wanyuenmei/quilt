@@ -67,3 +67,51 @@ func TestContainerResponse(t *testing.T) {
 
 	checkQuery(t, server{conn}, db.ContainerTable, exp)
 }
+
+func TestBadStitch(t *testing.T) {
+	conn := db.New()
+	s := server{dbConn: conn}
+
+	badStitch := `(+ "a" 1)`
+
+	_, err := s.Run(context.Background(),
+		&pb.RunRequest{Stitch: badStitch})
+
+	if err == nil {
+		t.Error("Expected error from bad stitch.")
+		return
+	}
+
+	expErr := "1: bad string concatenation argument: 1"
+	if err.Error() != expErr {
+		t.Errorf("Expected run error %s, but got %s\n", expErr, err.Error())
+	}
+}
+
+func TestRun(t *testing.T) {
+	conn := db.New()
+	s := server{dbConn: conn}
+
+	createMachineStitch :=
+		`(machine (provider "Amazon") (size "m4.large") (role "Master"))
+		(machine (provider "Amazon") (size "m4.large") (role "Worker"))`
+
+	_, err := s.Run(context.Background(),
+		&pb.RunRequest{Stitch: createMachineStitch})
+
+	if err != nil {
+		t.Errorf("Unexpected error when running stich: %s\n", err.Error())
+		return
+	}
+
+	var machines []db.Machine
+	conn.Transact(func(view db.Database) error {
+		machines = view.SelectFromMachine(nil)
+		return nil
+	})
+
+	if len(machines) != 2 {
+		t.Errorf("Two machines should have been created by running the stitch, "+
+			"but we found: %v\n", machines)
+	}
+}

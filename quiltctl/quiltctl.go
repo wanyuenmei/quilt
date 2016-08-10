@@ -15,6 +15,8 @@ var commands = map[string]command.SubCommand{
 	"containers": &command.Container{},
 	"get":        &command.Get{},
 	"inspect":    &command.Inspect{},
+	"run":        &command.Run{},
+	"stop":       &command.Stop{},
 }
 
 // Run parses and runs the quiltctl subcommand given the command line arguments.

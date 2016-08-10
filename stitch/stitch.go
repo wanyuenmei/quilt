@@ -2,6 +2,7 @@ package stitch
 
 import (
 	"fmt"
+	"strings"
 	"text/scanner"
 
 	log "github.com/Sirupsen/logrus"
@@ -77,19 +78,7 @@ func (stitchr Range) Accepts(x float64) bool {
 	return stitchr.Min <= x && (stitchr.Max == 0 || x <= stitchr.Max)
 }
 
-// New parses and executes a stitch (in text form), and returns an abstract Stitch
-// handle.
-func New(sc scanner.Scanner, path string, download bool) (Stitch, error) {
-	parsed, err := parse(sc)
-	if err != nil {
-		return Stitch{}, err
-	}
-
-	parsed, err = resolveImports(parsed, path, download)
-	if err != nil {
-		return Stitch{}, err
-	}
-
+func toStitch(parsed []ast) (Stitch, error) {
 	_, ctx, err := eval(astRoot(parsed))
 	if err != nil {
 		return Stitch{}, err
@@ -106,6 +95,38 @@ func New(sc scanner.Scanner, path string, download bool) (Stitch, error) {
 	}
 
 	return spec, nil
+}
+
+// Compile takes a Stitch (possibly with imports), and transforms it into a
+// single string that can be evaluated without other dependencies. It also
+// confirms that the result doesn't have any invariant, syntax, or evaluation
+// errors.
+func Compile(sc scanner.Scanner, path string, download bool) (string, error) {
+	parsed, err := parse(sc)
+	if err != nil {
+		return "", err
+	}
+
+	parsed, err = resolveImports(parsed, path, download)
+	if err != nil {
+		return "", err
+	}
+
+	_, err = toStitch(parsed)
+
+	return astRoot(parsed).String(), err
+}
+
+// New parses and executes a stitch (in text form), and returns an abstract Dsl handle.
+func New(specStr string) (Stitch, error) {
+	var sc scanner.Scanner
+	sc.Init(strings.NewReader(specStr))
+	parsed, err := parse(sc)
+	if err != nil {
+		return Stitch{}, err
+	}
+
+	return toStitch(parsed)
 }
 
 // QueryLabels returns a map where the keys are labels defined in the stitch, and the

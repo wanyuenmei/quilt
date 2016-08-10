@@ -161,7 +161,8 @@ containing specs (e.g. `github.com/NetSys/quilt`). Quilt will download files
 into your `QUILT_PATH`. You can read more about its functionality
 [here](https://github.com/NetSys/quilt/blob/master/docs/Stitch.md#quilt_path).
 
-Try `quilt get github.com/NetSys/quilt` and running
+Try starting the Quilt daemon with `quilt daemon`. Then, in a separate shell, try
+`quilt get github.com/NetSys/quilt` and running
 `quilt run github.com/NetSys/quilt/specs/example.spec` (remember to
 configure the file that was just downloaded by following the instructions
 above).

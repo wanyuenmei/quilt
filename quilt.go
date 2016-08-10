@@ -2,25 +2,19 @@
 package main
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	l_mod "log"
 	"os"
-	"path/filepath"
 	"strings"
-	"text/scanner"
-	"time"
 
 	"github.com/NetSys/quilt/api"
 	"github.com/NetSys/quilt/api/server"
 	"github.com/NetSys/quilt/cluster"
 	"github.com/NetSys/quilt/db"
-	"github.com/NetSys/quilt/engine"
 	"github.com/NetSys/quilt/minion"
 	"github.com/NetSys/quilt/quiltctl"
-	"github.com/NetSys/quilt/stitch"
 	"github.com/NetSys/quilt/util"
 
 	"google.golang.org/grpc/grpclog"
@@ -32,7 +26,7 @@ func main() {
 	flag.Usage = func() {
 		fmt.Println("Usage: quilt " +
 			"[-log-level=<level> | -l=<level>] [-H=<listen_address>] " +
-			"[inspect <stitch> | run <stitch> | minion | " +
+			"[daemon | inspect <stitch> | run <stitch> | minion | " +
 			"stop <namespace> | get <import_path> | " +
 			"machines | containers]")
 		fmt.Println("\nWhen provided a stitch, quilt takes responsibility\n" +
@@ -65,95 +59,32 @@ func main() {
 		grpclog.SetLogger(log.StandardLogger())
 	}
 
-	conn := db.New()
-	nArgs := len(flag.Args())
-	if nArgs < 1 || (flag.Arg(0) != "minion" && nArgs < 2) {
+	if len(flag.Args()) == 0 {
 		usage()
 	}
 
 	subcommand := flag.Arg(0)
 	switch {
-	case subcommand == "run":
-		go configLoop(conn, flag.Arg(1))
-	case subcommand == "stop":
-		stop(conn, flag.Arg(1))
 	case subcommand == "minion":
 		minion.Run()
-		return
+	case subcommand == "daemon":
+		runDaemon(*lAddr)
 	case quiltctl.HasSubcommand(subcommand):
 		quiltctl.Run(flag.Args())
-		return
 	default:
 		usage()
 	}
+}
 
-	go server.Run(conn, *lAddr)
+func runDaemon(lAddr string) {
+	conn := db.New()
+	go server.Run(conn, lAddr)
 	cluster.Run(conn)
-}
-
-func stop(conn db.Conn, namespace string) {
-	specStr := "(define AdminACL (list))"
-	if namespace != "" {
-		specStr += fmt.Sprintf(` (define Namespace "%s")`, namespace)
-	}
-
-	var sc scanner.Scanner
-	spec, err := stitch.New(*sc.Init(strings.NewReader(specStr)), "", false)
-	if err != nil {
-		panic(err)
-	}
-
-	err = engine.UpdatePolicy(conn, spec)
-	if err != nil {
-		panic(err)
-	}
-}
-
-func configLoop(conn db.Conn, stitchPath string) {
-	tick := time.Tick(5 * time.Second)
-	for {
-		if err := updateConfig(conn, stitchPath); err != nil {
-			log.WithError(err).Warn("Failed to update configuration.")
-		}
-		<-tick
-	}
 }
 
 func usage() {
 	flag.Usage()
 	os.Exit(1)
-}
-
-const quiltPath = "QUILT_PATH"
-
-func updateConfig(conn db.Conn, configPath string) error {
-	pathStr, _ := os.LookupEnv(quiltPath)
-	if pathStr == "" {
-		pathStr = stitch.GetQuiltPath()
-	}
-
-	f, err := util.Open(configPath)
-	if err != nil {
-		f, err = util.Open(filepath.Join(pathStr, configPath))
-		if err != nil {
-			return err
-		}
-	}
-
-	defer f.Close()
-
-	sc := scanner.Scanner{
-		Position: scanner.Position{
-			Filename: configPath,
-		},
-	}
-
-	spec, err := stitch.New(*sc.Init(bufio.NewReader(f)), pathStr, false)
-	if err != nil {
-		return err
-	}
-
-	return engine.UpdatePolicy(conn, spec)
 }
 
 // parseLogLevel returns the log.Level type corresponding to the given string

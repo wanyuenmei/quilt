@@ -12,6 +12,8 @@ import (
 	"github.com/NetSys/quilt/api"
 	"github.com/NetSys/quilt/api/pb"
 	"github.com/NetSys/quilt/db"
+	"github.com/NetSys/quilt/engine"
+	"github.com/NetSys/quilt/stitch"
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -83,4 +85,18 @@ func (s server) Query(cts context.Context, query *pb.DBQuery) (*pb.QueryReply, e
 	}
 
 	return &pb.QueryReply{TableContents: string(json)}, nil
+}
+
+func (s server) Run(cts context.Context, runReq *pb.RunRequest) (*pb.RunReply, error) {
+	stitch, err := stitch.New(runReq.Stitch)
+	if err != nil {
+		return &pb.RunReply{}, err
+	}
+
+	err = engine.UpdatePolicy(s.dbConn, stitch)
+	if err != nil {
+		return &pb.RunReply{}, err
+	}
+
+	return &pb.RunReply{}, nil
 }

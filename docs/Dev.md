@@ -1,3 +1,9 @@
+# The Quilt Daemon
+Two processes need to be running for Stitches to be enforced:  `quilt daemon` and
+`quilt run`. `quilt daemon` does the heavy lifting -- it's responsible for enforcing
+Stitches.  `quilt run` is responsible for compiling Stitches and sending them to
+the daemon to be enforced.
+
 # Code Structure
 Quilt is structured around a central database (`db`) that stores information about
 the current state of the system. This information is used both by the global

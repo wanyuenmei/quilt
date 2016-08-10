@@ -46,7 +46,12 @@ func Main(opts []string) int {
 		},
 	}
 	pathStr, _ := os.LookupEnv(quiltPath)
-	spec, err := stitch.New(*sc.Init(bufio.NewReader(f)), pathStr, false)
+	compiled, err := stitch.Compile(*sc.Init(bufio.NewReader(f)), pathStr, false)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	spec, err := stitch.New(compiled)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1

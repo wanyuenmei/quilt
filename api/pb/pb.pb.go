@@ -11,6 +11,8 @@ It is generated from these files:
 It has these top-level messages:
 	DBQuery
 	QueryReply
+	RunRequest
+	RunReply
 */
 package pb
 
@@ -52,9 +54,28 @@ func (m *QueryReply) String() string            { return proto.CompactTextString
 func (*QueryReply) ProtoMessage()               {}
 func (*QueryReply) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{1} }
 
+type RunRequest struct {
+	Stitch string `protobuf:"bytes,1,opt,name=Stitch,json=stitch" json:"Stitch,omitempty"`
+}
+
+func (m *RunRequest) Reset()                    { *m = RunRequest{} }
+func (m *RunRequest) String() string            { return proto.CompactTextString(m) }
+func (*RunRequest) ProtoMessage()               {}
+func (*RunRequest) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{2} }
+
+type RunReply struct {
+}
+
+func (m *RunReply) Reset()                    { *m = RunReply{} }
+func (m *RunReply) String() string            { return proto.CompactTextString(m) }
+func (*RunReply) ProtoMessage()               {}
+func (*RunReply) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{3} }
+
 func init() {
 	proto.RegisterType((*DBQuery)(nil), "DBQuery")
 	proto.RegisterType((*QueryReply)(nil), "QueryReply")
+	proto.RegisterType((*RunRequest)(nil), "RunRequest")
+	proto.RegisterType((*RunReply)(nil), "RunReply")
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -69,6 +90,7 @@ const _ = grpc.SupportPackageIsVersion3
 
 type APIClient interface {
 	Query(ctx context.Context, in *DBQuery, opts ...grpc.CallOption) (*QueryReply, error)
+	Run(ctx context.Context, in *RunRequest, opts ...grpc.CallOption) (*RunReply, error)
 }
 
 type aPIClient struct {
@@ -88,10 +110,20 @@ func (c *aPIClient) Query(ctx context.Context, in *DBQuery, opts ...grpc.CallOpt
 	return out, nil
 }
 
+func (c *aPIClient) Run(ctx context.Context, in *RunRequest, opts ...grpc.CallOption) (*RunReply, error) {
+	out := new(RunReply)
+	err := grpc.Invoke(ctx, "/API/Run", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // Server API for API service
 
 type APIServer interface {
 	Query(context.Context, *DBQuery) (*QueryReply, error)
+	Run(context.Context, *RunRequest) (*RunReply, error)
 }
 
 func RegisterAPIServer(s *grpc.Server, srv APIServer) {
@@ -116,6 +148,24 @@ func _API_Query_Handler(srv interface{}, ctx context.Context, dec func(interface
 	return interceptor(ctx, in, info, handler)
 }
 
+func _API_Run_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RunRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(APIServer).Run(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/API/Run",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(APIServer).Run(ctx, req.(*RunRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _API_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "API",
 	HandlerType: (*APIServer)(nil),
@@ -123,6 +173,10 @@ var _API_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Query",
 			Handler:    _API_Query_Handler,
+		},
+		{
+			MethodName: "Run",
+			Handler:    _API_Run_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -132,13 +186,17 @@ var _API_serviceDesc = grpc.ServiceDesc{
 func init() { proto.RegisterFile("pb/pb.proto", fileDescriptor0) }
 
 var fileDescriptor0 = []byte{
-	// 128 bytes of a gzipped FileDescriptorProto
+	// 185 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xe2, 0xe2, 0x2e, 0x48, 0xd2, 0x2f,
 	0x48, 0xd2, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x57, 0x92, 0xe7, 0x62, 0x77, 0x71, 0x0a, 0x2c, 0x4d,
 	0x2d, 0xaa, 0x14, 0x12, 0xe1, 0x62, 0x0d, 0x49, 0x4c, 0xca, 0x49, 0x95, 0x60, 0x54, 0x60, 0xd4,
 	0xe0, 0x0c, 0x62, 0x2d, 0x01, 0x71, 0x94, 0x8c, 0xb8, 0xb8, 0xc0, 0xd2, 0x41, 0xa9, 0x05, 0x39,
 	0x95, 0x42, 0x2a, 0x5c, 0xbc, 0x60, 0x35, 0xce, 0xf9, 0x79, 0x25, 0xa9, 0x79, 0x25, 0xc5, 0x50,
-	0xb5, 0xbc, 0x25, 0xc8, 0x82, 0x46, 0xea, 0x5c, 0xcc, 0x8e, 0x01, 0x9e, 0x42, 0x0a, 0x5c, 0xac,
-	0x10, 0x93, 0x39, 0xf4, 0xa0, 0x76, 0x48, 0x71, 0xeb, 0x21, 0x0c, 0x53, 0x62, 0x48, 0x62, 0x03,
-	0x3b, 0xc2, 0x18, 0x10, 0x00, 0x00, 0xff, 0xff, 0x5b, 0x72, 0x5d, 0x10, 0x93, 0x00, 0x00, 0x00,
+	0xb5, 0xbc, 0x25, 0xc8, 0x82, 0x4a, 0x2a, 0x5c, 0x5c, 0x41, 0xa5, 0x79, 0x41, 0xa9, 0x85, 0xa5,
+	0xa9, 0xc5, 0x25, 0x42, 0x62, 0x5c, 0x6c, 0xc1, 0x25, 0x99, 0x25, 0xc9, 0x19, 0x50, 0xc5, 0x6c,
+	0xc5, 0x60, 0x9e, 0x12, 0x17, 0x17, 0x07, 0x58, 0x15, 0xd0, 0x5c, 0x23, 0x0f, 0x2e, 0x66, 0xc7,
+	0x00, 0x4f, 0x21, 0x05, 0x2e, 0x56, 0x88, 0x5b, 0x38, 0xf4, 0xa0, 0xae, 0x92, 0xe2, 0xd6, 0x43,
+	0x58, 0xaf, 0xc4, 0x20, 0x24, 0xcf, 0xc5, 0x0c, 0xd4, 0x24, 0xc4, 0xad, 0x87, 0xb0, 0x40, 0x8a,
+	0x53, 0x0f, 0x66, 0x8e, 0x12, 0x43, 0x12, 0x1b, 0xd8, 0x5f, 0xc6, 0x80, 0x00, 0x00, 0x00, 0xff,
+	0xff, 0x7c, 0xaf, 0xc0, 0xc2, 0xe6, 0x00, 0x00, 0x00,
 }

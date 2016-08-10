@@ -24,6 +24,9 @@ type Client interface {
 
 	// QueryContainers retrieves the containers tracked by the Quilt daemon.
 	QueryContainers() ([]db.Container, error)
+
+	// RunStitch makes a request to the Quilt daemon to execute the given stitch.
+	RunStitch(stitch string) error
 }
 
 type clientImpl struct {
@@ -102,4 +105,11 @@ func (c clientImpl) QueryContainers() ([]db.Container, error) {
 	}
 
 	return rows.([]db.Container), nil
+}
+
+// RunStitch makes a request to the Quilt daemon to execute the given stitch.
+func (c clientImpl) RunStitch(stitch string) error {
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	_, err := c.pbClient.Run(ctx, &pb.RunRequest{Stitch: stitch})
+	return err
 }
