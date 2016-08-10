@@ -52,7 +52,7 @@ type Interface struct {
 	IfaceID     string
 	Bridge      string
 	Type        string
-	OFPort      int
+	OFPort      *int
 }
 
 const (
@@ -597,10 +597,9 @@ func ifaceFromRow(row row) (Interface, error) {
 	}
 
 	ofport, ok := row["ofport"].(int)
-	if !ok {
-		return iface, errors.New("missing Interface key: ofport")
+	if ok {
+		iface.OFPort = &ofport
 	}
-	iface.OFPort = ofport
 
 	// The following map keys could be missing without breaking the Schema in the
 	// Interface table.

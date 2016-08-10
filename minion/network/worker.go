@@ -861,7 +861,9 @@ func generateTargetOpenFlow(dk docker.Client, odb ovsdb.Client,
 
 		ifaceMap := make(map[string]int)
 		for _, iface := range ifaces {
-			ifaceMap[iface.Name] = iface.OFPort
+			if iface.OFPort != nil {
+				ifaceMap[iface.Name] = *iface.OFPort
+			}
 		}
 
 		ofQuilt, ok := ifaceMap[peerQuilt]
