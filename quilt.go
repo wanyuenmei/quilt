@@ -31,7 +31,7 @@ import (
 func main() {
 	flag.Usage = func() {
 		fmt.Println("Usage: quilt " +
-			"[-log-level=<level> | -l=<level> | -H=<listen_address>] " +
+			"[-log-level=<level> | -l=<level>] [-H=<listen_address>] " +
 			"[inspect <stitch> | run <stitch> | minion | " +
 			"stop <namespace> | get <import_path> | " +
 			"machines | containers]")
