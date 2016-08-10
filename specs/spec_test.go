@@ -46,6 +46,7 @@ func TestConfigs(t *testing.T) {
 	testConfig("example.spec", "specs/stdlib")
 	testConfig("../quilt-tester/config/infrastructure.spec", quiltPath)
 	testConfig("../quilt-tester/tests/basic/basic.spec", quiltPath)
+	testConfig("../quilt-tester/tests/spark/spark.spec", quiltPath)
 	testConfig("./spark/sparkPI.spec", quiltPath)
 	testConfig("./wordpress/main.spec", quiltPath)
 	testConfig("./etcd/example.spec", quiltPath)

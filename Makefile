@@ -33,6 +33,7 @@ clean:
 COV_SKIP= /minion/pb /minion/pprofile /api/pb /constants /scripts /quilt-tester \
 		  /quilt-tester/tests/basic /quilt-tester/tests/basic/check_docker.go \
 		  /quilt-tester/tests/basic/check_logs.go \
+		  /quilt-tester/tests/spark /quilt-tester/tests/spark/check_spark_monly.go
 
 COV_PKG = $(subst github.com/NetSys/quilt,,$(PACKAGES))
 coverage: $(addsuffix .cov, $(filter-out $(COV_SKIP), $(COV_PKG)))
