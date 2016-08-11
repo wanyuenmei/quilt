@@ -38,9 +38,13 @@ func (client ovsdbClient) transact(db string, operation ...ovs.Operation) (
 // LPort is a logical port in OVN.
 type LPort struct {
 	uuid      ovs.UUID
+	Bridge    string
 	Name      string
 	Addresses []string
 }
+
+// LPortSlice is a wrapper around []LPort so it can be used in joins
+type LPortSlice []LPort
 
 // Interface is a logical interface in OVN.
 type Interface struct {
@@ -172,6 +176,7 @@ func (ovsdb Client) ListLogicalPorts(lswitch string) ([]LPort, error) {
 
 		result = append(result, LPort{
 			uuid:      portUUID,
+			Bridge:    lswitch,
 			Name:      portrow["name"].(string),
 			Addresses: ovsStringSetToSlice(portrow["addresses"]),
 		})
@@ -755,4 +760,14 @@ func (ovsps InterfaceSlice) Get(i int) interface{} {
 // Len is required for HashJoin.
 func (ovsps InterfaceSlice) Len() int {
 	return len(ovsps)
+}
+
+// Get gets the element at the ith index
+func (lps LPortSlice) Get(i int) interface{} {
+	return lps[i]
+}
+
+// Len returns the length of the slice
+func (lps LPortSlice) Len() int {
+	return len(lps)
 }

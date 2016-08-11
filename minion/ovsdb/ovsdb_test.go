@@ -487,13 +487,3 @@ func (acls AclSlice) Get(i int) interface{} {
 func (acls AclSlice) Len() int {
 	return len(acls)
 }
-
-type LPortSlice []LPort
-
-func (lports LPortSlice) Get(i int) interface{} {
-	return lports[i]
-}
-
-func (lports LPortSlice) Len() int {
-	return len(lports)
-}

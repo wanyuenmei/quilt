@@ -2,12 +2,103 @@ package network
 
 import (
 	"fmt"
+	"sort"
+	"strconv"
 	"testing"
 
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/join"
 	"github.com/NetSys/quilt/minion/ovsdb"
 )
+
+type lportslice []ovsdb.LPort
+
+func (lps lportslice) Len() int {
+	return len(lps)
+}
+
+func (lps lportslice) Less(i, j int) bool {
+	return lps[i].Name < lps[j].Name
+}
+
+func (lps lportslice) Swap(i, j int) {
+	lps[i], lps[j] = lps[j], lps[i]
+}
+
+func TestRunMaster(t *testing.T) {
+	client := ovsdb.NewFakeOvsdbClient()
+	client.CreateLogicalSwitch(lSwitch)
+	conn := db.New()
+	ovsdb.Open = func() (ovsdb.Client, error) {
+		return client, nil
+	}
+
+	expPorts := []ovsdb.LPort{}
+	conn.Transact(func(view db.Database) error {
+		etcd := view.InsertEtcd()
+		etcd.Leader = true
+		view.Commit(etcd)
+
+		for i := 0; i < 3; i++ {
+			si := strconv.Itoa(i)
+			l := view.InsertLabel()
+			l.IP = fmt.Sprintf("0.0.0.%s", si)
+			l.MultiHost = true
+			view.Commit(l)
+			expPorts = append(expPorts, ovsdb.LPort{
+				Bridge:    lSwitch,
+				Name:      l.IP,
+				Addresses: []string{labelMac, l.IP},
+			})
+		}
+
+		for i := 3; i < 5; i++ {
+			si := strconv.Itoa(i)
+			c := view.InsertContainer()
+			c.IP = fmt.Sprintf("0.0.0.%s", si)
+			c.Mac = fmt.Sprintf("00:00:00:00:00:0%s", si)
+			view.Commit(c)
+			expPorts = append(expPorts, ovsdb.LPort{
+				Bridge:    lSwitch,
+				Name:      c.IP,
+				Addresses: []string{c.Mac, c.IP},
+			})
+		}
+
+		return nil
+	})
+
+	for i := 1; i < 6; i++ {
+		si := strconv.Itoa(i)
+		mac := fmt.Sprintf("00:00:00:00:00:0%s", si)
+		if i < 3 {
+			mac = labelMac
+		}
+		ip := fmt.Sprintf("0.0.0.%s", si)
+		client.CreateLogicalPort(lSwitch, ip, mac, ip)
+	}
+
+	runMaster(conn)
+
+	lports, err := client.ListLogicalPorts(lSwitch)
+	if err != nil {
+		t.Fatal("failed to fetch logical ports from mock client")
+	}
+
+	if len(lports) != len(expPorts) {
+		t.Fatalf("wrong number of logical ports. Got %d, expected %d.",
+			len(lports), len(expPorts))
+	}
+
+	sort.Sort(lportslice(lports))
+	sort.Sort(lportslice(expPorts))
+	for i, port := range expPorts {
+		lport := lports[i]
+		if lport.Bridge != port.Bridge || lport.Name != port.Name {
+			t.Fatalf("Incorrect port %v, expected %v.", lport, port)
+		}
+	}
+}
 
 func TestACL(t *testing.T) {
 	client := ovsdb.NewFakeOvsdbClient()

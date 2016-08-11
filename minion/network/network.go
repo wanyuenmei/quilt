@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/NetSys/quilt/db"
+	"github.com/NetSys/quilt/join"
 	"github.com/NetSys/quilt/minion/docker"
 	"github.com/NetSys/quilt/minion/ovsdb"
 
@@ -25,6 +26,15 @@ const ovnBridge = "br-int"
 const GatewayIP = "10.0.0.1"
 
 const gatewayMAC = "02:00:0a:00:00:01"
+
+type dbport struct {
+	bridge string
+	ip     string
+	mac    string
+}
+
+// dbslice is a wrapper around []dbport to allow us to perform a join
+type dbslice []dbport
 
 // Run blocks implementing the network services.
 func Run(conn db.Conn, dk docker.Client) {
@@ -73,6 +83,20 @@ func runMaster(conn db.Conn) {
 		return
 	}
 
+	var dbData []dbport
+	for _, l := range labels {
+		if l.MultiHost {
+			dbData = append(dbData, dbport{
+				bridge: lSwitch,
+				ip:     l.IP,
+				mac:    labelMac,
+			})
+		}
+	}
+	for _, c := range containers {
+		dbData = append(dbData, dbport{bridge: lSwitch, ip: c.IP, mac: c.Mac})
+	}
+
 	ovsdbClient, err := ovsdb.Open()
 	if err != nil {
 		log.WithError(err).Error("Failed to connect to OVSDB.")
@@ -87,57 +111,31 @@ func runMaster(conn db.Conn) {
 		return
 	}
 
-	// The garbageMap starts off containing every logical port in OVN.  As we find
-	// that these ports are still useful, they're deleted from garbageMap until only
-	// leftover garbage ports are remaining. These leftover logical ports are then
-	// deleted from ovsdb.
-	garbageMap := make(map[string]ovsdb.LPort)
-	for _, lport := range lports {
-		garbageMap[lport.Name] = lport
+	portKey := func(val interface{}) interface{} {
+		port := val.(ovsdb.LPort)
+		return fmt.Sprintf("bridge:%s\nname:%s", port.Bridge, port.Name)
 	}
 
-	for _, dbl := range labels {
-		if !dbl.MultiHost {
-			continue
-		}
+	dbKey := func(val interface{}) interface{} {
+		dbPort := val.(dbport)
+		return fmt.Sprintf("bridge:%s\nname:%s", dbPort.bridge, dbPort.ip)
+	}
 
-		if _, ok := garbageMap[dbl.IP]; ok {
-			delete(garbageMap, dbl.IP)
-			continue
-		}
+	_, ovsps, dbps := join.HashJoin(ovsdb.LPortSlice(lports), dbslice(dbData),
+		portKey, dbKey)
 
-		log.WithFields(log.Fields{
-			"IP": dbl.IP,
-		}).Info("New logical port.")
-
-		if err := ovsdbClient.CreateLogicalPort(lSwitch, dbl.Label, labelMac,
-			dbl.IP); err != nil {
-			log.WithError(err).Warnf("Failed to create port %s.", dbl.Label)
+	for _, dbp := range dbps {
+		lport := dbp.(dbport)
+		log.WithField("IP", lport.ip).Info("New logical port.")
+		err := ovsdbClient.CreateLogicalPort(lport.bridge, lport.ip, lport.mac,
+			lport.ip)
+		if err != nil {
+			log.WithError(err).Warnf("Failed to create port %s.", lport.ip)
 		}
 	}
 
-	for _, dbc := range containers {
-		if _, ok := garbageMap[dbc.IP]; ok {
-			delete(garbageMap, dbc.IP)
-			continue
-		}
-
-		log.WithFields(log.Fields{
-			"IP": dbc.IP,
-		}).Info("New logical port.")
-
-		if err := ovsdbClient.CreateLogicalPort(lSwitch, dbc.IP, dbc.Mac,
-			dbc.IP); err != nil {
-			log.WithFields(log.Fields{
-				"error": err,
-				"name":  dbc.IP,
-			}).Warn("Failed to create port.")
-		}
-	}
-
-	// Ports still in the map don't have a corresponding label otherwise they would
-	// have been deleted in the preceding loop.
-	for _, lport := range garbageMap {
+	for _, ovsp := range ovsps {
+		lport := ovsp.(ovsdb.LPort)
 		log.Infof("Delete logical port %s.", lport.Name)
 		if err := ovsdbClient.DeleteLogicalPort(lSwitch, lport); err != nil {
 			log.WithError(err).Warn("Failed to delete logical port.")
@@ -259,4 +257,14 @@ func updateACLs(connections []db.Connection, labels []db.Label,
 			log.WithError(err).Warn("Error adding ACL")
 		}
 	}
+}
+
+// Len returns the length of the slice
+func (dbs dbslice) Len() int {
+	return len(dbs)
+}
+
+// Get returns the element at index i of the slice
+func (dbs dbslice) Get(i int) interface{} {
+	return dbs[i]
 }
