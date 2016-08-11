@@ -16,6 +16,9 @@ import (
 
 // Client provides methods to interact with the Quilt daemon.
 type Client interface {
+	// Close the grpc connection.
+	Close() error
+
 	// QueryMachines retrieves the machines tracked by the Quilt daemon.
 	QueryMachines() ([]db.Machine, error)
 
@@ -25,6 +28,7 @@ type Client interface {
 
 type clientImpl struct {
 	pbClient pb.APIClient
+	cc       *grpc.ClientConn
 }
 
 // New creates a new Quilt client connected to `lAddr`.
@@ -43,7 +47,10 @@ func New(lAddr string) (Client, error) {
 	}
 
 	pbClient := pb.NewAPIClient(cc)
-	return clientImpl{pbClient: pbClient}, nil
+	return clientImpl{
+		pbClient: pbClient,
+		cc:       cc,
+	}, nil
 }
 
 func query(pbClient pb.APIClient, table db.TableType) (interface{}, error) {
@@ -70,6 +77,11 @@ func query(pbClient pb.APIClient, table db.TableType) (interface{}, error) {
 	default:
 		panic(fmt.Sprintf("unsupported table type: %s", table))
 	}
+}
+
+// Close the grpc connection.
+func (c clientImpl) Close() error {
+	return c.cc.Close()
 }
 
 // QueryMachines retrieves the machines tracked by the Quilt daemon.

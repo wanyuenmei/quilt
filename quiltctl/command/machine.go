@@ -36,6 +36,7 @@ func (mCmd *Machine) Run() int {
 		log.Error(err)
 		return 1
 	}
+	defer c.Close()
 
 	machines, err := c.QueryMachines()
 	if err != nil {

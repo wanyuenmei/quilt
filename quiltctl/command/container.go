@@ -36,6 +36,7 @@ func (cCmd *Container) Run() int {
 		log.Error(err)
 		return 1
 	}
+	defer c.Close()
 
 	containers, err := c.QueryContainers()
 	if err != nil {
