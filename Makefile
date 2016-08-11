@@ -20,10 +20,7 @@ install:
 	cd -P . && go install .
 
 check: format-check
-	# XXX: Hack to make `make check` skip the quilt-tester test scripts.
-	# `test` fails on the these files because they're scripts, and thus
-	# are all in package `main`, and define function `main`.
-	go test $(filter-out %quilt-tester/tests/basic %quilt-tester/tests/spark, $(PACKAGES))
+	go test $(PACKAGES)
 
 clean:
 	go clean -x $(PACKAGES)

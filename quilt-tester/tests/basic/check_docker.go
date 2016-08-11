@@ -1,10 +1,9 @@
 package main
 
-import (
-	"fmt"
-	"os/exec"
-	"strings"
-)
+/*
+
+XXX: This test is disabled pending development of a solution to this trello card:
+https://trello.com/c/pzSnXt1d/255-reorganize-tests-directory
 
 func main() {
 	output, err := exec.Command("docker", "ps", "-a").Output()
@@ -20,4 +19,4 @@ func main() {
 	} else {
 		fmt.Println("PASSED")
 	}
-}
+}*/
