@@ -18,7 +18,7 @@ func TestCmdExec(t *testing.T) {
 
 	expStdout := "standard out"
 	expStderr := "standard error"
-	cmd := exec.Command("bash", "-c",
+	cmd := exec.Command("sh", "-c",
 		fmt.Sprintf("echo %s ; echo %s 1>&2", expStdout, expStderr))
 	stdout, stderr, err := execCmd(cmd, "PREFIX")
 
