@@ -34,10 +34,18 @@ func TestMachineFlags(t *testing.T) {
 func TestMachineOutput(t *testing.T) {
 	t.Parallel()
 
-	res := machinesStr([]db.Machine{{ID: 1, Role: db.Master, PublicIP: "8.8.8.8"}})
-	exp := "Machine-1{Role=Master, PublicIP=8.8.8.8, Connected=false}\n"
+	res := machinesStr([]db.Machine{{
+		ID:       1,
+		Role:     db.Master,
+		Provider: "Amazon",
+		Region:   "us-west-1",
+		Size:     "m4.large",
+		PublicIP: "8.8.8.8",
+	}})
+
+	exp := "Machine-1{Master, Amazon us-west-1 m4.large, PublicIP=8.8.8.8}\n"
 	if res != exp {
-		t.Errorf("Expected machine command to print %s, but got %s.", exp, res)
+		t.Errorf("\nGot: %s\nExp: %s\n", res, exp)
 	}
 }
 
