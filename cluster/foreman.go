@@ -111,7 +111,7 @@ func (fm *foreman) runOnce() {
 
 		connected := err == nil
 		if connected && !m.connected {
-			log.WithField("machine", m.machine).Info("New connection.")
+			log.WithField("machine", m.machine).Debug("New connection.")
 		}
 
 		if connected != m.machine.Connected {
