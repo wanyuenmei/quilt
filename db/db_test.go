@@ -96,6 +96,34 @@ func TestMachineSelect(t *testing.T) {
 	}
 }
 
+func TestMachineString(t *testing.T) {
+	m := Machine{}
+
+	got := m.String()
+	exp := "Machine-0{  }"
+	if got != exp {
+		t.Errorf("\nGot: %s\nExp: %s", got, exp)
+	}
+
+	m = Machine{
+		ID:        1,
+		CloudID:   "CloudID1234",
+		Provider:  "Amazon",
+		Region:    "us-west-1",
+		Size:      "m4.large",
+		PublicIP:  "1.2.3.4",
+		PrivateIP: "5.6.7.8",
+		DiskSize:  56,
+		Connected: true,
+	}
+	got = m.String()
+	exp = "Machine-1{Amazon us-west-1 m4.large, CloudID1234, PublicIP=1.2.3.4," +
+		" PrivateIP=5.6.7.8, Disk=56GB, Connected}"
+	if got != exp {
+		t.Errorf("\nGot: %s\nExp: %s", got, exp)
+	}
+}
+
 func TestTrigger(t *testing.T) {
 	conn := New()
 

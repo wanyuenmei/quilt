@@ -1,7 +1,9 @@
 package db
 
 import (
+	"fmt"
 	"sort"
+	"strings"
 )
 
 // Machine represents a physical or virtual machine operated by a cloud provider on
@@ -49,7 +51,35 @@ func (m Machine) getID() int {
 }
 
 func (m Machine) String() string {
-	return defaultString(m)
+	var tags []string
+
+	if m.Role != "" {
+		tags = append(tags, string(m.Role))
+	}
+
+	tags = append(tags, string(m.Provider)+" "+m.Region+" "+m.Size)
+
+	if m.CloudID != "" {
+		tags = append(tags, m.CloudID)
+	}
+
+	if m.PublicIP != "" {
+		tags = append(tags, "PublicIP="+m.PublicIP)
+	}
+
+	if m.PrivateIP != "" {
+		tags = append(tags, "PrivateIP="+m.PrivateIP)
+	}
+
+	if m.DiskSize != 0 {
+		tags = append(tags, fmt.Sprintf("Disk=%dGB", m.DiskSize))
+	}
+
+	if m.Connected {
+		tags = append(tags, "Connected")
+	}
+
+	return fmt.Sprintf("Machine-%d{%s}", m.ID, strings.Join(tags, ", "))
 }
 
 func (m Machine) less(arg row) bool {
