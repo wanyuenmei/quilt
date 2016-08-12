@@ -95,9 +95,9 @@ docker-build-dev:
 	cd -P . && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build . \
 	    && ${DOCKER} build -t ${REPO}/quilt -f Dockerfile.Dev .
 
-docker-build-tester: tests
+docker-build-tester-dev: tests
 	cd -P quilt-tester && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/quilt-tester . \
-	&& ${DOCKER} build -t ${REPO}/tester .
+	&& ${DOCKER} build -t ${REPO}/tester -f Dockerfile.Dev .
 
 docker-build-ovs:
 	cd -P ovs && docker build -t ${REPO}/ovs .
