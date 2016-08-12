@@ -152,9 +152,11 @@ func execCmd(cmd *exec.Cmd, logLineTitle string) (string, string, error) {
 		return "", "", err
 	}
 
+	stdout := <-stdoutChan
+	stderr := <-stderrChan
 	err = cmd.Wait()
 	l.infoln(fmt.Sprintf("%s: Completed command: %v", logLineTitle, cmd.Args))
-	return <-stdoutChan, <-stderrChan, err
+	return stdout, stderr, err
 }
 
 func sshGen(host string, cmd *exec.Cmd) *exec.Cmd {
