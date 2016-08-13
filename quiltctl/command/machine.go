@@ -52,7 +52,7 @@ func (mCmd *Machine) Run() int {
 
 func machinesStr(machines []db.Machine) string {
 	var machinesStr string
-	for _, m := range machines {
+	for _, m := range db.SortMachines(machines) {
 		machinesStr += fmt.Sprintf("%v\n", m)
 	}
 
