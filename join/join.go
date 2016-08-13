@@ -104,7 +104,7 @@ func HashJoin(lSlice, rSlice List, lKey, rKey func(interface{}) interface{}) (
 		rKey = identity
 	}
 
-	// lonely lefts are tracked implicity by remaining elements in joinTable
+	// lonely lefts are tracked implicitly by remaining elements in joinTable
 	joinTable := make(map[interface{}]*interface{})
 
 	for ii := 0; ii < lSlice.Len(); ii++ {

@@ -82,13 +82,13 @@ func updateConnections(view db.Database, spec stitch.Stitch) {
 		}
 	}
 
-	pairs, stitchs, dbcs := join.HashJoin(scs, db.ConnectionSlice(vcs), nil, dbcKey)
+	pairs, stitches, dbcs := join.HashJoin(scs, db.ConnectionSlice(vcs), nil, dbcKey)
 
 	for _, dbc := range dbcs {
 		view.Remove(dbc.(db.Connection))
 	}
 
-	for _, stitchc := range stitchs {
+	for _, stitchc := range stitches {
 		pairs = append(pairs, join.Pair{L: stitchc, R: view.InsertConnection()})
 	}
 
@@ -163,7 +163,7 @@ func updateContainers(view db.Database, spec stitch.Stitch) {
 		dbc := pair.R.(db.Container)
 
 		// By sorting the labels we prevent the database from getting confused
-		// when their order is non determinisitic.
+		// when their order is non deterministic.
 		dbc.Labels = newc.Labels
 		sort.Sort(sort.StringSlice(dbc.Labels))
 

@@ -306,7 +306,7 @@ func (dk Client) Get(id string) (Container, error) {
 	}, nil
 }
 
-// IsRunning returns true if the contianer with the given `name` is running.
+// IsRunning returns true if the container with the given `name` is running.
 func (dk Client) IsRunning(name string) (bool, error) {
 	containers, err := dk.List(map[string][]string{
 		"name": {name},
