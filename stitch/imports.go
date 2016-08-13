@@ -29,7 +29,8 @@ func resolveImportsRec(asts []ast, path string, imported []string,
 		}
 
 		if !top {
-			return nil, errors.New("import must be begin the module")
+			return nil, errors.New(
+				"import must be at the beginning of the module")
 		}
 
 		// Check for any import cycles.
@@ -49,7 +50,8 @@ func resolveImportsRec(asts []ast, path string, imported []string,
 
 		f, err := util.Open(modulePath)
 		if err != nil {
-			return nil, fmt.Errorf("unable to open import %s", name)
+			return nil, fmt.Errorf("unable to open import %s (path=%s)",
+				name, modulePath)
 		}
 
 		defer f.Close()

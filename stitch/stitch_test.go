@@ -1600,8 +1600,9 @@ func testCheckSpec(t *testing.T) {
 	util.WriteFile("test/toDownload.spec",
 		[]byte(`(import "github.com/NetSys/quilt/specs/example")`), 0644)
 	expected := "unable to open import github.com/NetSys/quilt/specs/example"
-	if err := checkSpec("test/toDownload.spec", nil, nil); err.Error() != expected {
-		t.Errorf("expected %s \n but got %s", expected, err.Error())
+	err := checkSpec("test/toDownload.spec", nil, nil)
+	if !strings.HasPrefix(err.Error(), expected) {
+		t.Errorf("'%s' does not begin with '%s'", err.Error(), expected)
 	}
 
 	if len(created) == 0 {
@@ -1620,8 +1621,8 @@ func TestResolveSpecImports(t *testing.T) {
 	// This will error because we do not actually download the file. Checking a spec
 	// is handled in testCheckSpec.
 	expected := "unable to open import github.com/NetSys/quilt/specs/example"
-	if err := resolveSpecImports("test"); err.Error() != expected {
-		t.Errorf("expected %s \n but got %s", expected, err.Error())
+	if err := resolveSpecImports("test"); !strings.HasPrefix(err.Error(), expected) {
+		t.Errorf("'%s' does not begin with '%s'", err.Error(), expected)
 	}
 
 	if len(created) == 0 {
