@@ -488,7 +488,7 @@ func generateTargetNatRules(containers []db.Container,
 func updatePorts(odb ovsdb.Client, containers []db.Container) {
 	// An Open vSwitch patch port is referred to as a "port".
 	targetPorts := generateTargetPorts(containers)
-	currentPorts, err := generateCurrentPorts(odb)
+	currentPorts, err := odb.ListInterfaces()
 	if err != nil {
 		log.WithError(err).Error("failed to generate current openflow ports")
 		return
@@ -503,7 +503,8 @@ func updatePorts(odb ovsdb.Client, containers []db.Container) {
 		}
 	}
 
-	pairs, lefts, rights := join.HashJoin(currentPorts, targetPorts, key, key)
+	pairs, lefts, rights := join.HashJoin(ovsdb.InterfaceSlice(currentPorts),
+		targetPorts, key, key)
 
 	for _, l := range lefts {
 		if l.(ovsdb.Interface).Type == ovsdb.InterfaceTypeGeneve ||
@@ -557,10 +558,6 @@ func generateTargetPorts(containers []db.Container) ovsdb.InterfaceSlice {
 		})
 	}
 	return configs
-}
-
-func generateCurrentPorts(odb ovsdb.Client) (ovsdb.InterfaceSlice, error) {
-	return odb.ListInterfaces()
 }
 
 func addPort(odb ovsdb.Client, iface ovsdb.Interface) error {
