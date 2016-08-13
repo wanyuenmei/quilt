@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"sync"
+	"time"
 
 	dkc "github.com/fsouza/go-dockerclient"
 	"github.com/satori/go.uuid"
@@ -44,7 +45,7 @@ func NewMock() (*MockClient, Client) {
 		createdExecs: map[string]dkc.CreateExecOptions{},
 		Executions:   map[string][]string{},
 	}
-	return md, Client{md, &sync.Mutex{}, map[string]struct{}{}}
+	return md, Client{md, &sync.Mutex{}, map[string]time.Time{}}
 }
 
 // StartContainer starts the given docker container.

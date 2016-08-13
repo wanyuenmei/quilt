@@ -16,6 +16,8 @@ import (
 	dkc "github.com/fsouza/go-dockerclient"
 )
 
+const pullCacheTimeout = time.Minute
+
 // ErrNoSuchContainer is the error returned when an operation is requested on a
 // non-existent container.
 var ErrNoSuchContainer = errors.New("container does not exist")
@@ -40,7 +42,7 @@ type ContainerSlice []Container
 type Client struct {
 	client
 	*sync.Mutex
-	imageCache map[string]struct{}
+	imageCache map[string]time.Time
 }
 
 // RunOptions changes the behavior of the Run function.
@@ -84,7 +86,7 @@ func New(sock string) Client {
 		break
 	}
 
-	return Client{client, &sync.Mutex{}, map[string]struct{}{}}
+	return Client{client, &sync.Mutex{}, map[string]time.Time{}}
 }
 
 // Run creates and starts a new container in accordance RunOptions.
@@ -233,7 +235,8 @@ func (dk Client) Pull(image string) error {
 	dk.Lock()
 	defer dk.Unlock()
 
-	if _, ok := dk.imageCache[image]; ok {
+	now := time.Now()
+	if t, ok := dk.imageCache[image]; ok && t.Before(now) {
 		return nil
 	}
 
@@ -243,7 +246,7 @@ func (dk Client) Pull(image string) error {
 		return err
 	}
 
-	dk.imageCache[image] = struct{}{}
+	dk.imageCache[image] = now.Add(pullCacheTimeout)
 	return nil
 }
 

@@ -3,6 +3,7 @@ package docker
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	dkc "github.com/fsouza/go-dockerclient"
@@ -32,7 +33,7 @@ func TestPull(t *testing.T) {
 		t.Error(spew.Sprintf("Pulled %v\nexpected: %v", md.Pulled, exp))
 
 	}
-	if !reflect.DeepEqual(dk.imageCache, exp) {
+	if !reflect.DeepEqual(cacheKeys(dk.imageCache), exp) {
 		t.Error(spew.Sprintf("Pulled %v\nexpected: %v", md.Pulled, exp))
 
 	}
@@ -44,7 +45,7 @@ func TestPull(t *testing.T) {
 		t.Error(spew.Sprintf("Pulled %v\nexpected: %v", md.Pulled, exp))
 
 	}
-	if !reflect.DeepEqual(dk.imageCache, exp) {
+	if !reflect.DeepEqual(cacheKeys(dk.imageCache), exp) {
 		t.Error(spew.Sprintf("Pulled %v\nexpected: %v", md.Pulled, exp))
 
 	}
@@ -325,4 +326,12 @@ func TestExec(t *testing.T) {
 	if len(md.createdExecs) > 0 {
 		t.Errorf("Bad Executions %v", md.createdExecs)
 	}
+}
+
+func cacheKeys(cache map[string]time.Time) map[string]struct{} {
+	res := map[string]struct{}{}
+	for k := range cache {
+		res[k] = struct{}{}
+	}
+	return res
 }
