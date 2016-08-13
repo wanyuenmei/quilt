@@ -20,13 +20,13 @@ type Stop struct {
 func (sCmd *Stop) createFlagSet() *flag.FlagSet {
 	flags := flag.NewFlagSet("stop", flag.ExitOnError)
 
-	flags.StringVar(&sCmd.host, "host", api.DefaultSocket,
+	flags.StringVar(&sCmd.host, "H", api.DefaultSocket,
 		"the host to connect to")
 	flags.StringVar(&sCmd.namespace, "namespace", "", "the namespace to stop")
 
 	flags.Usage = func() {
-		fmt.Println("usage: quiltctl stop [-H=<daemon_host> " +
-			"-namespace=<namespace> <namespace>]")
+		fmt.Println("usage: quilt stop [-H=<daemon_host>] " +
+			"[-namespace=<namespace>] <namespace>]")
 		fmt.Println("`stop` creates an empty Stitch for the given namespace, " +
 			"and sends it to the Quilt daemon to be executed.")
 		fmt.Println("The result is that resources associated with the " +

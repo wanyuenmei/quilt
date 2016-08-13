@@ -31,8 +31,8 @@ func (rCmd *Run) createFlagSet() *flag.FlagSet {
 		"the host to connect to")
 
 	flags.Usage = func() {
-		fmt.Println("usage: quiltctl run [-H=<daemon_host> " +
-			"-stitch=<stitch> <stitch>]")
+		fmt.Println("usage: quilt run [-H=<daemon_host>] " +
+			"[-stitch=<stitch>] <stitch>")
 		fmt.Println("`run` compiles the provided stitch, and sends the " +
 			"result to the Quilt daemon to be executed.")
 		rCmd.flags.PrintDefaults()

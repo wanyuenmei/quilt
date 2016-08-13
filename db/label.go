@@ -1,7 +1,6 @@
 package db
 
-// A Label row is created for each container specified by the policy.  Each row will
-// eventually be instantiated within its corresponding cluster. */
+// A Label row is created for each label specified by the policy.
 type Label struct {
 	ID int
 
@@ -13,14 +12,14 @@ type Label struct {
 // LabelSlice is an alias for []Label to allow for joins
 type LabelSlice []Label
 
-// InsertLabel creates a new container row and inserts it into the database.
+// InsertLabel creates a new label row and inserts it into the database.
 func (db Database) InsertLabel() Label {
 	result := Label{ID: db.nextID()}
 	db.insert(result)
 	return result
 }
 
-// SelectFromLabel gets all containers in the database that satisfy 'check'.
+// SelectFromLabel gets all labels in the database that satisfy 'check'.
 func (db Database) SelectFromLabel(check func(Label) bool) []Label {
 	var result []Label
 	for _, row := range db.tables[LabelTable].rows {
@@ -32,7 +31,7 @@ func (db Database) SelectFromLabel(check func(Label) bool) []Label {
 	return result
 }
 
-// SelectFromLabel gets all containers in the database connection that satisfy 'check'.
+// SelectFromLabel gets all labels in the database connection that satisfy 'check'.
 func (conn Conn) SelectFromLabel(check func(Label) bool) []Label {
 	var result []Label
 	conn.Transact(func(view Database) error {

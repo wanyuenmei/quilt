@@ -25,17 +25,17 @@ type SSH struct {
 func (sCmd *SSH) createFlagSet() *flag.FlagSet {
 	flags := flag.NewFlagSet("ssh", flag.ExitOnError)
 
-	flags.StringVar(&sCmd.host, "host", api.DefaultSocket,
+	flags.StringVar(&sCmd.host, "H", api.DefaultSocket,
 		"the host to query for machine information")
 
 	flags.Usage = func() {
-		fmt.Println("usage: quiltctl ssh [-H=<daemon_host>] <machine_num> " +
+		fmt.Println("usage: quilt ssh [-H=<daemon_host>] <machine_num> " +
 			"[ssh_options]")
 		fmt.Println("`ssh` creates a SSH session to the specified machine. " +
 			"The machine is identified the database ID produced by " +
-			"`quiltctl queryMachines`.")
+			"`quilt queryMachines`.")
 		fmt.Println("For example, to SSH to machine 5 with a specific " +
-			"private key: quiltctl ssh 5 -i ~/.ssh/quilt")
+			"private key: quilt ssh 5 -i ~/.ssh/quilt")
 		sCmd.flags.PrintDefaults()
 	}
 
@@ -43,7 +43,7 @@ func (sCmd *SSH) createFlagSet() *flag.FlagSet {
 	return flags
 }
 
-// Parse parses the command line arguments for the stop command.
+// Parse parses the command line arguments for the ssh command.
 func (sCmd *SSH) Parse(rawArgs []string) error {
 	flags := sCmd.createFlagSet()
 

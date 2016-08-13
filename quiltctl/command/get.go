@@ -23,7 +23,7 @@ func (gCmd *Get) createFlagSet() *flag.FlagSet {
 	flags.StringVar(&gCmd.importPath, "import", "", "the stitch to download")
 
 	flags.Usage = func() {
-		fmt.Println("usage: quiltctl get [-import=<import>] <import> ")
+		fmt.Println("usage: quilt get [-import=<import>] <import> ")
 		fmt.Println("`get` downloads a given import into QUILT_PATH.")
 		flags.PrintDefaults()
 	}

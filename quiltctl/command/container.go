@@ -52,8 +52,8 @@ func (cCmd *Container) Run() int {
 
 func containersStr(containers []db.Container) string {
 	var containersStr string
-	for _, m := range containers {
-		containersStr += fmt.Sprintf("%v\n", m)
+	for _, c := range containers {
+		containersStr += fmt.Sprintf("%v\n", c)
 	}
 
 	return containersStr

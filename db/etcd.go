@@ -26,7 +26,7 @@ func (db Database) InsertEtcd() Etcd {
 	return result
 }
 
-// EtcdLeader returns true if the minion is the leade master for the cluster
+// EtcdLeader returns true if the minion is the lead master for the cluster.
 func (db Database) EtcdLeader() bool {
 	etcds := db.SelectFromEtcd(nil)
 	return len(etcds) == 1 && etcds[0].Leader
@@ -43,7 +43,7 @@ func (db Database) SelectFromEtcd(check func(Etcd) bool) []Etcd {
 	return result
 }
 
-// EtcdLeader returns true if the minion is the leade master for the cluster
+// EtcdLeader returns true if the minion is the lead master for the cluster.
 func (conn Conn) EtcdLeader() bool {
 	var leader bool
 	conn.Transact(func(view Database) error {
