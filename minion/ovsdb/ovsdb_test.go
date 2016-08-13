@@ -287,9 +287,11 @@ func TestInterfaces(t *testing.T) {
 		iface := val.(Interface)
 		return struct {
 			name, bridge string
+			ofport       int
 		}{
 			name:   iface.Name,
 			bridge: iface.Bridge,
+			ofport: *iface.OFPort,
 		}
 	}
 
@@ -311,10 +313,14 @@ func TestInterfaces(t *testing.T) {
 		t.Error(err)
 	}
 
+	// Ovsdb mock uses defaultOFPort as the ofport created for each interface.
+	expectedOFPort := int(defaultOFPort)
+
 	// Create one interface.
 	iface1 := Interface{
 		Name:   "iface1",
 		Bridge: lswitch1,
+		OFPort: &expectedOFPort,
 	}
 
 	if err := ovsdbClient.CreateInterface(iface1.Bridge, iface1.Name); err != nil {
@@ -354,6 +360,7 @@ func TestInterfaces(t *testing.T) {
 	iface2 := Interface{
 		Name:   "iface2",
 		Bridge: lswitch2,
+		OFPort: &expectedOFPort,
 	}
 
 	if err := ovsdbClient.CreateInterface(iface2.Bridge, iface2.Name); err != nil {

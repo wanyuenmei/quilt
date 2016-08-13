@@ -18,7 +18,7 @@ func NewFakeOvsdbClient() Client {
 }
 
 // Default OFPort used during creation of interface.
-const defaultOFPort = 123
+const defaultOFPort float64 = 123
 
 type fakeOvsdbClient struct {
 	databases map[string]fakeDb

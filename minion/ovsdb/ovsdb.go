@@ -601,9 +601,10 @@ func ifaceFromRow(row row) (Interface, error) {
 		return iface, err
 	}
 
-	ofport, ok := row["ofport"].(int)
+	ofport, ok := row["ofport"].(float64)
 	if ok {
-		iface.OFPort = &ofport
+		port := int(ofport)
+		iface.OFPort = &port
 	}
 
 	// The following map keys could be missing without breaking the Schema in the
