@@ -107,9 +107,15 @@ required.  These can be installed with the `make go-get` target.
 
 ## Protobufs
 If you change any of the proto files, you'll need to regenerate the protobuf
-code.  This requires you to install the protobuf compiler found
-[here](https://developers.google.com/protocol-buffers/).  And alls
-proto-gen-go.
+code. We currently use protoc v3. On a Mac with homebrew, you can install protoc v3
+using:
+
+    brew install --devel protobuf
+
+On other operating systems you can directly download the protoc binary
+[here](https://github.com/google/protobuf/releases), and then add it to your `$PATH`.
+
+You'll also need to install protobuf go bindings:
 
     go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
 
