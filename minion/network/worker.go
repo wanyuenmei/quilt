@@ -845,23 +845,23 @@ func generateTargetOpenFlow(dk docker.Client, odb ovsdb.Client,
 		log.WithError(err).Error("failed to get MAC of default gateway.")
 	}
 
+	ifaces, err := odb.ListInterfaces()
+	if err != nil {
+		return nil, err
+	}
+
+	ifaceMap := make(map[string]int)
+	for _, iface := range ifaces {
+		if iface.OFPort != nil {
+			ifaceMap[iface.Name] = *iface.OFPort
+		}
+	}
+
 	var rules []string
 	for _, dbc := range containers {
 		_, vethOut := veths(dbc.DockerID)
 		_, peerQuilt := patchPorts(dbc.DockerID)
 		dbcMac := dbc.Mac
-
-		ifaces, err := odb.ListInterfaces()
-		if err != nil {
-			return nil, err
-		}
-
-		ifaceMap := make(map[string]int)
-		for _, iface := range ifaces {
-			if iface.OFPort != nil {
-				ifaceMap[iface.Name] = *iface.OFPort
-			}
-		}
 
 		ofQuilt, ok := ifaceMap[peerQuilt]
 		if !ok {
