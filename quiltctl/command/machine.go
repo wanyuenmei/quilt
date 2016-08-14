@@ -40,7 +40,7 @@ func (mCmd *Machine) Run() int {
 
 	machines, err := c.QueryMachines()
 	if err != nil {
-		log.Error(DaemonResponseError{responseError: err})
+		log.WithError(err).Error("Unable to query machines.")
 		return 1
 	}
 

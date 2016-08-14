@@ -40,7 +40,7 @@ func (cCmd *Container) Run() int {
 
 	containers, err := c.QueryContainers()
 	if err != nil {
-		log.Error(DaemonResponseError{responseError: err})
+		log.WithError(err).Error("Unable to query containers.")
 		return 1
 	}
 

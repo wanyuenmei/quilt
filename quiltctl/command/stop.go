@@ -72,7 +72,7 @@ func (sCmd *Stop) Run() int {
 	defer c.Close()
 
 	if err = c.RunStitch(specStr); err != nil {
-		log.Error(DaemonResponseError{responseError: err})
+		log.WithError(err).Error("Unable to stop namespace.")
 		return 1
 	}
 

@@ -98,7 +98,7 @@ func (rCmd *Run) Run() int {
 
 	err = c.RunStitch(compiled)
 	if err != nil {
-		log.Error(DaemonResponseError{responseError: err})
+		log.WithError(err).Error("Unable to start run.")
 		return 1
 	}
 
