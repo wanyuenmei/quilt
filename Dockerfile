@@ -18,5 +18,7 @@ RUN VER=1.6.2 \
 && go test github.com/NetSys/quilt/... \
 && go install github.com/NetSys/quilt \
 && cp $GOPATH/bin/* /\
+&& git -C "$GOPATH/src/github.com/NetSys/quilt/" show --pretty=medium --no-patch \
+	> /buildinfo \
 && rm -rf /tmp/build \
 && apk del .build_deps

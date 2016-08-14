@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"time"
@@ -50,6 +51,7 @@ func newLogger(myIP string) (logger, error) {
 	passedDir := filepath.Join(webDir, "passed")
 	failedDir := filepath.Join(webDir, "failed")
 	logDir := filepath.Join(webDir, "log")
+	buildinfoPath := filepath.Join(webDir, "buildinfo")
 
 	if err := os.MkdirAll(logDir, 0755); err != nil {
 		return logger{}, err
@@ -59,6 +61,9 @@ func newLogger(myIP string) (logger, error) {
 	}
 	if err := os.MkdirAll(failedDir, 0755); err != nil {
 		return logger{}, err
+	}
+	if err := exec.Command("cp", "/buildinfo", buildinfoPath).Run(); err != nil {
+		logrus.WithError(err).Error("Failed to copy build info.")
 	}
 
 	latestSymlink := filepath.Join(webRoot, "latest")
