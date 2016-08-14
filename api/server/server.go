@@ -47,7 +47,7 @@ func Run(conn db.Conn, listenAddr string) error {
 
 	// Cleanup the socket if we're interrupted.
 	sigc := make(chan os.Signal, 1)
-	signal.Notify(sigc, os.Interrupt, os.Kill, syscall.SIGTERM)
+	signal.Notify(sigc, os.Interrupt, os.Kill, syscall.SIGTERM, syscall.SIGHUP)
 	go func(c chan os.Signal) {
 		sig := <-c
 		log.Printf("Caught signal %s: shutting down.\n", sig)
