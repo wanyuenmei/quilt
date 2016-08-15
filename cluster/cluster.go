@@ -164,48 +164,52 @@ func (clst cluster) sync() {
 	 * are necessary the code loops so that database can be updated before
 	 * the next sync() call. */
 	for i := 0; i < 2; i++ {
-		cloudMachines, err := clst.get()
-		if err != nil {
-			log.WithError(err).Error("Failed to list machines.")
-			return
+		bootSet, terminateSet := clst.syncMachines()
+		if len(bootSet) == 0 && len(terminateSet) == 0 {
+			break
 		}
-
-		var dbMachines []db.Machine
-		clst.conn.Transact(func(view db.Database) error {
-			dbMachines = view.SelectFromMachine(nil)
-			return nil
-		})
-
-		pairs, bootSet, terminateSet := syncDB(cloudMachines, dbMachines)
-
-		clst.conn.Transact(func(view db.Database) error {
-			for _, pair := range pairs {
-				dbm := pair.L.(db.Machine)
-				m := pair.R.(provider.Machine)
-
-				dbm.CloudID = m.ID
-				dbm.PublicIP = m.PublicIP
-				dbm.PrivateIP = m.PrivateIP
-
-				// If we overwrite the machine's size before the machine
-				// has fully booted, the Stitch will flip it back
-				// immediately.
-				if m.Size != "" {
-					dbm.Size = m.Size
-				}
-				if m.DiskSize != 0 {
-					dbm.DiskSize = m.DiskSize
-				}
-				dbm.Provider = m.Provider
-				// XXX: Get the SSH keys?
-				view.Commit(dbm)
-			}
-			return nil
-		})
-
 		clst.updateCloud(bootSet, true)
 		clst.updateCloud(terminateSet, false)
 	}
+}
+
+func (clst cluster) syncMachines() (bootSet, terminateSet []provider.Machine) {
+	cloudMachines, err := clst.get()
+	if err != nil {
+		log.WithError(err).Error("Failed to list machines.")
+		return
+	}
+
+	clst.conn.Transact(func(view db.Database) error {
+		dbMachines := view.SelectFromMachine(nil)
+
+		var pairs []join.Pair
+		pairs, bootSet, terminateSet = syncDB(cloudMachines, dbMachines)
+		for _, pair := range pairs {
+			dbm := pair.L.(db.Machine)
+			m := pair.R.(provider.Machine)
+
+			dbm.CloudID = m.ID
+			dbm.PublicIP = m.PublicIP
+			dbm.PrivateIP = m.PrivateIP
+
+			// If we overwrite the machine's size before the machine
+			// has fully booted, the Stitch will flip it back
+			// immediately.
+			if m.Size != "" {
+				dbm.Size = m.Size
+			}
+			if m.DiskSize != 0 {
+				dbm.DiskSize = m.DiskSize
+			}
+			dbm.Provider = m.Provider
+			// XXX: Get the SSH keys?
+			view.Commit(dbm)
+		}
+		return nil
+	})
+
+	return bootSet, terminateSet
 }
 
 func (clst cluster) syncACLs(acls []string, machines []db.Machine) {
