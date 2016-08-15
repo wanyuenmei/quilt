@@ -73,15 +73,12 @@ func newCluster(conn db.Conn, namespace string) *cluster {
 }
 
 func (clst *cluster) listen() {
-	rateLimit := time.NewTicker(5 * time.Second)
-	defer rateLimit.Stop()
-
 	clst.sync()
 	clst.fm.init()
 	for range clst.trigger.C {
-		<-rateLimit.C
 		clst.sync()
 		clst.fm.runOnce()
+		time.Sleep(5 * time.Second)
 	}
 }
 
