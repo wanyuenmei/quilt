@@ -76,8 +76,8 @@ func (clst *cluster) listen() {
 	clst.sync()
 	clst.fm.init()
 	for range clst.trigger.C {
-		clst.sync()
 		clst.fm.runOnce()
+		clst.sync()
 		time.Sleep(5 * time.Second)
 	}
 }
