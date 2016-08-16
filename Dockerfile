@@ -1,7 +1,7 @@
 From alpine:3.3
 Maintainer Ethan J. Jackson
 
-RUN VER=1.6.2 \
+RUN VER=1.7 \
 && export GOROOT=/tmp/build/go GOPATH=/tmp/build/gowork \
 && export PATH=$PATH:$GOROOT/bin \
 && apk update \
