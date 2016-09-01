@@ -43,8 +43,8 @@ func Main(opts []string) int {
 			Filename: configPath,
 		},
 	}
-	pathStr, _ := os.LookupEnv(stitch.QuiltPathKey)
-	compiled, err := stitch.Compile(*sc.Init(bufio.NewReader(f)), pathStr, false)
+	compiled, err := stitch.Compile(*sc.Init(bufio.NewReader(f)),
+		stitch.DefaultImportGetter)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
