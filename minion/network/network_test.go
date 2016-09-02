@@ -136,12 +136,6 @@ func TestACL(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		updateACLs(connections, labels, containers)
-
-		res, err = client.ListACLs(lSwitch)
-		if err != nil {
-			t.Error(err)
-		}
 
 		expectedAclCores = append(defaultAclCores, expectedAclCores...)
 
