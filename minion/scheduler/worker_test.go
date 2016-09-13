@@ -54,6 +54,15 @@ func TestRunWorker(t *testing.T) {
 	}
 }
 
+func runSync(dk docker.Client, dbcs []db.Container,
+	dkcs []docker.Container) []db.Container {
+
+	changes, tdbcs, tdkcs := syncWorker(dbcs, dkcs)
+	doContainers(dk, tdkcs, dockerKill)
+	doContainers(dk, tdbcs, dockerRun)
+	return changes
+}
+
 func TestSyncWorker(t *testing.T) {
 	t.Parallel()
 
@@ -69,15 +78,15 @@ func TestSyncWorker(t *testing.T) {
 	}
 
 	md.StartError = true
-	changed := syncWorker(dk, dbcs, nil)
+	changed := runSync(dk, dbcs, nil)
 	md.StartError = false
 	if len(changed) > 0 {
 		t.Error(spew.Sprintf("Expected no changed to to an error\n%v", changed))
 	}
 
-	changed = syncWorker(dk, dbcs, nil)
-
+	runSync(dk, dbcs, nil)
 	dkcs, err := dk.List(nil)
+	changed, _, _ = syncWorker(dbcs, dkcs)
 	if err != nil {
 		t.Errorf("Unexpected err %v", err)
 	}
@@ -105,7 +114,7 @@ func TestSyncWorker(t *testing.T) {
 	}
 
 	dbcs[0].DockerID = ""
-	changed = syncWorker(dk, dbcs, dkcs)
+	changed = runSync(dk, dbcs, dkcs)
 
 	newDkcs, err := dk.List(nil)
 	if err != nil {
@@ -122,7 +131,7 @@ func TestSyncWorker(t *testing.T) {
 
 	// Atempt a failed remove
 	md.RemoveError = true
-	changed = syncWorker(dk, nil, dkcs)
+	changed = runSync(dk, nil, dkcs)
 	md.RemoveError = false
 	if len(changed) > 0 {
 		t.Error(spew.Sprintf("Expected no changed to to an error\n%v", changed))
@@ -135,7 +144,7 @@ func TestSyncWorker(t *testing.T) {
 		t.Error(expLog("Unexpected container change", newDkcs, dkcs))
 	}
 
-	changed = syncWorker(dk, nil, dkcs)
+	changed = runSync(dk, nil, dkcs)
 	if len(changed) > 0 {
 		t.Error(spew.Sprintf("Expected no changed to to an error\n%v", changed))
 	}

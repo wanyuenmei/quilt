@@ -1,6 +1,8 @@
 package scheduler
 
 import (
+	"sync"
+
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/join"
 	"github.com/NetSys/quilt/minion/docker"
@@ -11,6 +13,7 @@ import (
 const labelKey = "quilt"
 const labelValue = "scheduler"
 const labelPair = labelKey + "=" + labelValue
+const concurrencyLimit = 32
 
 func runWorker(conn db.Conn, dk docker.Client, myIP string) {
 	if myIP == "" {
@@ -18,69 +21,44 @@ func runWorker(conn db.Conn, dk docker.Client, myIP string) {
 	}
 
 	filter := map[string][]string{"label": {labelPair}}
-	dkcs, err := dk.List(filter)
-	if err != nil {
-		log.WithError(err).Warning("Failed to list docker containers.")
-		return
-	}
 
-	conn.Transact(func(view db.Database) error {
-		dbcs := view.SelectFromContainer(func(dbc db.Container) bool {
-			return dbc.Minion == myIP
+	var toBoot, toKill []interface{}
+	for i := 0; i < 2; i++ {
+		dkcs, err := dk.List(filter)
+		if err != nil {
+			log.WithError(err).Warning("Failed to list docker containers.")
+			return
+		}
+
+		conn.Transact(func(view db.Database) error {
+			dbcs := view.SelectFromContainer(func(dbc db.Container) bool {
+				return dbc.Minion == myIP
+			})
+
+			var changed []db.Container
+			changed, toBoot, toKill = syncWorker(dbcs, dkcs)
+			for _, dbc := range changed {
+				view.Commit(dbc)
+			}
+			return nil
 		})
 
-		changed := syncWorker(dk, dbcs, dkcs)
-		for _, dbc := range changed {
-			view.Commit(dbc)
-		}
-		return nil
-	})
+		doContainers(dk, toBoot, dockerRun)
+		doContainers(dk, toKill, dockerKill)
+	}
 }
 
-func syncWorker(dk docker.Client, dbcs []db.Container,
-	dkcs []docker.Container) (changed []db.Container) {
+func syncWorker(dbcs []db.Container, dkcs []docker.Container) (changed []db.Container,
+	toBoot, toKill []interface{}) {
 
 	pairs, dbci, dkci := join.Join(dbcs, dkcs, syncJoinScore)
 
 	for _, i := range dkci {
-		dkc := i.(docker.Container)
-		log.WithField("container", dkc.ID).Info("Remove container")
-		if err := dk.RemoveID(dkc.ID); err != nil {
-			log.WithFields(log.Fields{
-				"error": err,
-				"id":    dkc.ID,
-			}).Warning("Failed to remove container.")
-		}
+		toKill = append(toKill, i.(docker.Container))
 	}
 
 	for _, i := range dbci {
-		dbc := i.(db.Container)
-
-		log.WithField("container", dbc).Info("Start container")
-		id, err := dk.Run(docker.RunOptions{
-			Image:  dbc.Image,
-			Args:   dbc.Command,
-			Env:    dbc.Env,
-			Labels: map[string]string{labelKey: labelValue},
-		})
-		if err != nil {
-			log.WithFields(log.Fields{
-				"error":     err,
-				"container": dbc,
-			}).WithError(err).Warning("Failed to run container", dbc)
-			continue
-		}
-
-		dkc, err := dk.Get(id)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"error":     err,
-				"container": dbc,
-			}).WithError(err).Warning("Failed to get container", dbc)
-			continue
-		}
-
-		pairs = append(pairs, join.Pair{L: dbc, R: dkc})
+		toBoot = append(toBoot, i.(db.Container))
 	}
 
 	for _, pair := range pairs {
@@ -94,7 +72,60 @@ func syncWorker(dk docker.Client, dbcs []db.Container,
 		}
 	}
 
-	return changed
+	return changed, toBoot, toKill
+}
+
+func doContainers(dk docker.Client, containers []interface{},
+	do func(docker.Client, chan interface{})) {
+
+	in := make(chan interface{})
+	var wg sync.WaitGroup
+	wg.Add(concurrencyLimit)
+	for i := 0; i < concurrencyLimit; i++ {
+		go func() {
+			do(dk, in)
+			wg.Done()
+		}()
+	}
+
+	for _, dbc := range containers {
+		in <- dbc
+	}
+	close(in)
+	wg.Wait()
+}
+
+func dockerRun(dk docker.Client, in chan interface{}) {
+	for i := range in {
+		dbc := i.(db.Container)
+		log.WithField("container", dbc).Info("Start container")
+		_, err := dk.Run(docker.RunOptions{
+			Image:  dbc.Image,
+			Args:   dbc.Command,
+			Env:    dbc.Env,
+			Labels: map[string]string{labelKey: labelValue},
+		})
+		if err != nil {
+			log.WithFields(log.Fields{
+				"error":     err,
+				"container": dbc,
+			}).WithError(err).Warning("Failed to run container", dbc)
+			continue
+		}
+	}
+}
+
+func dockerKill(dk docker.Client, in chan interface{}) {
+	for i := range in {
+		dkc := i.(docker.Container)
+		log.WithField("container", dkc.ID).Info("Remove container")
+		if err := dk.RemoveID(dkc.ID); err != nil {
+			log.WithFields(log.Fields{
+				"error": err,
+				"id":    dkc.ID,
+			}).Warning("Failed to remove container.")
+		}
+	}
 }
 
 func syncJoinScore(left, right interface{}) int {
