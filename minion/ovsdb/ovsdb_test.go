@@ -3,6 +3,8 @@ package ovsdb
 import (
 	"fmt"
 	"reflect"
+	"sort"
+	"strings"
 	"testing"
 
 	"github.com/NetSys/quilt/join"
@@ -274,6 +276,132 @@ func TestACLs(t *testing.T) {
 
 }
 
+// We can't use a slice in the HashJoin key, so we represent the addresses in
+// an address set as the addresses concatenated together.
+type addressSetKey struct {
+	name      string
+	addresses string
+}
+
+func newAddressSetKey(name string, addresses []string) addressSetKey {
+	// OVSDB returns the addresses in a non-deterministic order, so we
+	// sort them.
+	sort.Strings(addresses)
+	return addressSetKey{
+		name:      name,
+		addresses: strings.Join(addresses, " "),
+	}
+}
+
+func TestAddressSets(t *testing.T) {
+	ovsdbClient := NewFakeOvsdbClient()
+
+	key := func(intf interface{}) interface{} {
+		addrSet := intf.(AddressSet)
+		// OVSDB returns the addresses in a non-deterministic order, so we
+		// sort them.
+		sort.Strings(addrSet.Addresses)
+		return addressSetKey{
+			name:      addrSet.Name,
+			addresses: strings.Join(addrSet.Addresses, " "),
+		}
+	}
+
+	checkCorrectness := func(ovsdbAddrSets []AddressSet, expAddrSets ...AddressSet) {
+		pair, _, _ := join.HashJoin(addressSlice(ovsdbAddrSets),
+			addressSlice(expAddrSets), key, key)
+		if len(pair) != len(expAddrSets) {
+			t.Error("Address sets do not match expected.")
+		}
+	}
+
+	// Create new switch.
+	lswitch := "test-switch"
+	if err := ovsdbClient.CreateLogicalSwitch(lswitch); err != nil {
+		t.Error(err)
+	}
+
+	// Create one Address Set.
+	addrSet1 := AddressSet{
+		Name:      "red",
+		Addresses: []string{"foo", "bar"},
+	}
+
+	if err := ovsdbClient.CreateAddressSet(lswitch, addrSet1.Name,
+		addrSet1.Addresses); err != nil {
+		t.Error(err)
+	}
+
+	// It should now have one ACL entry to be listed.
+	ovsdbAddrSets, err := ovsdbClient.ListAddressSets(lswitch)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if len(ovsdbAddrSets) != 1 {
+		t.Errorf("expected 1 address set. Got %d instead.", len(ovsdbAddrSets))
+	}
+
+	checkCorrectness(ovsdbAddrSets, addrSet1)
+
+	// Create one more address set.
+	addrSet2 := AddressSet{
+		Name:      "blue",
+		Addresses: []string{"bar", "baz"},
+	}
+
+	if err := ovsdbClient.CreateAddressSet(lswitch, addrSet2.Name,
+		addrSet2.Addresses); err != nil {
+		t.Error(err)
+	}
+
+	// It should now have two address sets to be listed.
+	ovsdbAddrSets, err = ovsdbClient.ListAddressSets(lswitch)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if len(ovsdbAddrSets) != 2 {
+		t.Errorf("expected 2 address sets. Got %d instead.", len(ovsdbAddrSets))
+	}
+
+	checkCorrectness(ovsdbAddrSets, addrSet1, addrSet2)
+
+	// Delete the first address set.
+	if err := ovsdbClient.DeleteAddressSet(lswitch, addrSet1.Name); err != nil {
+		t.Error(err)
+	}
+
+	// It should now have only one address set to be listed.
+	ovsdbAddrSets, err = ovsdbClient.ListAddressSets(lswitch)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if len(ovsdbAddrSets) != 1 {
+		t.Errorf("expected 1 address set entry. Got %d instead.",
+			len(ovsdbAddrSets))
+	}
+
+	checkCorrectness(ovsdbAddrSets, addrSet2)
+
+	// Delete the other ACL rule.
+	if err := ovsdbClient.DeleteAddressSet(lswitch, addrSet2.Name); err != nil {
+		t.Error(err)
+	}
+
+	// It should now have only one address set to be listed.
+	ovsdbAddrSets, err = ovsdbClient.ListAddressSets(lswitch)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if len(ovsdbAddrSets) != 0 {
+		t.Errorf("expected 0 address sets. Got %d instead.", len(ovsdbAddrSets))
+	}
+
+}
+
 func TestInterfaces(t *testing.T) {
 	ovsdbClient := NewFakeOvsdbClient()
 
@@ -493,4 +621,14 @@ func (acls ACLSlice) Get(i int) interface{} {
 
 func (acls ACLSlice) Len() int {
 	return len(acls)
+}
+
+type addressSlice []AddressSet
+
+func (slc addressSlice) Len() int {
+	return len(slc)
+}
+
+func (slc addressSlice) Get(i int) interface{} {
+	return slc[i]
 }

@@ -2,12 +2,13 @@ package network
 
 import (
 	"fmt"
-	"reflect"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/NetSys/quilt/db"
+	"github.com/NetSys/quilt/join"
 	"github.com/NetSys/quilt/minion/ovsdb"
 )
 
@@ -100,282 +101,179 @@ func TestRunMaster(t *testing.T) {
 	}
 }
 
-func checkACLCount(t *testing.T, client ovsdb.Client,
-	connections []db.Connection, expCount int) {
+func checkAddressSet(t *testing.T, client ovsdb.Client,
+	labels []db.Label, exp []ovsdb.AddressSet) {
 
-	updateACLs(connections, allLabels, allContainers)
-	if acls, _ := client.ListACLs(lSwitch); len(acls) != expCount {
-		t.Errorf("Wrong number of ACLs: expected %d, got %d.",
-			expCount, len(acls))
+	syncAddressSets(client, labels)
+	actual, _ := client.ListAddressSets(lSwitch)
+
+	ovsdbKey := func(intf interface{}) interface{} {
+		addrSet := intf.(ovsdb.AddressSet)
+		// OVSDB returns the addresses in a non-deterministic order, so we
+		// sort them.
+		sort.Strings(addrSet.Addresses)
+		return addressSetKey{
+			name:      addrSet.Name,
+			addresses: strings.Join(addrSet.Addresses, " "),
+		}
+	}
+	if _, lefts, rights := join.HashJoin(addressSlice(actual), addressSlice(exp),
+		ovsdbKey, ovsdbKey); len(lefts) != 0 || len(rights) != 0 {
+		t.Errorf("Wrong address sets: expected %v, got %v.", exp, actual)
 	}
 }
 
-func TestACLUpdate(t *testing.T) {
+func TestAddressSetSync(t *testing.T) {
+	t.Parallel()
+
 	client := ovsdb.NewFakeOvsdbClient()
 	client.CreateLogicalSwitch(lSwitch)
-	ovsdb.Open = func() (ovsdb.Client, error) {
-		return client, nil
+
+	redLabel := db.Label{
+		Label:        "red",
+		ContainerIPs: []string{"8.8.8.8"},
+		IP:           "8.8.8.8",
 	}
+	blueLabel := db.Label{
+		Label:        "blue",
+		ContainerIPs: []string{"10.10.10.10", "11.11.11.11"},
+		IP:           "9.9.9.9",
+	}
+	redAddressSet := ovsdb.AddressSet{
+		Name:      "red",
+		Addresses: []string{"8.8.8.8"},
+	}
+	blueAddressSet := ovsdb.AddressSet{
+		Name:      "blue",
+		Addresses: []string{"9.9.9.9", "10.10.10.10", "11.11.11.11"},
+	}
+	checkAddressSet(t, client,
+		[]db.Label{redLabel},
+		[]ovsdb.AddressSet{redAddressSet},
+	)
+	checkAddressSet(t, client,
+		[]db.Label{redLabel, blueLabel},
+		[]ovsdb.AddressSet{redAddressSet, blueAddressSet},
+	)
+	checkAddressSet(t, client,
+		[]db.Label{blueLabel},
+		[]ovsdb.AddressSet{blueAddressSet},
+	)
+
+	// Test hyphen conversion.
+	dashLabel := db.Label{
+		Label: "spark-ms",
+		IP:    "9.9.9.9",
+	}
+	dashAddressSet := ovsdb.AddressSet{
+		Name:      "SPARK_MS",
+		Addresses: []string{"9.9.9.9"},
+	}
+	checkAddressSet(t, client,
+		[]db.Label{dashLabel},
+		[]ovsdb.AddressSet{dashAddressSet},
+	)
+}
+
+func checkACLs(t *testing.T, client ovsdb.Client,
+	connections []db.Connection, exp []ovsdb.ACL) {
+
+	syncACLs(client, connections)
+
+	actual, _ := client.ListACLs(lSwitch)
+
+	ovsdbKey := func(ovsdbIntf interface{}) interface{} {
+		return ovsdbIntf.(ovsdb.ACL).Core
+	}
+	if _, left, right := join.HashJoin(ovsdbACLSlice(actual), ovsdbACLSlice(exp),
+		ovsdbKey, ovsdbKey); len(left) != 0 || len(right) != 0 {
+		t.Errorf("Wrong ACLs: expected %v, got %v.", exp, actual)
+	}
+}
+
+func TestACLSync(t *testing.T) {
+	t.Parallel()
+
+	client := ovsdb.NewFakeOvsdbClient()
+	client.CreateLogicalSwitch(lSwitch)
+
+	dropACLs := directedACLs(ovsdb.ACL{
+		Core: ovsdb.ACLCore{
+			Priority: 0,
+			Match:    "ip",
+			Action:   "drop",
+		},
+	})
+
 	redBlueConnection := db.Connection{
 		From:    "red",
 		To:      "blue",
 		MinPort: 80,
 		MaxPort: 80,
 	}
+	redBlueACLs := directedACLs(ovsdb.ACL{
+		Core: ovsdb.ACLCore{
+			Priority: 1,
+			Match: "(((ip4.src == $red && ip4.dst == $blue) && " +
+				"(icmp || 80 <= udp.dst <= 80 || " +
+				"80 <= tcp.dst <= 80)) || ((ip4.src == $blue && " +
+				"ip4.dst == $red) && (icmp || 80 <= udp.src <= 80 || " +
+				"80 <= tcp.src <= 80)))",
+			Action: "allow",
+		},
+	})
+
 	redYellowConnection := db.Connection{
-		From:    "redBlue",
-		To:      "redBlue",
+		From:    "red",
+		To:      "yellow",
 		MinPort: 80,
 		MaxPort: 81,
 	}
-	checkACLCount(t, client, []db.Connection{redBlueConnection}, 18)
-	checkACLCount(t, client,
-		[]db.Connection{redBlueConnection, redYellowConnection}, 54)
-	checkACLCount(t, client, []db.Connection{redYellowConnection}, 42)
-	checkACLCount(t, client, nil, 2)
-}
+	redYellowACLs := directedACLs(ovsdb.ACL{
+		Core: ovsdb.ACLCore{
+			Priority: 1,
+			Match: "(((ip4.src == $red && ip4.dst == $yellow) && " +
+				"(icmp || 80 <= udp.dst <= 81 || " +
+				"80 <= tcp.dst <= 81)) || ((ip4.src == $yellow && " +
+				"ip4.dst == $red) && (icmp || 80 <= udp.src <= 81 || " +
+				"80 <= tcp.src <= 81)))",
+			Action: "allow",
+		},
+	})
 
-func allowMatch(acls map[ovsdb.ACLCore]struct{}, match string) {
-	acls[ovsdb.ACLCore{
-		Priority:  1,
-		Direction: "from-lport",
-		Action:    "allow",
-		Match:     match,
-	}] = struct{}{}
-	acls[ovsdb.ACLCore{
-		Priority:  1,
-		Direction: "to-lport",
-		Action:    "allow",
-		Match:     match,
-	}] = struct{}{}
-}
+	checkACLs(t, client,
+		[]db.Connection{redBlueConnection},
+		append(dropACLs, redBlueACLs...),
+	)
+	checkACLs(t, client,
+		[]db.Connection{redBlueConnection, redYellowConnection},
+		append(dropACLs, append(redBlueACLs, redYellowACLs...)...),
+	)
+	checkACLs(t, client,
+		[]db.Connection{redYellowConnection},
+		append(dropACLs, redYellowACLs...),
+	)
 
-func TestACLGeneration(t *testing.T) {
-	exp := map[ovsdb.ACLCore]struct{}{
-		{
-			Priority:  0,
-			Direction: "from-lport",
-			Match:     "ip",
-			Action:    "drop",
-		}: {},
-		{
-			Priority:  0,
-			Direction: "to-lport",
-			Match:     "ip",
-			Action:    "drop",
-		}: {},
+	// Test hyphen conversion.
+	dashConnection := db.Connection{
+		From:    "spark-ms",
+		To:      "spark-wk",
+		MinPort: 80,
+		MaxPort: 80,
 	}
-	allowMatch(exp, "ip4.src==8.8.8.8 && ip4.dst==9.9.9.9 "+
-		"&& (80 <= udp.dst <= 80 || 80 <= tcp.dst <= 80)")
-	allowMatch(exp, "ip4.src==8.8.8.8 && ip4.dst==9.9.9.9 && icmp")
-	allowMatch(exp, "ip4.src==9.9.9.9 && ip4.dst==8.8.8.8 "+
-		"&& (80 <= udp.src <= 80 || 80 <= tcp.src <= 80)")
-	allowMatch(exp, "ip4.src==9.9.9.9 && ip4.dst==8.8.8.8 && icmp")
-	allowMatch(exp, "ip4.src==10.10.10.10 && ip4.dst==12.12.12.12 "+
-		"&& (80 <= udp.dst <= 81 || 80 <= tcp.dst <= 81)")
-	allowMatch(exp, "ip4.src==10.10.10.10 && ip4.dst==12.12.12.12 && icmp")
-	allowMatch(exp, "ip4.src==10.10.10.10 && ip4.dst==13.13.13.13 "+
-		"&& (80 <= udp.dst <= 81 || 80 <= tcp.dst <= 81)")
-	allowMatch(exp, "ip4.src==10.10.10.10 && ip4.dst==13.13.13.13 && icmp")
-	allowMatch(exp, "ip4.src==11.11.11.11 && ip4.dst==12.12.12.12 "+
-		"&& (80 <= udp.dst <= 81 || 80 <= tcp.dst <= 81)")
-	allowMatch(exp, "ip4.src==11.11.11.11 && ip4.dst==12.12.12.12 && icmp")
-	allowMatch(exp, "ip4.src==11.11.11.11 && ip4.dst==13.13.13.13 "+
-		"&& (80 <= udp.dst <= 81 || 80 <= tcp.dst <= 81)")
-	allowMatch(exp, "ip4.src==11.11.11.11 && ip4.dst==13.13.13.13 && icmp")
-	allowMatch(exp, "ip4.src==12.12.12.12 && ip4.dst==10.10.10.10 "+
-		"&& (80 <= udp.src <= 81 || 80 <= tcp.src <= 81)")
-	allowMatch(exp, "ip4.src==12.12.12.12 && ip4.dst==10.10.10.10 && icmp")
-	allowMatch(exp, "ip4.src==12.12.12.12 && ip4.dst==11.11.11.11 "+
-		"&& (80 <= udp.src <= 81 || 80 <= tcp.src <= 81)")
-	allowMatch(exp, "ip4.src==12.12.12.12 && ip4.dst==11.11.11.11 && icmp")
-	allowMatch(exp, "ip4.src==13.13.13.13 && ip4.dst==10.10.10.10 "+
-		"&& (80 <= udp.src <= 81 || 80 <= tcp.src <= 81)")
-	allowMatch(exp, "ip4.src==13.13.13.13 && ip4.dst==10.10.10.10 && icmp")
-	allowMatch(exp, "ip4.src==13.13.13.13 && ip4.dst==11.11.11.11 "+
-		"&& (80 <= udp.src <= 81 || 80 <= tcp.src <= 81)")
-	allowMatch(exp, "ip4.src==13.13.13.13 && ip4.dst==11.11.11.11 && icmp")
-
-	actual := generateACLs(
-		[]aclConnection{
-			{
-				fromIPs: []string{"8.8.8.8"},
-				toIPs:   []string{"9.9.9.9"},
-				minPort: 80,
-				maxPort: 80,
-			},
-			{
-				fromIPs: []string{"10.10.10.10", "11.11.11.11"},
-				toIPs:   []string{"12.12.12.12", "13.13.13.13"},
-				minPort: 80,
-				maxPort: 81,
-			},
+	dashACLs := directedACLs(ovsdb.ACL{
+		Core: ovsdb.ACLCore{
+			Priority: 1,
+			Match: "(((ip4.src == $SPARK_MS && ip4.dst == $SPARK_WK) && " +
+				"(icmp || 80 <= udp.dst <= 80 || " +
+				"80 <= tcp.dst <= 80)) || ((ip4.src == $SPARK_WK && " +
+				"ip4.dst == $SPARK_MS) && " +
+				"(icmp || 80 <= udp.src <= 80 || 80 <= tcp.src <= 80)))",
+			Action: "allow",
 		},
-	)
-	if !reflect.DeepEqual(actual, exp) {
-		t.Errorf("Bad ACL generation: expected %v, got %v",
-			exp, actual)
-	}
-}
-
-func checkConnectionConstruction(t *testing.T, connections []db.Connection,
-	labels []db.Label, containers []db.Container, expected []aclConnection) {
-
-	actual := getACLConnections(connections, labels, containers)
-	if !reflect.DeepEqual(actual, expected) {
-		t.Errorf("Bad connection deconstruction: expected %v, got %v",
-			expected, actual)
-	}
-}
-
-var redLabelIP = "8.8.8.8"
-var blueLabelIP = "9.9.9.9"
-var yellowLabelIP = "10.10.10.10"
-var redBlueLabelIP = "13.13.13.13"
-var redContainerIP = "100.1.1.1"
-var blueContainerIP = "100.1.1.2"
-var yellowContainerIP = "100.1.1.3"
-
-var redLabel = db.Label{
-	Label:        "red",
-	IP:           redLabelIP,
-	ContainerIPs: []string{redContainerIP},
-}
-var blueLabel = db.Label{
-	Label:        "blue",
-	IP:           blueLabelIP,
-	ContainerIPs: []string{blueContainerIP},
-}
-var yellowLabel = db.Label{
-	Label:        "yellow",
-	IP:           yellowLabelIP,
-	ContainerIPs: []string{yellowContainerIP},
-}
-var redBlueLabel = db.Label{
-	Label:        "redBlue",
-	IP:           redBlueLabelIP,
-	ContainerIPs: []string{redContainerIP, blueContainerIP},
-}
-var allLabels = []db.Label{redLabel, blueLabel, yellowLabel, redBlueLabel}
-
-var redContainer = db.Container{
-	IP:     redContainerIP,
-	Labels: []string{"red", "redBlue"},
-}
-var blueContainer = db.Container{
-	IP:     blueContainerIP,
-	Labels: []string{"blue", "redBlue"},
-}
-var yellowContainer = db.Container{
-	IP:     yellowContainerIP,
-	Labels: []string{"yellow"},
-}
-var allContainers = []db.Container{redContainer, blueContainer, yellowContainer}
-
-func TestConnectionBreakdown(t *testing.T) {
-
-	// No connections should result in no ACLs but the default drop rules.
-	checkConnectionConstruction(t,
-		[]db.Connection{}, []db.Label{}, []db.Container{}, nil)
-
-	// Test one connection (with range)
-	checkConnectionConstruction(t,
-		[]db.Connection{
-			{
-				From:    "red",
-				To:      "blue",
-				MinPort: 80,
-				MaxPort: 81,
-			},
-		},
-		allLabels,
-		allContainers,
-		[]aclConnection{
-			{
-				fromIPs: []string{redContainerIP},
-				toIPs:   []string{blueContainerIP, blueLabelIP},
-				minPort: 80,
-				maxPort: 81,
-			},
-		},
-	)
-
-	// Test connecting from label with multiple containers
-	checkConnectionConstruction(t,
-		[]db.Connection{
-			{
-				From:    "redBlue",
-				To:      "yellow",
-				MinPort: 80,
-				MaxPort: 80,
-			},
-		},
-		allLabels,
-		allContainers,
-		[]aclConnection{
-			{
-				fromIPs: []string{redContainerIP, blueContainerIP},
-				toIPs:   []string{yellowContainerIP, yellowLabelIP},
-				minPort: 80,
-				maxPort: 80,
-			},
-		},
-	)
-
-	// Test multiple connections
-	checkConnectionConstruction(t,
-		[]db.Connection{
-			{
-				From:    "redBlue",
-				To:      "yellow",
-				MinPort: 80,
-				MaxPort: 80,
-			},
-			{
-				From:    "red",
-				To:      "blue",
-				MinPort: 80,
-				MaxPort: 81,
-			},
-		},
-		allLabels,
-		allContainers,
-		[]aclConnection{
-			{
-				fromIPs: []string{redContainerIP, blueContainerIP},
-				toIPs:   []string{yellowContainerIP, yellowLabelIP},
-				minPort: 80,
-				maxPort: 80,
-			},
-			{
-				fromIPs: []string{redContainerIP},
-				toIPs:   []string{blueContainerIP, blueLabelIP},
-				minPort: 80,
-				maxPort: 81,
-			},
-		},
-	)
-
-	// Test toLabel with multiple containers
-	checkConnectionConstruction(t,
-		[]db.Connection{
-			{
-				From:    "yellow",
-				To:      "redBlue",
-				MinPort: 80,
-				MaxPort: 80,
-			},
-		},
-		allLabels,
-		allContainers,
-		[]aclConnection{
-			{
-				fromIPs: []string{yellowContainerIP},
-				toIPs: []string{redContainerIP, blueContainerIP,
-					redBlueLabelIP},
-				minPort: 80,
-				maxPort: 80,
-			},
-		},
+	})
+	checkACLs(t, client,
+		[]db.Connection{dashConnection},
+		append(dropACLs, dashACLs...),
 	)
 }
