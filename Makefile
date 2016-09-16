@@ -33,6 +33,7 @@ COV_SKIP= /minion/pb /minion/pprofile /api/pb /constants /scripts /quilt-tester 
 		  /quilt-tester/tests/100-basic /quilt-tester/tests/100-basic/check_docker.go \
 		  /quilt-tester/tests/100-basic/check_logs.go \
 		  /quilt-tester/tests/spark /quilt-tester/tests/spark/check_spark.go \
+		  /quilt-tester/tests/75-network /quilt-tester/tests/75-network/check_network.go \
 		  /quiltctl/testutils /cluster/provider/mocks /api/client/mocks
 
 COV_PKG = $(subst github.com/NetSys/quilt,,$(PACKAGES))
