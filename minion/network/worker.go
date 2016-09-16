@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/join"
@@ -25,10 +26,11 @@ import (
 )
 
 const (
-	nsPath    string = "/var/run/netns"
-	innerVeth string = "eth0"
-	loopback  string = "lo"
-	innerMTU  int    = 1400
+	nsPath           string = "/var/run/netns"
+	innerVeth        string = "eth0"
+	loopback         string = "lo"
+	innerMTU         int    = 1400
+	concurrencyLimit int    = 32 // Adjust to change per function goroutine limit
 )
 
 // This represents a network namespace
@@ -140,6 +142,19 @@ func runWorker(conn db.Conn, dk docker.Client) {
 		})
 		connections := view.SelectFromConnection(nil)
 
+		var wg sync.WaitGroup
+		wg.Add(2)
+
+		go func() {
+			updateEtcHosts(dk, containers, labels, connections)
+			wg.Done()
+		}()
+
+		go func() {
+			updateNameservers(dk, containers)
+			wg.Done()
+		}()
+
 		updateNamespaces(containers)
 		updateVeths(containers)
 		updateNAT(containers, connections)
@@ -147,16 +162,20 @@ func runWorker(conn db.Conn, dk docker.Client) {
 
 		if exists, err := linkExists("", quiltBridge); exists {
 			updateDefaultGw(odb)
-			updateOpenFlow(dk, odb, containers, labels, connections)
+			wg.Add(1)
+			go func() {
+				updateOpenFlow(dk, odb, containers, labels, connections)
+				wg.Done()
+			}()
 		} else if err != nil {
 			log.WithError(err).Error("failed to check if link exists")
 		}
-		updateNameservers(dk, containers)
+
 		updateContainerIPs(containers, labels)
 		updateRoutes(containers)
-		updateEtcHosts(dk, containers, labels, connections)
-		updateLoopback(containers)
 
+		wg.Wait()
+		updateLoopback(containers)
 		return nil
 	})
 }
@@ -275,24 +294,38 @@ func updateVeths(containers []db.Container) {
 
 	pairs, lefts, rights := join.HashJoin(currentVeths, targetVeths, key, key)
 
-	for _, l := range lefts {
-		if err := delVeth(l.(netdev)); err != nil {
-			log.WithError(err).Error("failed to delete veth")
-			continue
-		}
-	}
-	for _, r := range rights {
-		if err := addVeth(r.(netdev)); err != nil {
-			log.WithError(err).Error("failed to add veth")
-			continue
-		}
-	}
+	// Changing veths takes a long time, so we do it concurrently
+	doVeths(lefts, delVeth, "delete")
+	doVeths(rights, addVeth, "add")
 	for _, p := range pairs {
 		if err := modVeth(p.L.(netdev), p.R.(netdev)); err != nil {
 			log.WithError(err).Error("failed to modify veth")
 			continue
 		}
 	}
+}
+
+func doVeths(veths []interface{}, do func(netdev) error, action string) {
+	var wg sync.WaitGroup
+	vethsChannel := make(chan netdev, len(veths))
+	for _, v := range veths {
+		vethsChannel <- v.(netdev)
+	}
+	close(vethsChannel)
+
+	wg.Add(concurrencyLimit)
+	for i := 0; i < concurrencyLimit; i++ {
+		go func() {
+			defer wg.Done()
+			for v := range vethsChannel {
+				if err := do(v); err != nil {
+					log.WithError(err).Errorf("failed to %s veth",
+						action)
+				}
+			}
+		}()
+	}
+	wg.Wait()
 }
 
 func generateTargetVeths(containers []db.Container) netdevSlice {
@@ -634,9 +667,27 @@ func updateContainerIPs(containers []db.Container, labels []db.Label) {
 		labelIP[l.Label] = l.IP
 	}
 
-	for _, dbc := range containers {
-		var err error
+	containerChannel := make(chan db.Container)
+	var wg sync.WaitGroup
+	wg.Add(concurrencyLimit)
+	for i := 0; i < concurrencyLimit; i++ {
+		go func() {
+			updateContainers(containerChannel, labelIP)
+			wg.Done()
+		}()
+	}
 
+	for _, c := range containers {
+		containerChannel <- c
+	}
+	close(containerChannel)
+
+	wg.Wait()
+}
+
+func updateContainers(in chan db.Container, labelIP map[string]string) {
+	for dbc := range in {
+		var err error
 		ns := networkNS(dbc.DockerID)
 		ip := dbc.IP
 
@@ -771,6 +822,7 @@ func generateCurrentRoutes(namespace string) (routeSlice, error) {
 // choosing datapath recirculation instead.
 func updateOpenFlow(dk docker.Client, odb ovsdb.Client, containers []db.Container,
 	labels []db.Label, connections []db.Connection) {
+
 	targetOF, err := generateTargetOpenFlow(dk, odb, containers, labels, connections)
 	if err != nil {
 		log.WithError(err).Error("failed to get target OpenFlow flows")
@@ -1055,13 +1107,32 @@ func updateNameservers(dk docker.Client, containers []db.Container) {
 	matches := nsRE.FindAllString(string(hostResolv), -1)
 	newNameservers := strings.Join(matches, "\n")
 
-	for _, dbc := range containers {
-		id := dbc.DockerID
+	containerChan := make(chan db.Container)
+	var wg sync.WaitGroup
+	wg.Add(concurrencyLimit)
+	for i := 0; i < concurrencyLimit; i++ {
+		go func() {
+			updateNS(dk, newNameservers, containerChan)
+			wg.Done()
+		}()
+	}
 
-		currNameservers, err := dk.GetFromContainer(id, "/etc/resolv.conf")
+	for _, dbc := range containers {
+		containerChan <- dbc
+	}
+	close(containerChan)
+	wg.Wait()
+}
+
+func updateNS(dk docker.Client, newNameservers string, in chan db.Container) {
+	for dbc := range in {
+		id := dbc.DockerID
+		currNameservers, err := dk.GetFromContainer(id,
+			"/etc/resolv.conf")
 		if err != nil {
-			log.WithError(err).Error("failed to get /etc/resolv.conf")
-			return
+			log.WithError(err).Error("failed to get " +
+				"/etc/resolv.conf")
+			continue
 		}
 
 		if newNameservers != currNameservers {
@@ -1096,24 +1167,43 @@ func updateEtcHosts(dk docker.Client, containers []db.Container, labels []db.Lab
 		conns[conn.From] = append(conns[conn.From], conn.To)
 	}
 
-	for _, dbc := range containers {
-		id := dbc.DockerID
-
-		currHosts, err := dk.GetFromContainer(id, "/etc/hosts")
-		if err != nil {
-			log.WithError(err).Error("Failed to get /etc/hosts")
-			return
-		}
-
-		newHosts := generateEtcHosts(dbc, labelMap, conns)
-
-		if newHosts != currHosts {
-			err = dk.WriteToContainer(id, newHosts, "/etc", "hosts", 0644)
+	containerChannel := make(chan db.Container)
+	updateHosts := func(in chan db.Container) {
+		for dbc := range in {
+			id := dbc.DockerID
+			currHosts, err := dk.GetFromContainer(id, "/etc/hosts")
 			if err != nil {
-				log.WithError(err).Error("Failed to update /etc/hosts")
+				log.WithError(err).Error("Failed to get /etc/hosts")
+				continue
+			}
+
+			newHosts := generateEtcHosts(dbc, labelMap, conns)
+
+			if newHosts != currHosts {
+				err = dk.WriteToContainer(id, newHosts, "/etc",
+					"hosts", 0644)
+				if err != nil {
+					log.WithError(err).Error("Failed to update " +
+						"/etc/hosts")
+				}
 			}
 		}
 	}
+
+	var wg sync.WaitGroup
+	wg.Add(concurrencyLimit)
+	for i := 0; i < concurrencyLimit; i++ {
+		go func() {
+			updateHosts(containerChannel)
+			wg.Done()
+		}()
+	}
+
+	for _, dbc := range containers {
+		containerChannel <- dbc
+	}
+	close(containerChannel)
+	wg.Wait()
 }
 
 func generateEtcHosts(dbc db.Container, labels map[string]db.Label,
