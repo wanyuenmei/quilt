@@ -108,13 +108,13 @@ func (clst *azureCluster) List() ([]Machine, error) {
 		if len(ifaceIPConfig) == 0 {
 			return nil, errors.New("could not retrieve private IP address")
 		}
-		privateIP := *ifaceIPConfig[0].Properties.PrivateIPAddress
+		privateIP := resolveString(ifaceIPConfig[0].Properties.PrivateIPAddress)
 
 		pip, err := clst.azureClient.publicIPGet(resourceGroupName, nicName, "")
 		if err != nil {
 			return nil, err
 		}
-		publicIP := *pip.Properties.IPAddress
+		publicIP := resolveString(pip.Properties.IPAddress)
 
 		vmSize := string(vm.Properties.HardwareProfile.VMSize)
 
@@ -448,7 +448,8 @@ func (clst *azureCluster) listSecurityGroups() (map[string]network.SecurityGroup
 
 	secGroups := map[string]network.SecurityGroup{}
 	for _, secGroup := range *result.Value {
-		if !clst.validateResourceTag(*secGroup.Tags, nsTag, clst.namespace) {
+		if secGroup.Tags == nil ||
+			!clst.validateResourceTag(*secGroup.Tags, nsTag, clst.namespace) {
 			continue
 		}
 		secGroups[*secGroup.Location] = secGroup

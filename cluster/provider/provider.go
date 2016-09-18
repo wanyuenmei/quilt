@@ -88,3 +88,10 @@ func DefaultRegion(m db.Machine) db.Machine {
 	m.Region = region
 	return m
 }
+
+func resolveString(ptr *string) string {
+	if ptr == nil {
+		return ""
+	}
+	return *ptr
+}
