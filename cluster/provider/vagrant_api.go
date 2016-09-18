@@ -81,12 +81,11 @@ func (api vagrantAPI) Destroy(id string) error {
 
 func (api vagrantAPI) PublicIP(id string) (string, error) {
 	ip, err := api.Shell(id,
-		`vagrant ssh -c "ip address show eth1 | grep 'inet ' | " +
-		"sed -e 's/^.*inet //' -e 's/\/.*$//' | tr -d '\n'"`)
+		`vagrant ssh -c "ip -f inet addr show enp0s8 | grep -Po 'inet \K[\d.]+'"`)
 	if err != nil {
 		return "", err
 	}
-	return string(ip[:]), nil
+	return strings.TrimSuffix(string(ip), "\n"), nil
 }
 
 func (api vagrantAPI) Status(id string) (string, error) {
@@ -192,7 +191,7 @@ Vagrant.require_version ">= 1.6.0"
 
 size = File.open(SIZE_PATH).read.strip.split(",")
 Vagrant.configure(2) do |config|
-  config.vm.box = "boxcutter/ubuntu1504"
+  config.vm.box = "boxcutter/ubuntu1604"
 
   config.vm.network "private_network", type: "dhcp"
 

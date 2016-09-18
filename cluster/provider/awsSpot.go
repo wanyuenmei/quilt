@@ -18,11 +18,11 @@ import (
 
 const spotPrice = "0.5"
 
-// Ubuntu 15.10, 64-bit hvm-ssd
+// Ubuntu 16.04, 64-bit hvm-ssd
 var amis = map[string]string{
-	"ap-southeast-2": "ami-f599ba96",
-	"us-west-1":      "ami-af671bcf",
-	"us-west-2":      "ami-acd63bcc",
+	"ap-southeast-2": "ami-550c3c36",
+	"us-west-1":      "ami-26074946",
+	"us-west-2":      "ami-e1fe2281",
 }
 
 type amazonCluster struct {

@@ -31,8 +31,8 @@ const (
 	credentialsPath         = "/.azure/credentials.json"
 	imagePublisher          = "Canonical"
 	imageOffer              = "UbuntuServer"
-	imageSku                = "15.10"
-	imageVersion            = "15.10.201511161"
+	imageSku                = "16.04.0-LTS"
+	imageVersion            = "16.04.201609071"
 	resourceGroupName       = "quilt"
 	resourceGroupLocation   = "centralus"
 	subnetName              = "quiltsubnet"
@@ -210,7 +210,7 @@ func (clst *azureCluster) Boot(bootSet []Machine) error {
 			return err
 		}
 
-		cloudConfig := cloudConfigUbuntu(m.SSHKeys, "wily")
+		cloudConfig := cloudConfigUbuntu(m.SSHKeys, "xenial")
 		if err := clst.configureVirtualMachine(vmName, osDiskName, nicName,
 			cloudConfig, m.Size, m.Region, iface); err != nil {
 			return err

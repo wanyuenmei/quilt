@@ -78,7 +78,7 @@ func (clst *gceCluster) Connect(namespace string) error {
 	clst.imgURL = fmt.Sprintf(
 		"%s/%s",
 		computeBaseURL,
-		"ubuntu-os-cloud/global/images/ubuntu-1510-wily-v20160310")
+		"ubuntu-os-cloud/global/images/ubuntu-1604-xenial-v20160921")
 	clst.baseURL = fmt.Sprintf("%s/%s", computeBaseURL, clst.projID)
 	clst.ipv4Range = "192.168.0.0/16"
 	clst.intFW = fmt.Sprintf("%s-internal", clst.ns)
@@ -136,7 +136,7 @@ func (clst *gceCluster) Boot(bootSet []Machine) error {
 	for _, m := range bootSet {
 		name := "quilt-" + uuid.NewV4().String()
 		_, err := clst.instanceNew(name, m.Size, m.Region,
-			cloudConfigUbuntu(m.SSHKeys, "wily"))
+			cloudConfigUbuntu(m.SSHKeys, "xenial"))
 		if err != nil {
 			log.WithFields(log.Fields{
 				"error": err,

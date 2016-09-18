@@ -16,7 +16,7 @@ type vagrantCluster struct {
 
 func (clst *vagrantCluster) Connect(namespace string) error {
 	vagrant := newVagrantAPI()
-	err := vagrant.AddBox("boxcutter/ubuntu1504", "virtualbox")
+	err := vagrant.AddBox("boxcutter/ubuntu1604", "virtualbox")
 	if err != nil {
 		return err
 	}
@@ -58,7 +58,7 @@ func (clst vagrantCluster) Boot(bootSet []Machine) error {
 func bootMachine(vagrant vagrantAPI, m Machine) error {
 	id := uuid.NewV4().String()
 
-	err := vagrant.Init(cloudConfigUbuntu(m.SSHKeys, "vivid"), m.Size, id)
+	err := vagrant.Init(cloudConfigUbuntu(m.SSHKeys, "xenial"), m.Size, id)
 	if err == nil {
 		err = vagrant.Up(id)
 	}
