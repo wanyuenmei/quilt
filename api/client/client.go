@@ -36,6 +36,13 @@ type Client interface {
 	// QueryEtcd retrieves the etcd information tracked by the Quilt daemon.
 	QueryEtcd() ([]db.Etcd, error)
 
+	// QueryConnections retrieves the connection information tracked by the
+	// Quilt daemon.
+	QueryConnections() ([]db.Connection, error)
+
+	// QueryLabels retrieves the label information tracked by the Quilt daemon.
+	QueryLabels() ([]db.Label, error)
+
 	// Deploy makes a request to the Quilt daemon to deploy the given deployment.
 	Deploy(deployment string) error
 
@@ -114,6 +121,18 @@ func query(pbClient pb.APIClient, table db.TableType) (interface{}, error) {
 			return nil, err
 		}
 		return etcds, nil
+	case db.LabelTable:
+		var labels []db.Label
+		if err := json.Unmarshal(replyBytes, &labels); err != nil {
+			return nil, err
+		}
+		return labels, nil
+	case db.ConnectionTable:
+		var connections []db.Connection
+		if err := json.Unmarshal(replyBytes, &connections); err != nil {
+			return nil, err
+		}
+		return connections, nil
 	default:
 		panic(fmt.Sprintf("unsupported table type: %s", table))
 	}
@@ -152,6 +171,26 @@ func (c clientImpl) QueryEtcd() ([]db.Etcd, error) {
 	}
 
 	return rows.([]db.Etcd), nil
+}
+
+// QueryConnections retrieves the connection information tracked by the Quilt daemon.
+func (c clientImpl) QueryConnections() ([]db.Connection, error) {
+	rows, err := query(c.pbClient, db.ConnectionTable)
+	if err != nil {
+		return nil, err
+	}
+
+	return rows.([]db.Connection), nil
+}
+
+// QueryLabels retrieves the label information tracked by the Quilt daemon.
+func (c clientImpl) QueryLabels() ([]db.Label, error) {
+	rows, err := query(c.pbClient, db.LabelTable)
+	if err != nil {
+		return nil, err
+	}
+
+	return rows.([]db.Label), nil
 }
 
 // Deploy makes a request to the Quilt daemon to deploy the given deployment.

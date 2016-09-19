@@ -28,6 +28,17 @@ func (c *Client) QueryEtcd() ([]db.Etcd, error) {
 	return c.EtcdReturn, nil
 }
 
+// QueryConnections retrieves the connection information tracked by the
+// Quilt daemon.
+func (c *Client) QueryConnections() ([]db.Connection, error) {
+	return nil, nil
+}
+
+// QueryLabels retrieves the label information tracked by the Quilt daemon.
+func (c *Client) QueryLabels() ([]db.Label, error) {
+	return nil, nil
+}
+
 // Close the grpc connection.
 func (c *Client) Close() error {
 	return nil
