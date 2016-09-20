@@ -6,9 +6,11 @@ import (
 	"github.com/NetSys/quilt/cluster/provider"
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/join"
+	"github.com/NetSys/quilt/util"
 	log "github.com/Sirupsen/logrus"
 )
 
+var myIP = util.MyIP
 var sleep = time.Sleep
 
 // Store the providers in a variable so we can change it in the tests
@@ -214,6 +216,15 @@ func (clst cluster) syncMachines() (bootSet, terminateSet []provider.Machine) {
 
 func (clst cluster) syncACLs(adminACLs []string, machines []db.Machine) {
 	acls := adminACLs
+
+	// Always allow traffic from the Quilt controller.
+	ip, err := myIP()
+	if err == nil {
+		acls = append(acls, ip+"/32")
+	} else {
+		log.WithError(err).Error("Couldn't retrieve our IP address.")
+	}
+
 	// Providers with at least one machine.
 	prvdrSet := map[db.Provider]struct{}{}
 	for _, m := range machines {

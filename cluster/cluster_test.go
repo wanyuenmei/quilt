@@ -269,6 +269,10 @@ func TestSync(t *testing.T) {
 }
 
 func TestACLs(t *testing.T) {
+	myIP = func() (string, error) {
+		return "5.6.7.8", nil
+	}
+
 	clst := newTestCluster()
 	clst.syncACLs([]string{"admin"},
 		[]db.Machine{
@@ -280,7 +284,7 @@ func TestACLs(t *testing.T) {
 		},
 	)
 
-	exp := []string{"admin", "8.8.8.8/32"}
+	exp := []string{"admin", "5.6.7.8/32", "8.8.8.8/32"}
 	actual := clst.providers[FakeAmazon].(*fakeProvider).aclRequests
 
 	if !reflect.DeepEqual(exp, actual) {
