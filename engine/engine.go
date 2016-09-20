@@ -55,7 +55,7 @@ func updateTxn(view db.Database, stitch stitch.Stitch) error {
 func clusterTxn(view db.Database, stitch stitch.Stitch) error {
 	namespace := stitch.QueryString("Namespace")
 	if namespace == "" {
-		namespace = "DEFAULT_NAMESPACE"
+		namespace = "default-namespace"
 		msg := "policy did not specify 'Namespace', defaulting to '%s'"
 		log.Warn(fmt.Sprintf(msg, namespace))
 	}
