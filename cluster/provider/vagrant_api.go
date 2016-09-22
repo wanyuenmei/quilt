@@ -2,6 +2,7 @@ package provider
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -36,7 +37,7 @@ func (api vagrantAPI) Init(cloudConfig string, size string, id string) error {
 	_, err = api.Shell(id, `vagrant --machine-readable init coreos-beta`)
 	if err != nil {
 		api.Destroy(id)
-		return err
+		return errors.New("unable to init machine")
 	}
 
 	err = util.WriteFile(path+"/user-data", []byte(cloudConfig), 0644)
@@ -64,7 +65,7 @@ func (api vagrantAPI) Init(cloudConfig string, size string, id string) error {
 func (api vagrantAPI) Up(id string) error {
 	_, err := api.Shell(id, `vagrant --machine-readable up`)
 	if err != nil {
-		return err
+		return errors.New("unable to check machine status")
 	}
 	return nil
 }
@@ -73,7 +74,7 @@ func (api vagrantAPI) Destroy(id string) error {
 	_, err := api.Shell(id,
 		`vagrant --machine-readable destroy -f; cd ../; rm -rf %s`)
 	if err != nil {
-		return err
+		return errors.New("unable to destroy machine")
 	}
 	return nil
 }
@@ -91,7 +92,7 @@ func (api vagrantAPI) PublicIP(id string) (string, error) {
 func (api vagrantAPI) Status(id string) (string, error) {
 	output, err := api.Shell(id, `vagrant --machine-readable status`)
 	if err != nil {
-		return "", err
+		return "", errors.New("unable to retrieve machine status")
 	}
 	lines := bytes.Split(output, []byte("\n"))
 	for _, line := range lines {
@@ -128,16 +129,13 @@ func (api vagrantAPI) List() ([]string, error) {
 func (api vagrantAPI) AddBox(name string, provider string) error {
 	/* Adding a box fails if it already exists, hence the check. */
 	exists, err := api.ContainsBox(name)
-	if err != nil {
-		return err
-	}
-	if exists {
+	if err == nil && exists {
 		return nil
 	}
 	err = exec.Command(vagrantCmd, []string{"--machine-readable", "box", "add",
 		"--provider", provider, name}...).Run()
 	if err != nil {
-		return err
+		return errors.New("unable to add box")
 	}
 	return nil
 }
@@ -146,7 +144,7 @@ func (api vagrantAPI) ContainsBox(name string) (bool, error) {
 	output, err := exec.Command(vagrantCmd, []string{"--machine-readable", "box",
 		"list"}...).Output()
 	if err != nil {
-		return false, err
+		return false, errors.New("unable to list machines")
 	}
 	lines := bytes.Split(output, []byte("\n"))
 	for _, line := range lines {
