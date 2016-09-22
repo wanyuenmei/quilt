@@ -58,7 +58,7 @@ lint: format
 	cd -P . && go vet $(PACKAGES)
 	for package in $(PACKAGES) ; do \
 		if [[ $$package != *minion/pb* && $$package != *api/pb* ]] ; then \
-			golint -min_confidence .25 $$package ; \
+			golint -min_confidence .25 -set_exit_status $$package || exit 1 ; \
 		fi \
 	done
 	ineffassign .
