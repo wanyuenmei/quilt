@@ -27,46 +27,6 @@
 			"Rev": "87de771fcdf5ec4341f3842f74b5bb98652b10f7"
 		},
 		{
-			"ImportPath": "github.com/Azure/azure-sdk-for-go/core/http",
-			"Comment": "v3.1.0-beta-18-g87de771",
-			"Rev": "87de771fcdf5ec4341f3842f74b5bb98652b10f7"
-		},
-		{
-			"ImportPath": "github.com/Azure/azure-sdk-for-go/core/tls",
-			"Comment": "v3.1.0-beta-18-g87de771",
-			"Rev": "87de771fcdf5ec4341f3842f74b5bb98652b10f7"
-		},
-		{
-			"ImportPath": "github.com/Azure/azure-sdk-for-go/management",
-			"Comment": "v3.1.0-beta-18-g87de771",
-			"Rev": "87de771fcdf5ec4341f3842f74b5bb98652b10f7"
-		},
-		{
-			"ImportPath": "github.com/Azure/azure-sdk-for-go/management/hostedservice",
-			"Comment": "v3.1.0-beta-18-g87de771",
-			"Rev": "87de771fcdf5ec4341f3842f74b5bb98652b10f7"
-		},
-		{
-			"ImportPath": "github.com/Azure/azure-sdk-for-go/management/location",
-			"Comment": "v3.1.0-beta-18-g87de771",
-			"Rev": "87de771fcdf5ec4341f3842f74b5bb98652b10f7"
-		},
-		{
-			"ImportPath": "github.com/Azure/azure-sdk-for-go/management/virtualmachine",
-			"Comment": "v3.1.0-beta-18-g87de771",
-			"Rev": "87de771fcdf5ec4341f3842f74b5bb98652b10f7"
-		},
-		{
-			"ImportPath": "github.com/Azure/azure-sdk-for-go/management/virtualmachinedisk",
-			"Comment": "v3.1.0-beta-18-g87de771",
-			"Rev": "87de771fcdf5ec4341f3842f74b5bb98652b10f7"
-		},
-		{
-			"ImportPath": "github.com/Azure/azure-sdk-for-go/management/vmutils",
-			"Comment": "v3.1.0-beta-18-g87de771",
-			"Rev": "87de771fcdf5ec4341f3842f74b5bb98652b10f7"
-		},
-		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest",
 			"Comment": "v7.0.7-4-gd09c6ea",
 			"Rev": "d09c6ea2240178fb3942d698d432dc00ea7e08e6"
@@ -381,14 +341,6 @@
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/ed25519/internal/edwards25519",
-			"Rev": "5bcd134fee4dd1475da17714aac19c0aa0142e2f"
-		},
-		{
-			"ImportPath": "golang.org/x/crypto/pkcs12",
-			"Rev": "5bcd134fee4dd1475da17714aac19c0aa0142e2f"
-		},
-		{
-			"ImportPath": "golang.org/x/crypto/pkcs12/internal/rc2",
 			"Rev": "5bcd134fee4dd1475da17714aac19c0aa0142e2f"
 		},
 		{
