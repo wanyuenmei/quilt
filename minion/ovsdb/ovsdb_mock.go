@@ -210,30 +210,29 @@ func (client fakeOvsdbClient) insertOp(database string, op ovs.Operation) (
 
 	for newKey, newVal := range op.Row {
 		switch v := newVal.(type) {
-		case string:
+		case string, bool:
 			row[newKey] = newVal
 		case *ovs.OvsSet:
-			switch val := v.GoSet[0].(type) {
-			case string:
-				row[newKey] = val
+			var goSet []interface{}
+			switch v.GoSet[0].(type) {
 			case ovs.UUID:
-				var uuidToAdd string
-				uuidGeneric := v.GoSet[0].(ovs.UUID).GoUUID
-				if actualUUID, ok := uuidMap[uuidGeneric]; ok {
-					uuidToAdd = actualUUID
-				} else {
-					uuidToAdd = uuidGeneric
+				for _, elem := range v.GoSet {
+					var uuidToAdd string
+					uuidGeneric := elem.(ovs.UUID).GoUUID
+					if actualUUID, ok := uuidMap[uuidGeneric]; ok {
+						uuidToAdd = actualUUID
+					} else {
+						uuidToAdd = uuidGeneric
+					}
+					goSet = append(goSet,
+						[]interface{}{"uuid", uuidToAdd})
 				}
-				row[newKey] = []interface{}{"set",
-					[]interface{}{[]interface{}{"uuid", uuidToAdd}}}
 			default:
-				panic("not yet supported: " +
-					reflect.TypeOf(v.GoSet[0]).String())
+				goSet = v.GoSet
 			}
+			row[newKey] = append([]interface{}{"set"}, goSet)
 		case int:
-			row[newKey] = float64(newVal.(int))
-		case bool:
-			row[newKey] = newVal
+			row[newKey] = float64(v)
 		default:
 			panic("insert value type is not yet supported: " +
 				reflect.TypeOf(v).String())
