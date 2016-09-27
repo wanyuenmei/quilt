@@ -16,7 +16,7 @@ import (
 	dkc "github.com/fsouza/go-dockerclient"
 )
 
-const pullCacheTimeout = time.Minute
+var pullCacheTimeout = time.Minute
 
 // ErrNoSuchContainer is the error returned when an operation is requested on a
 // non-existent container.
@@ -236,7 +236,7 @@ func (dk Client) Pull(image string) error {
 	defer dk.Unlock()
 
 	now := time.Now()
-	if t, ok := dk.imageCache[image]; ok && t.Before(now) {
+	if expiration, ok := dk.imageCache[image]; ok && now.Before(expiration) {
 		return nil
 	}
 

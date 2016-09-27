@@ -51,6 +51,51 @@ func TestPull(t *testing.T) {
 	}
 }
 
+func checkCache(prePull func()) (bool, error) {
+	testImage := "foo"
+	md, dk := NewMock()
+
+	if err := dk.Pull(testImage); err != nil {
+		return false, err
+	}
+
+	delete(md.Pulled, testImage)
+
+	prePull()
+	if err := dk.Pull(testImage); err != nil {
+		return false, err
+	}
+
+	_, pulled := md.Pulled[testImage]
+	return !pulled, nil
+}
+
+func TestPullImageCached(t *testing.T) {
+	cached, err := checkCache(func() {})
+	if err != nil {
+		t.Errorf("Unexpected error: %s", err)
+		return
+	}
+	if !cached {
+		t.Errorf("Should not have pulled the image because it's cached.")
+	}
+}
+
+func TestPullImageNotCached(t *testing.T) {
+	pullCacheTimeout = 300 * time.Millisecond
+
+	cached, err := checkCache(func() {
+		time.Sleep(500 * time.Millisecond)
+	})
+	if err != nil {
+		t.Errorf("Unexpected error: %s", err)
+		return
+	}
+	if cached {
+		t.Errorf("Should have pulled the image because it's no longer cached.")
+	}
+}
+
 func TestCreateGet(t *testing.T) {
 	t.Parallel()
 	md, dk := NewMock()
