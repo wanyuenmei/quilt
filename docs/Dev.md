@@ -84,10 +84,9 @@ We currently require go version 1.3 or later.  Ubuntu 15.10 uses this version
 by default, so you should just be able to apt-get install golang to get
 started.
 
-Since the repository is private, you can't use "go get" to checkout the source
-code, so you'll have to do so manually:
+Checkout the source code:
 
-    git clone git@github.com:NetSys/quilt.git $GOPATH/src/github.com/NetSys/quilt
+    git clone https://github.com/NetSys/quilt $GOPATH/src/github.com/NetSys/quilt
 
 Once this is done you can install the AWS API and various other dependencies
 automatically:
