@@ -85,6 +85,11 @@ func toStitch(parsed []ast) (Stitch, error) {
 	}
 
 	spec := Stitch{astRoot(parsed).String(), ctx}
+
+	if len(*ctx.invariants) == 0 {
+		return spec, nil
+	}
+
 	graph, err := InitializeGraph(spec)
 	if err != nil {
 		return Stitch{}, err
