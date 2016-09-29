@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/NetSys/quilt/util"
+	log "github.com/Sirupsen/logrus"
 	homedir "github.com/mitchellh/go-homedir"
 )
 
@@ -34,8 +35,9 @@ func (api vagrantAPI) Init(cloudConfig string, size string, id string) error {
 	path := vdir + id
 	os.Mkdir(path, os.ModeDir|os.ModePerm)
 
-	_, _, err = api.Shell(id, `vagrant --machine-readable init coreos-beta`)
+	_, stderr, err := api.Shell(id, `vagrant --machine-readable init coreos-beta`)
 	if err != nil {
+		log.Errorf("Failed to initialize Vagrant environment: %s", string(stderr))
 		api.Destroy(id)
 		return errors.New("unable to init machine")
 	}
@@ -63,34 +65,39 @@ func (api vagrantAPI) Init(cloudConfig string, size string, id string) error {
 }
 
 func (api vagrantAPI) Up(id string) error {
-	_, _, err := api.Shell(id, `vagrant --machine-readable up`)
+	_, stderr, err := api.Shell(id, `vagrant --machine-readable up`)
 	if err != nil {
+		log.Errorf("Failed to start Vagrant machine: %s", string(stderr))
 		return errors.New("unable to check machine status")
 	}
 	return nil
 }
 
 func (api vagrantAPI) Destroy(id string) error {
-	_, _, err := api.Shell(id,
+	_, stderr, err := api.Shell(id,
 		`vagrant --machine-readable destroy -f; cd ../; rm -rf %s`)
 	if err != nil {
+		log.Errorf("Failed to destroy Vagrant machine: %s", string(stderr))
 		return errors.New("unable to destroy machine")
 	}
 	return nil
 }
 
 func (api vagrantAPI) PublicIP(id string) (string, error) {
-	ip, _, err := api.Shell(id,
+	ip, stderr, err := api.Shell(id,
 		`vagrant ssh -c "ip -f inet addr show enp0s8 | grep -Po 'inet \K[\d.]+'"`)
 	if err != nil {
+		log.Errorf("Failed to parse Vagrant machine IP: %s", string(stderr))
 		return "", err
 	}
 	return strings.TrimSuffix(string(ip), "\n"), nil
 }
 
 func (api vagrantAPI) Status(id string) (string, error) {
-	output, _, err := api.Shell(id, `vagrant --machine-readable status`)
+	output, stderr, err := api.Shell(id, `vagrant --machine-readable status`)
 	if err != nil {
+		log.Errorf("Failed to retrieve Vagrant machine status: %s",
+			string(stderr))
 		return "", errors.New("unable to retrieve machine status")
 	}
 	lines := bytes.Split(output, []byte("\n"))
