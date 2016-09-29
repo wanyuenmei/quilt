@@ -68,7 +68,7 @@ func (api vagrantAPI) Up(id string) error {
 	_, stderr, err := api.Shell(id, `vagrant --machine-readable up`)
 	if err != nil {
 		log.Errorf("Failed to start Vagrant machine: %s", string(stderr))
-		return errors.New("unable to check machine status")
+		return errors.New("unable to start machine")
 	}
 	return nil
 }
