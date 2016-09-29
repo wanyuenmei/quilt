@@ -34,7 +34,7 @@ func (api vagrantAPI) Init(cloudConfig string, size string, id string) error {
 	path := vdir + id
 	os.Mkdir(path, os.ModeDir|os.ModePerm)
 
-	_, err = api.Shell(id, `vagrant --machine-readable init coreos-beta`)
+	_, _, err = api.Shell(id, `vagrant --machine-readable init coreos-beta`)
 	if err != nil {
 		api.Destroy(id)
 		return errors.New("unable to init machine")
@@ -63,7 +63,7 @@ func (api vagrantAPI) Init(cloudConfig string, size string, id string) error {
 }
 
 func (api vagrantAPI) Up(id string) error {
-	_, err := api.Shell(id, `vagrant --machine-readable up`)
+	_, _, err := api.Shell(id, `vagrant --machine-readable up`)
 	if err != nil {
 		return errors.New("unable to check machine status")
 	}
@@ -71,7 +71,7 @@ func (api vagrantAPI) Up(id string) error {
 }
 
 func (api vagrantAPI) Destroy(id string) error {
-	_, err := api.Shell(id,
+	_, _, err := api.Shell(id,
 		`vagrant --machine-readable destroy -f; cd ../; rm -rf %s`)
 	if err != nil {
 		return errors.New("unable to destroy machine")
@@ -80,7 +80,7 @@ func (api vagrantAPI) Destroy(id string) error {
 }
 
 func (api vagrantAPI) PublicIP(id string) (string, error) {
-	ip, err := api.Shell(id,
+	ip, _, err := api.Shell(id,
 		`vagrant ssh -c "ip -f inet addr show enp0s8 | grep -Po 'inet \K[\d.]+'"`)
 	if err != nil {
 		return "", err
@@ -89,7 +89,7 @@ func (api vagrantAPI) PublicIP(id string) (string, error) {
 }
 
 func (api vagrantAPI) Status(id string) (string, error) {
-	output, err := api.Shell(id, `vagrant --machine-readable status`)
+	output, _, err := api.Shell(id, `vagrant --machine-readable status`)
 	if err != nil {
 		return "", errors.New("unable to retrieve machine status")
 	}
@@ -155,16 +155,22 @@ func (api vagrantAPI) ContainsBox(name string) (bool, error) {
 	return false, nil
 }
 
-func (api vagrantAPI) Shell(id string, commands string) ([]byte, error) {
+func (api vagrantAPI) Shell(id string, commands string) ([]byte, []byte, error) {
 	chdir := `(cd %s; `
 	vdir, err := api.VagrantDir()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	chdir = fmt.Sprintf(chdir, vdir+id)
 	shellCommand := chdir + strings.Replace(commands, "%s", id, -1) + ")"
-	output, err := exec.Command(shCmd, []string{"-c", shellCommand}...).Output()
-	return output, err
+
+	var outbuf, errbuf bytes.Buffer
+	cmd := exec.Command(shCmd, []string{"-c", shellCommand}...)
+	cmd.Stdout = &outbuf
+	cmd.Stderr = &errbuf
+	err = cmd.Run()
+
+	return outbuf.Bytes(), errbuf.Bytes(), err
 }
 
 func (api vagrantAPI) VagrantDir() (string, error) {
@@ -177,7 +183,7 @@ func (api vagrantAPI) VagrantDir() (string, error) {
 }
 
 func (api vagrantAPI) Size(id string) string {
-	size, err := api.Shell(id, "cat size")
+	size, _, err := api.Shell(id, "cat size")
 	if err != nil {
 		return ""
 	}
