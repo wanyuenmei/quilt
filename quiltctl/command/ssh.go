@@ -121,5 +121,6 @@ var ssh = func(host string, args []string) *exec.Cmd {
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+
 	return cmd
 }

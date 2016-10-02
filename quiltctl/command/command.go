@@ -8,6 +8,7 @@ import (
 
 	"github.com/NetSys/quilt/api"
 	"github.com/NetSys/quilt/api/client"
+	"github.com/NetSys/quilt/db"
 )
 
 // SubCommand defines the conversion between the user CLI flags and
@@ -97,4 +98,52 @@ func getPublicIP(c client.Client, privateIP string) (string, error) {
 	}
 
 	return "", fmt.Errorf("no machine with private IP %s", privateIP)
+}
+
+// Get a client connected to the local daemon and the daemon on the lead minion.
+func getClients(host string) (client.Client, client.Client, error) {
+	localClient, err := getClient(host)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	leaderClient, err := getLeaderClient(localClient)
+	if err != nil {
+		localClient.Close()
+		return nil, nil, err
+	}
+
+	return localClient, leaderClient, err
+}
+
+// Get the public IP of the machine the container is running on.
+func getContainerHost(localClient client.Client, leaderClient client.Client,
+	stitchID int) (string, error) {
+
+	container, err := getContainer(leaderClient, stitchID)
+	if err != nil {
+		return "", err
+	}
+
+	if container.Minion == "" {
+		return "", errors.New("container hasn't been scheduled yet")
+	}
+
+	return getPublicIP(localClient, container.Minion)
+}
+
+// Get the container information for the given stitchID stored by the client.
+func getContainer(c client.Client, stitchID int) (db.Container, error) {
+	containers, err := c.QueryContainers()
+	if err != nil {
+		return db.Container{}, err
+	}
+
+	for _, c := range containers {
+		if c.StitchID == stitchID {
+			return c, nil
+		}
+	}
+
+	return db.Container{}, fmt.Errorf("no container with stitchID %d", stitchID)
 }

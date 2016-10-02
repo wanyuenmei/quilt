@@ -19,6 +19,7 @@ var commands = map[string]command.SubCommand{
 	"stop":       &command.Stop{},
 	"ssh":        &command.SSH{},
 	"exec":       &command.Exec{},
+	"logs":       &command.Log{},
 }
 
 // Run parses and runs the quiltctl subcommand given the command line arguments.

@@ -30,7 +30,8 @@ func main() {
 			"[daemon | inspect <stitch> | run <stitch> | minion | " +
 			"stop <namespace> | get <import_path> | " +
 			"machines | containers | ssh <machine> | " +
-			"exec <container> <command>]")
+			"exec <container> <command>]" +
+			"logs <container>")
 		fmt.Println("\nWhen provided a stitch, quilt takes responsibility\n" +
 			"for deploying it as specified.  Alternatively, quilt may be\n" +
 			"instructed to stop all deployments in a given namespace,\n" +
