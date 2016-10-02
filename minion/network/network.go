@@ -259,16 +259,16 @@ func (c aclConnection) acls() (acls []string) {
 	return acls
 }
 
-func generateACLs(connections []aclConnection) map[ovsdb.AclCore]struct{} {
-	coreACLs := map[ovsdb.AclCore]struct{}{
+func generateACLs(connections []aclConnection) map[ovsdb.ACLCore]struct{} {
+	coreACLs := map[ovsdb.ACLCore]struct{}{
 		// Drop all ip traffic by default.
-		ovsdb.AclCore{
+		ovsdb.ACLCore{
 			Priority:  0,
 			Match:     "ip",
 			Action:    "drop",
 			Direction: "to-lport",
 		}: {},
-		ovsdb.AclCore{
+		ovsdb.ACLCore{
 			Priority:  0,
 			Match:     "ip",
 			Action:    "drop",
@@ -277,13 +277,13 @@ func generateACLs(connections []aclConnection) map[ovsdb.AclCore]struct{} {
 	}
 	for _, c := range connections {
 		for _, match := range c.acls() {
-			coreACLs[ovsdb.AclCore{
+			coreACLs[ovsdb.ACLCore{
 				Priority:  1,
 				Direction: "to-lport",
 				Action:    "allow",
 				Match:     match,
 			}] = struct{}{}
-			coreACLs[ovsdb.AclCore{
+			coreACLs[ovsdb.ACLCore{
 				Priority:  1,
 				Direction: "from-lport",
 				Action:    "allow",

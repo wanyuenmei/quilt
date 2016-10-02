@@ -135,14 +135,14 @@ func TestACLUpdate(t *testing.T) {
 	checkACLCount(t, client, nil, 2)
 }
 
-func allowMatch(acls map[ovsdb.AclCore]struct{}, match string) {
-	acls[ovsdb.AclCore{
+func allowMatch(acls map[ovsdb.ACLCore]struct{}, match string) {
+	acls[ovsdb.ACLCore{
 		Priority:  1,
 		Direction: "from-lport",
 		Action:    "allow",
 		Match:     match,
 	}] = struct{}{}
-	acls[ovsdb.AclCore{
+	acls[ovsdb.ACLCore{
 		Priority:  1,
 		Direction: "to-lport",
 		Action:    "allow",
@@ -151,7 +151,7 @@ func allowMatch(acls map[ovsdb.AclCore]struct{}, match string) {
 }
 
 func TestACLGeneration(t *testing.T) {
-	exp := map[ovsdb.AclCore]struct{}{
+	exp := map[ovsdb.ACLCore]struct{}{
 		{
 			Priority:  0,
 			Direction: "from-lport",

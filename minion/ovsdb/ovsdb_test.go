@@ -161,11 +161,11 @@ func TestACLs(t *testing.T) {
 	ovsdbClient := NewFakeOvsdbClient()
 
 	key := func(val interface{}) interface{} {
-		return val.(Acl).Core
+		return val.(ACL).Core
 	}
 
-	checkCorrectness := func(ovsdbACLs []Acl, localACLs ...Acl) {
-		pair, _, _ := join.HashJoin(AclSlice(ovsdbACLs), AclSlice(localACLs),
+	checkCorrectness := func(ovsdbACLs []ACL, localACLs ...ACL) {
+		pair, _, _ := join.HashJoin(ACLSlice(ovsdbACLs), ACLSlice(localACLs),
 			key, key)
 		if len(pair) != len(localACLs) {
 			t.Error("Local ACLs do not match ovsdbACLs.")
@@ -179,14 +179,14 @@ func TestACLs(t *testing.T) {
 	}
 
 	// Create one ACL rule.
-	localCore1 := AclCore{
+	localCore1 := ACLCore{
 		Priority:  1,
 		Direction: "from-lport",
 		Match:     "0.0.0.0",
 		Action:    "allow",
 	}
 
-	localACL1 := Acl{
+	localACL1 := ACL{
 		Core: localCore1,
 		Log:  false,
 	}
@@ -210,13 +210,13 @@ func TestACLs(t *testing.T) {
 	checkCorrectness(ovsdbACLs, localACL1)
 
 	// Create one more ACL rule.
-	localCore2 := AclCore{
+	localCore2 := ACLCore{
 		Priority:  2,
 		Direction: "from-lport",
 		Match:     "0.0.0.1",
 		Action:    "drop",
 	}
-	localACL2 := Acl{
+	localACL2 := ACL{
 		Core: localCore2,
 		Log:  false,
 	}
@@ -485,12 +485,12 @@ func TestBridgeMac(t *testing.T) {
 	}
 }
 
-type AclSlice []Acl
+type ACLSlice []ACL
 
-func (acls AclSlice) Get(i int) interface{} {
+func (acls ACLSlice) Get(i int) interface{} {
 	return acls[i]
 }
 
-func (acls AclSlice) Len() int {
+func (acls ACLSlice) Len() int {
 	return len(acls)
 }

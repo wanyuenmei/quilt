@@ -70,16 +70,16 @@ const (
 	InterfaceTypeGeneve = "geneve"
 )
 
-// Acl is a firewall rule in OVN.
-type Acl struct {
+// ACL is a firewall rule in OVN.
+type ACL struct {
 	uuid ovs.UUID
-	Core AclCore
+	Core ACLCore
 	Log  bool
 }
 
-// AclCore is the actual ACL rule that will be matched, without various OVSDB metadata
-// found in Acl.
-type AclCore struct {
+// ACLCore is the actual ACL rule that will be matched, without various OVSDB metadata
+// found in ACL.
+type ACLCore struct {
 	Priority  int
 	Direction string
 	Match     string
@@ -242,8 +242,8 @@ func (ovsdb Client) DeleteLogicalPort(lswitch string, lport LPort) error {
 }
 
 // ListACLs lists the access control rules in OVN.
-func (ovsdb Client) ListACLs(lswitch string) ([]Acl, error) {
-	result := []Acl{}
+func (ovsdb Client) ListACLs(lswitch string) ([]ACL, error) {
+	result := []ACL{}
 
 	switchReply, err := ovsdb.transact("OVN_Northbound", ovs.Operation{
 		Op:    "select",
@@ -276,9 +276,9 @@ func (ovsdb Client) ListACLs(lswitch string) ([]Acl, error) {
 			return nil, fmt.Errorf("missing ACL %v", aclUUID)
 		}
 
-		result = append(result, Acl{
+		result = append(result, ACL{
 			uuid: aclUUID,
-			Core: AclCore{
+			Core: ACLCore{
 				Priority:  int(aclrow["priority"].(float64)),
 				Direction: aclrow["direction"].(string),
 				Match:     aclrow["match"].(string),
@@ -341,7 +341,7 @@ func (ovsdb Client) CreateACL(lswitch string, direction string, priority int,
 }
 
 // DeleteACL removes an access control rule from OVN.
-func (ovsdb Client) DeleteACL(lswitch string, ovsdbACL Acl) error {
+func (ovsdb Client) DeleteACL(lswitch string, ovsdbACL ACL) error {
 	deleteOp := ovs.Operation{
 		Op:    "delete",
 		Table: "ACL",
