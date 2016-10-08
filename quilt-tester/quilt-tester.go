@@ -328,8 +328,11 @@ func (ts *testSuite) run(machines []db.Machine) error {
 				ts.failed++
 			}
 
-			if e == nil {
-				err = e
+			if e != nil {
+				l.println("...... Test init error: " + e.Error())
+				if err == nil {
+					err = e
+				}
 			}
 		}
 		l.println("")
@@ -345,14 +348,13 @@ func runTest(testPath string, m db.Machine) (bool, error) {
 	_, testName := filepath.Split(testPath)
 
 	// Run the test on the remote machine.
-	err := scp(m.PublicIP, testPath, testName)
-	if err != nil {
-		return false, err
+	if err := scp(m.PublicIP, testPath, testName); err != nil {
+		return false, fmt.Errorf("failed to scp test: %s", err.Error())
 	}
 	sshCmd := sshGen(m.PublicIP, exec.Command(fmt.Sprintf("./%s", testName)))
 	output, err := sshCmd.CombinedOutput()
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("failed to run test: %s", output)
 	}
 
 	testPassed := true

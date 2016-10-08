@@ -175,7 +175,11 @@ func scp(host string, source string, target string) error {
 	cmd := exec.Command("scp", "-o", "UserKnownHostsFile=/dev/null", "-o",
 		"StrictHostKeyChecking=no", source,
 		fmt.Sprintf("quilt@%s:%s", host, target))
-	return cmd.Run()
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return errors.New(string(out))
+	}
+	return nil
 }
 
 func queryMachines() ([]db.Machine, error) {
