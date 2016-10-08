@@ -86,7 +86,7 @@ func runSpec(spec string) (string, string, error) {
 
 // runQuiltDaemon starts the daemon.
 func runQuiltDaemon() {
-	cmd := exec.Command("/quilt", "daemon")
+	cmd := exec.Command("/quilt", "-l", "debug", "daemon")
 	execCmd(cmd, "QUILT")
 }
 
