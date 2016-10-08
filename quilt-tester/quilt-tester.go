@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -54,6 +55,8 @@ func main() {
 }
 
 type tester struct {
+	preserveFailed bool
+
 	testSuites  []*testSuite
 	initialized bool
 	ip          string
@@ -63,6 +66,10 @@ func newTester(testRoot, myIP string) (tester, error) {
 	t := tester{
 		ip: myIP,
 	}
+
+	flag.BoolVar(&t.preserveFailed, "preserve-failed", false,
+		"don't destroy machines on failed tests")
+	flag.Parse()
 
 	err := t.generateTestSuites(testRoot)
 	if err != nil {
@@ -125,6 +132,18 @@ func (t *tester) generateTestSuites(testRoot string) error {
 
 func (t tester) run() error {
 	defer func() {
+		failed := false
+		for _, suite := range t.testSuites {
+			if suite.failed != 0 {
+				failed = true
+				break
+			}
+		}
+
+		if failed && t.preserveFailed {
+			return
+		}
+
 		cleanupMachines(t.namespace())
 	}()
 

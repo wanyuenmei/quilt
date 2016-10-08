@@ -83,7 +83,7 @@ if docker inspect tester > /dev/null ; then
 fi
 docker pull $container
 docker run -d -v $TESTER_HOME/.aws:/root/.aws -v /var/www:/var/www -v /etc/localtime:/etc/localtime:ro \
--e MY_IP=$ip -e SLACK_CHANNEL="$slack_channel" --name=tester --net=host $container
+-e MY_IP=$ip -e SLACK_CHANNEL="$slack_channel" --name=tester --net=host $container --preserve-failed
 
 echo "Logs at: http://$ip/latest/log"
 exit 0
