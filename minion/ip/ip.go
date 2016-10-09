@@ -3,6 +3,7 @@ package ip
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
 	"math/rand"
 	"net"
 
@@ -29,6 +30,13 @@ var (
 	// LabelPrefix is the subnet that is reserved for label IPs. It represents
 	// 10.0.0.0/20
 	LabelPrefix = net.IPv4(10, 0, 0, 0) // Labels get their own /20
+
+	minionMaskBits, _ = SubMask.Size()
+	quiltMaskBits, _  = QuiltMask.Size()
+
+	// MaxMinionCount is the largest number of minions that can exist, based
+	// on the number of available subnets
+	MaxMinionCount = int(math.Pow(2, float64(minionMaskBits-quiltMaskBits))+0.5) - 1
 )
 
 // Sync takes a map of IDs to IPs and creates an IP address for every entry that's
