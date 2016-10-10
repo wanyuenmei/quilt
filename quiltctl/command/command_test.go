@@ -2,7 +2,6 @@ package command
 
 import (
 	"errors"
-	"os/exec"
 	"reflect"
 	"testing"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/NetSys/quilt/api"
 	"github.com/NetSys/quilt/api/client"
 	"github.com/NetSys/quilt/db"
+	"github.com/NetSys/quilt/quiltctl/testutils"
 	"github.com/NetSys/quilt/util"
 )
 
@@ -425,19 +425,21 @@ func TestNoLeader(t *testing.T) {
 func TestSSHCommandCreation(t *testing.T) {
 	exp := []string{"ssh", "quilt@host", "-o", "StrictHostKeyChecking=no",
 		"-i", "~/.ssh/quilt"}
-	res := ssh("host", []string{"-i", "~/.ssh/quilt"})
+	res := runSSHCommand("host", []string{"-i", "~/.ssh/quilt"})
 	if !reflect.DeepEqual(res.Args, exp) {
 		t.Errorf("Bad SSH command creation: expected %v, got %v.", exp, res.Args)
 	}
 }
 
 func TestExec(t *testing.T) {
+	mockSSHClient := new(testutils.MockSSHClient)
 	targetContainer := 1
 	execCmd := Exec{
 		privateKey:      "key",
 		command:         "cat /etc/hosts",
 		targetContainer: targetContainer,
 		host:            api.DefaultSocket,
+		SSHClient:       mockSSHClient,
 	}
 	workerHost := "worker"
 	getClient = func(host string) (client.Client, error) {
@@ -491,23 +493,11 @@ func TestExec(t *testing.T) {
 		panic("unreached")
 	}
 
-	expArgs := []string{"-t", "-i", "key", "docker exec -it foo cat /etc/hosts"}
-	var sshCalled bool
-	ssh = func(host string, args []string) *exec.Cmd {
-		sshCalled = true
-		if host != workerHost {
-			t.Errorf("Bad ssh host: expected %s, but got %s",
-				workerHost, host)
-		}
-		if !reflect.DeepEqual(args, expArgs) {
-			t.Errorf("Bad ssh args: expected %v, but got %v", expArgs, args)
-		}
-		return &exec.Cmd{}
-	}
+	mockSSHClient.On("Connect", workerHost, "key").Return(nil)
+	mockSSHClient.On("Run", "docker exec -it foo cat /etc/hosts").Return(nil)
+	mockSSHClient.On("Disconnect").Return(nil)
 
 	execCmd.Run()
 
-	if !sshCalled {
-		t.Errorf("Never tried SSHing")
-	}
+	mockSSHClient.AssertExpectations(t)
 }

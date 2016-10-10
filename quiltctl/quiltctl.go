@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/NetSys/quilt/quiltctl/command"
+	"github.com/NetSys/quilt/quiltctl/ssh"
 
 	log "github.com/Sirupsen/logrus"
 )
@@ -18,8 +19,8 @@ var commands = map[string]command.SubCommand{
 	"run":        &command.Run{},
 	"stop":       &command.Stop{},
 	"ssh":        &command.SSH{},
-	"exec":       &command.Exec{},
-	"logs":       &command.Log{},
+	"exec":       &command.Exec{SSHClient: ssh.NewNativeClient()},
+	"logs":       &command.Log{SSHClient: ssh.NewNativeClient()},
 }
 
 // Run parses and runs the quiltctl subcommand given the command line arguments.

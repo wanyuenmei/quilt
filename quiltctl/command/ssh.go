@@ -100,7 +100,7 @@ func (sCmd *SSH) Run() int {
 		return 1
 	}
 
-	if err = ssh(host, sCmd.sshArgs).Run(); err != nil {
+	if err = runSSHCommand(host, sCmd.sshArgs).Run(); err != nil {
 		log.WithError(err).Error("Error executing the SSH command")
 		return 1
 	}
@@ -113,7 +113,7 @@ func (sCmd *SSH) Usage() {
 }
 
 // Stored in a variable so we can mock it out for unit tests.
-var ssh = func(host string, args []string) *exec.Cmd {
+var runSSHCommand = func(host string, args []string) *exec.Cmd {
 	baseArgs := []string{fmt.Sprintf("quilt@%s", host),
 		"-o", "StrictHostKeyChecking=no"}
 

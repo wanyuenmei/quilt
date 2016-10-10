@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/NetSys/quilt/quiltctl/ssh"
 	log "github.com/Sirupsen/logrus"
 
 	"github.com/NetSys/quilt/api"
@@ -19,7 +20,8 @@ type Exec struct {
 	targetContainer int
 	command         string
 
-	flags *flag.FlagSet
+	SSHClient ssh.Client
+	flags     *flag.FlagSet
 }
 
 func (eCmd *Exec) createFlagSet() *flag.FlagSet {
@@ -101,16 +103,19 @@ func (eCmd *Exec) Run() int {
 	}
 
 	// -t allows the docker command to receive input over SSH.
-	sshArgs := []string{"-t"}
-	if eCmd.privateKey != "" {
-		sshArgs = append(sshArgs, "-i", eCmd.privateKey)
-	}
-	sshArgs = append(sshArgs,
-		fmt.Sprintf("docker exec -it %s %s", container.DockerID, eCmd.command))
-	if err = ssh(containerHost, sshArgs).Run(); err != nil {
-		log.WithError(err).Error("Error running the exec command.")
+	err = eCmd.SSHClient.Connect(containerHost, eCmd.privateKey)
+	if err != nil {
+		log.WithError(err).Info("Error opening SSH connection")
 		return 1
 	}
+	defer eCmd.SSHClient.Disconnect()
+
+	command := fmt.Sprintf("docker exec -it %s %s", container.DockerID, eCmd.command)
+	if err = eCmd.SSHClient.Run(command); err != nil {
+		log.WithError(err).Info("Error running command over SSH")
+		return 1
+	}
+
 	return 0
 }
 

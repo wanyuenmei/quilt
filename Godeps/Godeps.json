@@ -1,6 +1,6 @@
 {
 	"ImportPath": "github.com/NetSys/quilt",
-	"GoVersion": "go1.6",
+	"GoVersion": "go1.7",
 	"GodepVersion": "v74",
 	"Packages": [
 		"./..."
@@ -316,6 +316,10 @@
 			"Rev": "526cf9b2b38d2f3675e34e473f2cef38e1e0565b"
 		},
 		{
+			"ImportPath": "github.com/pmezard/go-difflib/difflib",
+			"Rev": "792786c7400a136282c1664665ae0a8db921c6c2"
+		},
+		{
 			"ImportPath": "github.com/satori/go.uuid",
 			"Comment": "v1.0.0",
 			"Rev": "f9ab0dce87d815821e221626b772e3475a0d2749"
@@ -338,6 +342,20 @@
 			"Rev": "e7c8609bb02fc74f69832076b562f026cfc2b640"
 		},
 		{
+			"ImportPath": "github.com/stretchr/objx",
+			"Rev": "1a9d0bb9f541897e62256577b352fdbc1fb4fd94"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/assert",
+			"Comment": "v1.1.4-4-g976c720",
+			"Rev": "976c720a22c8eb4eb6a0b4348ad85ad12491a506"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/mock",
+			"Comment": "v1.1.4-4-g976c720",
+			"Rev": "976c720a22c8eb4eb6a0b4348ad85ad12491a506"
+		},
+		{
 			"ImportPath": "github.com/ugorji/go/codec",
 			"Rev": "b94837a2404ab90efe9289e77a70694c355739cb"
 		},
@@ -355,6 +373,10 @@
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/ssh",
+			"Rev": "5bcd134fee4dd1475da17714aac19c0aa0142e2f"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/ssh/agent",
 			"Rev": "5bcd134fee4dd1475da17714aac19c0aa0142e2f"
 		},
 		{

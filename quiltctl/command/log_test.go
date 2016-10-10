@@ -2,11 +2,12 @@ package command
 
 import (
 	"errors"
-	"os/exec"
-	"reflect"
 	"testing"
 
 	"github.com/NetSys/quilt/api"
+	"github.com/NetSys/quilt/api/client"
+	"github.com/NetSys/quilt/db"
+	"github.com/NetSys/quilt/quiltctl/testutils"
 )
 
 func TestLogFlags(t *testing.T) {
@@ -37,35 +38,7 @@ func TestLogFlags(t *testing.T) {
 }
 
 func TestLog(t *testing.T) {
-	targetContainer := 1
-	logsCmd := Log{
-		privateKey:      "key",
-		targetContainer: targetContainer,
-		host:            api.DefaultSocket,
-	}
-
-	expArgs := []string{"-t", "-i", "key", "docker logs foo"}
-	var sshCalled bool
-	ssh = func(host string, args []string) *exec.Cmd {
-		sshCalled = true
-		if host != "worker" {
-			t.Errorf("Bad ssh host: expected %s, but got %s",
-				"worker", host)
-		}
-		if !reflect.DeepEqual(args, expArgs) {
-			t.Errorf("Bad ssh args: expected %v, but got %v", expArgs, args)
-		}
-		return &exec.Cmd{}
-	}
-
-	logsCmd.Run()
-
-	if !sshCalled {
-		t.Errorf("Never tried SSHing")
-	}
-}
-
-func TestLogOptions(t *testing.T) {
+	mockSSHClient := new(testutils.MockSSHClient)
 	targetContainer := 1
 	logsCmd := Log{
 		privateKey:      "key",
@@ -74,28 +47,69 @@ func TestLogOptions(t *testing.T) {
 		shouldTail:      true,
 		showTimestamps:  true,
 		sinceTimestamp:  "2006-01-02T15:04:05",
+		SSHClient:       mockSSHClient,
 	}
 
-	expArgs := []string{"-t", "-i", "key", "docker logs " +
-		"--since=2006-01-02T15:04:05 --timestamps --follow foo"}
-	var sshCalled bool
-	ssh = func(host string, args []string) *exec.Cmd {
-		sshCalled = true
-		if host != "worker" {
-			t.Errorf("Bad ssh host: expected %s, but got %s",
-				"worker", host)
+	workerHost := "worker"
+	getClient = func(host string) (client.Client, error) {
+		switch host {
+		// The local client. Used by getLeaderClient to figure out machine
+		// information.
+		case api.DefaultSocket:
+			return &mockClient{
+				machineReturn: []db.Machine{
+					{
+						PublicIP:  "leader",
+						PrivateIP: "leader-priv",
+					},
+					{
+						PrivateIP: "worker-priv",
+						PublicIP:  workerHost,
+					},
+				},
+			}, nil
+		case api.RemoteAddress("leader"):
+			return &mockClient{
+				containerReturn: []db.Container{
+					{
+						StitchID: targetContainer,
+						Minion:   "worker-priv",
+					},
+					{
+						StitchID: 5,
+						Minion:   "bad",
+					},
+				},
+				etcdReturn: []db.Etcd{
+					{
+						LeaderIP: "leader-priv",
+					},
+				},
+			}, nil
+		case api.RemoteAddress(workerHost):
+			return &mockClient{
+				containerReturn: []db.Container{
+					{
+						StitchID: targetContainer,
+						DockerID: "foo",
+					},
+				},
+			}, nil
+		default:
+			t.Errorf("Unexpected call to getClient with host %s", host)
+			t.Fail()
 		}
-		if !reflect.DeepEqual(args, expArgs) {
-			t.Errorf("Bad ssh args: expected %v, but got %v", expArgs, args)
-		}
-		return &exec.Cmd{}
+		panic("unreached")
 	}
+
+	mockSSHClient.On("Connect", workerHost, "key").Return(nil)
+	mockSSHClient.On("Run", "docker logs --since=2006-01-02T15:04:05 --timestamps "+
+		"--follow foo").Return(nil)
+	mockSSHClient.On("Disconnect").Return(nil)
 
 	logsCmd.Run()
 
-	if !sshCalled {
-		t.Errorf("Never tried SSHing")
-	}
+	mockSSHClient.AssertExpectations(t)
 }
 
 func checkLogParsing(t *testing.T, args []string, exp Log, expErr error) {

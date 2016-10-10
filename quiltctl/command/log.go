@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/NetSys/quilt/api"
+	"github.com/NetSys/quilt/quiltctl/ssh"
 	log "github.com/Sirupsen/logrus"
 )
 
@@ -19,6 +20,7 @@ type Log struct {
 	shouldTail     bool
 
 	targetContainer int
+	SSHClient       ssh.Client
 	flags           *flag.FlagSet
 }
 
@@ -89,13 +91,6 @@ func (lCmd *Log) Run() int {
 			"from the container host.")
 		return 1
 	}
-
-	// -t allows the docker command to receive input over SSH.
-	sshArgs := []string{"-t"}
-	if lCmd.privateKey != "" {
-		sshArgs = append(sshArgs, "-i", lCmd.privateKey)
-	}
-
 	dockerCmd := "docker logs"
 	if lCmd.sinceTimestamp != "" {
 		dockerCmd += fmt.Sprintf(" --since=%s", lCmd.sinceTimestamp)
@@ -108,9 +103,15 @@ func (lCmd *Log) Run() int {
 	}
 	dockerCmd += " " + container.DockerID
 
-	sshArgs = append(sshArgs, dockerCmd)
-	if err := ssh(containerHost, sshArgs).Run(); err != nil {
-		log.WithError(err).Error("Error running the logs command.")
+	err = lCmd.SSHClient.Connect(containerHost, lCmd.privateKey)
+	if err != nil {
+		log.WithError(err).Info("Error opening SSH connection")
+		return 1
+	}
+	defer lCmd.SSHClient.Disconnect()
+
+	if err = lCmd.SSHClient.Run(dockerCmd); err != nil {
+		log.WithError(err).Info("Error running command over SSH")
 		return 1
 	}
 
