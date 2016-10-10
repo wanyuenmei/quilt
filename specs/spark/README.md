@@ -65,26 +65,15 @@ INFO [Jun  8 10:44:10.523] New connection.
 Once you see the "New connection" message, you can connect to the Machines with the command
 `quilt ssh <MACHINE_NUM>`, or manually with `ssh quilt@<PUBLIC_IP>`.
 
-### Inspect Docker Containers
-Docker Swarm has a global view of all the containers in the cluster.  To make
-it easy to access, the Master nodes have a command line utility, `swarm`, that
-directs docker commands to the swarm cluster.  For example, to list all of the
-active Docker containers in the cluster use `swarm ps`.  For example:
+### Inspect Containers
+To list all active containers in the cluster, use `quilt containers`.  For example:
 ```
-quilt@ip-172-31-11-161:~$ swarm ps
-CONTAINER ID        IMAGE                        COMMAND                  CREATED             STATUS              PORTS               NAMES
-b4fec2b9950b        quilt/spark                  "run worker"             8 minutes ago       Up 8 minutes                            ip-172-31-7-86/jovial_poincare
-b532520449b9        quilt/spark                  "run worker"             8 minutes ago       Up 8 minutes                            ip-172-31-1-237/jovial_wright
-d41dc1480707        quilt/spark                  "run worker"             8 minutes ago       Up 8 minutes                            ip-172-31-10-179/amazing_torvalds
-c29d3201c633        quilt/spark                  "run worker"             8 minutes ago       Up 8 minutes                            ip-172-31-15-97/small_leakey
-0cc00855552e        quilt/spark                  "run worker"             8 minutes ago       Up 8 minutes                            ip-172-31-9-185/tiny_pike
-3f4fcbb962a5        quilt/spark                  "run master"             8 minutes ago       Up 8 minutes                            ip-172-31-8-88/berserk_ptolemy
-
-[truncated]
+$ quilt containers
+Container-40{run quilt/spark run worker, Minion: 172.31.3.163, StitchID: 4, IP: 10.0.163.12, Mac: 02:00:0a:00:a3:0c, Labels: [spark-wk-2], Env: map[MASTERS:spark-ms-0.q]}
+Container-37{run quilt/spark run master, Minion: 172.31.11.3, StitchID: 1, IP: 10.0.155.142, Mac: 02:00:0a:00:9b:8e, Labels: [spark-ms-0], Env: map[JOB:run-example SparkPi]}
+Container-38{run quilt/spark run worker, Minion: 172.31.11.189, StitchID: 2, IP: 10.0.9.118, Mac: 02:00:0a:00:09:76, Labels: [spark-wk-0], Env: map[MASTERS:spark-ms-0.q]}
+Container-39{run quilt/spark run worker, Minion: 172.31.11.205, StitchID: 3, IP: 10.0.11.2, Mac: 02:00:0a:00:0b:02, Labels: [spark-wk-1], Env: map[MASTERS:spark-ms-0.q]}
 ```
-
-If the `quilt/spark` containers are not running, it means the `quilt/spark`
-containers are still being downloaded.
 
 ### Recovering Pi
 Once our Master Spark container is up, we can connect to it to find the results of
