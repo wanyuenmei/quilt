@@ -76,14 +76,15 @@ Container-39{run quilt/spark run worker, Minion: 172.31.11.205, StitchID: 3, IP:
 ```
 
 ### Recovering Pi
-Once our Master Spark container is up, we can connect to it to find the results of
-our SparkPi job! The results are located in the log of the Master container. In
-the output above, our Master container's name is `ip-172-31-8-88/berserk_ptolemy`.
+Once our Master Spark container is up, we can find the results of our SparkPi job via
+logs.
 
-Execute `swarm logs <MASTER_CONTAINER_NAME>`. After
-scrolling through Spark's info logging, we will find the result of SparkPi:
+Execute `quilt logs <Stitch ID>`. After scrolling through Spark's info logging, we will
+find the result of SparkPi:
 
 ```
+$ quilt logs 1
+# ...
 16/06/08 18:49:42 INFO TaskSchedulerImpl: Removed TaskSet 0.0, whose tasks have all completed, from pool
 16/06/08 18:49:42 INFO DAGScheduler: ResultStage 0 (reduce at SparkPi.scala:36) finished in 0.381 s
 16/06/08 18:49:42 INFO DAGScheduler: Job 0 finished: reduce at SparkPi.scala:36, took 0.525937 s
