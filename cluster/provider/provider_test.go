@@ -153,7 +153,7 @@ func TestGroupBy(t *testing.T) {
 }
 
 func TestCloudConfig(t *testing.T) {
-	cloudConfigFormat = "(%v) (%v) (%v)"
+	cloudConfigTemplate = "({{.QuiltImage}}) ({{.SSHKeys}}) ({{.UbuntuVersion}})"
 
 	res := cloudConfigUbuntu([]string{"a", "b"}, "1")
 	exp := "(quilt/quilt:latest) (a\nb) (1)"

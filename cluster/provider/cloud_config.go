@@ -1,15 +1,16 @@
 package provider
 
 import (
-	"fmt"
+	"bytes"
 	"strings"
+	"text/template"
 )
 
 const (
 	quiltImage = "quilt/quilt:latest"
 )
 
-var cloudConfigFormat = `#!/bin/bash
+var cloudConfigTemplate = `#!/bin/bash
 
 initialize_ovs() {
 	cat <<- EOF > /etc/systemd/system/ovs.service
@@ -54,11 +55,11 @@ initialize_minion() {
 	ExecStartPre=-/usr/bin/mkdir -p /var/run/netns
 	ExecStartPre=-/usr/bin/docker kill minion
 	ExecStartPre=-/usr/bin/docker rm minion
-	ExecStartPre=/usr/bin/docker pull %[1]s
+	ExecStartPre=/usr/bin/docker pull {{.QuiltImage}}
 	ExecStart=/usr/bin/docker run --net=host --name=minion --privileged \
 	-v /var/run/docker.sock:/var/run/docker.sock \
 	-v /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt \
-	-v /proc:/hostproc:ro -v /var/run/netns:/var/run/netns:rw %[1]s \
+	-v /proc:/hostproc:ro -v /var/run/netns:/var/run/netns:rw {{.QuiltImage}} \
 	quilt minion
 
 	[Install]
@@ -67,9 +68,9 @@ initialize_minion() {
 }
 
 install_docker() {
-	echo "deb https://apt.dockerproject.org/repo ubuntu-%[3]s main" > /etc/apt/sources.list.d/docker.list
+	echo "deb https://apt.dockerproject.org/repo ubuntu-{{.UbuntuVersion}} main" > /etc/apt/sources.list.d/docker.list
 	apt-get update
-	apt-get install docker-engine=1.12.1-0~%[3]s -y --force-yes
+	apt-get install docker-engine=1.12.1-0~{{.UbuntuVersion}} -y --force-yes
 	systemctl stop docker.service
 }
 
@@ -95,7 +96,7 @@ date >> /var/log/bootscript.log
 
 export DEBIAN_FRONTEND=noninteractive
 
-ssh_keys="%[2]s"
+ssh_keys="{{.SSHKeys}}"
 setup_user quilt "$ssh_keys"
 
 install_docker
@@ -120,6 +121,21 @@ date >> /var/log/bootscript.log
     `
 
 func cloudConfigUbuntu(keys []string, ubuntuVersion string) string {
-	keyStr := strings.Join(keys, "\n")
-	return fmt.Sprintf(cloudConfigFormat, quiltImage, keyStr, ubuntuVersion)
+	t := template.Must(template.New("cloudConfig").Parse(cloudConfigTemplate))
+
+	var cloudConfigBytes bytes.Buffer
+	err := t.Execute(&cloudConfigBytes, struct {
+		QuiltImage    string
+		UbuntuVersion string
+		SSHKeys       string
+	}{
+		QuiltImage:    quiltImage,
+		UbuntuVersion: ubuntuVersion,
+		SSHKeys:       strings.Join(keys, "\n"),
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	return cloudConfigBytes.String()
 }
