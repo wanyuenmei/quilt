@@ -14,13 +14,10 @@ import (
 // Get contains the options for downloading imports.
 type Get struct {
 	importPath string
-
-	flags *flag.FlagSet
 }
 
-func (gCmd *Get) createFlagSet() *flag.FlagSet {
-	flags := flag.NewFlagSet("get", flag.ExitOnError)
-
+// InstallFlags sets up parsing for command line flags.
+func (gCmd *Get) InstallFlags(flags *flag.FlagSet) {
 	flags.StringVar(&gCmd.importPath, "import", "", "the stitch to download")
 
 	flags.Usage = func() {
@@ -29,25 +26,15 @@ func (gCmd *Get) createFlagSet() *flag.FlagSet {
 			stitch.QuiltPathKey)
 		flags.PrintDefaults()
 	}
-
-	gCmd.flags = flags
-	return flags
 }
 
 // Parse parses the command line arguments for the get command.
 func (gCmd *Get) Parse(args []string) error {
-	flags := gCmd.createFlagSet()
-
-	if err := flags.Parse(args); err != nil {
-		return err
-	}
-
 	if gCmd.importPath == "" {
-		nonFlagArgs := flags.Args()
-		if len(nonFlagArgs) == 0 {
+		if len(args) == 0 {
 			return errors.New("no import specified")
 		}
-		gCmd.importPath = nonFlagArgs[0]
+		gCmd.importPath = args[0]
 	}
 
 	return nil
@@ -67,9 +54,4 @@ func (gCmd *Get) Run() int {
 	fmt.Println("Successfully installed import.")
 
 	return 0
-}
-
-// Usage prints the usage for the get command.
-func (gCmd *Get) Usage() {
-	gCmd.flags.Usage()
 }

@@ -13,7 +13,6 @@ import (
 
 // Log is the structure for the `quilt logs` command.
 type Log struct {
-	host           string
 	privateKey     string
 	sinceTimestamp string
 	showTimestamps bool
@@ -21,39 +20,49 @@ type Log struct {
 
 	targetContainer int
 	SSHClient       ssh.Client
-	flags           *flag.FlagSet
+
+	common *commonFlags
 }
 
-func (lCmd *Log) createFlagSet() {
-	flags := flag.NewFlagSet("logs", flag.ExitOnError)
+// NewLogCommand creates a new Log command instance.
+func NewLogCommand(c ssh.Client) *Log {
+	return &Log{
+		SSHClient: c,
+		common:    &commonFlags{},
+	}
+}
 
-	flags.StringVar(&lCmd.host, "H", api.DefaultSocket,
-		"the host to query for machine information")
+// InstallFlags sets up parsing for command line flags.
+func (lCmd *Log) InstallFlags(flags *flag.FlagSet) {
+	lCmd.common.InstallFlags(flags)
+
 	flags.StringVar(&lCmd.privateKey, "i", "",
 		"the private key to use to connect to the host")
 	flags.StringVar(&lCmd.sinceTimestamp, "since", "", "show logs since timestamp")
 	flags.BoolVar(&lCmd.shouldTail, "f", false, "follow log output")
 	flags.BoolVar(&lCmd.showTimestamps, "t", false, "show timestamps")
 
-	lCmd.flags = flags
+	flags.Usage = func() {
+		fmt.Println("usage: quilt logs [-H=<daemon_host>] [-i=<private_key>] " +
+			"<stitch_id> <command>")
+		fmt.Println("`logs` fetches the logs of a container. " +
+			"The container is identified by the stitch ID provided by " +
+			"`quilt containers`.")
+		fmt.Println("For example, to get the logs of container 5 with a " +
+			"specific private key: `quilt logs -i ~/.ssh/quilt 5`")
+		flags.PrintDefaults()
+	}
 }
 
 // Parse parses the command line arguments for the `logs` command.
-func (lCmd *Log) Parse(rawArgs []string) error {
-	lCmd.createFlagSet()
-
-	if err := lCmd.flags.Parse(rawArgs); err != nil {
-		return err
-	}
-
-	parsedArgs := lCmd.flags.Args()
-	if len(parsedArgs) == 0 {
+func (lCmd *Log) Parse(args []string) error {
+	if len(args) == 0 {
 		return errors.New("must specify a target container")
 	}
 
-	targetContainer, err := strconv.Atoi(parsedArgs[0])
+	targetContainer, err := strconv.Atoi(args[0])
 	if err != nil {
-		return fmt.Errorf("target container must be a number: %s", parsedArgs[0])
+		return fmt.Errorf("target container must be a number: %s", args[0])
 	}
 
 	lCmd.targetContainer = targetContainer
@@ -62,7 +71,7 @@ func (lCmd *Log) Parse(rawArgs []string) error {
 
 // Run finds the target continer and outputs logs.
 func (lCmd *Log) Run() int {
-	localClient, leaderClient, err := getClients(lCmd.host)
+	localClient, leaderClient, err := getClients(lCmd.common.host)
 	if err != nil {
 		log.Error(err)
 		return 1
@@ -116,16 +125,4 @@ func (lCmd *Log) Run() int {
 	}
 
 	return 0
-}
-
-// Usage prints command usage info.
-func (lCmd *Log) Usage() {
-	fmt.Println("usage: quilt logs [-H=<daemon_host>] [-i=<private_key>] " +
-		"<stitch_id> <command>")
-	fmt.Println("`logs` fetches the logs of a container. " +
-		"The container is identified by the stitch ID provided by " +
-		"`quilt containers`.")
-	fmt.Println("For example, to get the logs of container 5 with a " +
-		"specific private key: `quilt logs -i ~/.ssh/quilt 5`")
-	lCmd.flags.PrintDefaults()
 }

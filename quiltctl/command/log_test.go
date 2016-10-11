@@ -43,11 +43,13 @@ func TestLog(t *testing.T) {
 	logsCmd := Log{
 		privateKey:      "key",
 		targetContainer: targetContainer,
-		host:            api.DefaultSocket,
 		shouldTail:      true,
 		showTimestamps:  true,
 		sinceTimestamp:  "2006-01-02T15:04:05",
 		SSHClient:       mockSSHClient,
+		common: &commonFlags{
+			host: api.DefaultSocket,
+		},
 	}
 
 	workerHost := "worker"
@@ -113,8 +115,8 @@ func TestLog(t *testing.T) {
 }
 
 func checkLogParsing(t *testing.T, args []string, exp Log, expErr error) {
-	logsCmd := Log{}
-	err := logsCmd.Parse(args)
+	logsCmd := NewLogCommand(nil)
+	err := parseHelper(logsCmd, args)
 
 	if err != nil {
 		if expErr != nil {

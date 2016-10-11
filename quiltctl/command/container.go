@@ -1,32 +1,28 @@
 package command
 
 import (
-	"flag"
 	"fmt"
 
 	log "github.com/Sirupsen/logrus"
 
-	"github.com/NetSys/quilt/api"
 	"github.com/NetSys/quilt/db"
 )
 
 // Container contains the options for querying containers.
 type Container struct {
-	host string
-
-	flags *flag.FlagSet
+	*commonFlags
 }
 
-func (cCmd *Container) createFlagSet() {
-	flags := flag.NewFlagSet("containers", flag.ExitOnError)
-	flags.StringVar(&cCmd.host, "H", api.DefaultSocket, "the host to connect to")
-	cCmd.flags = flags
+// NewContainerCommand creates a new Container command instance.
+func NewContainerCommand() *Container {
+	return &Container{
+		commonFlags: &commonFlags{},
+	}
 }
 
 // Parse parses the command line arguments for the container command.
 func (cCmd *Container) Parse(args []string) error {
-	cCmd.createFlagSet()
-	return cCmd.flags.Parse(args)
+	return nil
 }
 
 // Run retrieves and prints the requested containers.
@@ -64,9 +60,4 @@ func containersStr(containers []db.Container) string {
 	}
 
 	return containersStr
-}
-
-// Usage prints the usage for the container command.
-func (cCmd *Container) Usage() {
-	cCmd.flags.Usage()
 }

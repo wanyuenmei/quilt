@@ -15,20 +15,27 @@ import (
 
 // Exec contains the options for running commands in containers.
 type Exec struct {
-	host            string
 	privateKey      string
 	targetContainer int
 	command         string
 
+	common *commonFlags
+
 	SSHClient ssh.Client
-	flags     *flag.FlagSet
 }
 
-func (eCmd *Exec) createFlagSet() *flag.FlagSet {
-	flags := flag.NewFlagSet("exec", flag.ExitOnError)
+// NewExecCommand creates a new Exec command instance.
+func NewExecCommand(c ssh.Client) *Exec {
+	return &Exec{
+		common:    &commonFlags{},
+		SSHClient: c,
+	}
+}
 
-	flags.StringVar(&eCmd.host, "H", api.DefaultSocket,
-		"the host to query for machine information")
+// InstallFlags sets up parsing for command line flags.
+func (eCmd *Exec) InstallFlags(flags *flag.FlagSet) {
+	eCmd.common.InstallFlags(flags)
+
 	flags.StringVar(&eCmd.privateKey, "i", "",
 		"the private key to use to connect to the host")
 
@@ -40,39 +47,29 @@ func (eCmd *Exec) createFlagSet() *flag.FlagSet {
 			"`quilt containers`.")
 		fmt.Println("For example, to get a shell in container 5 with a " +
 			"specific private key: quilt exec -i ~/.ssh/quilt 5 sh")
-		eCmd.flags.PrintDefaults()
+		flags.PrintDefaults()
 	}
-
-	eCmd.flags = flags
-	return flags
 }
 
 // Parse parses the command line arguments for the exec command.
-func (eCmd *Exec) Parse(rawArgs []string) error {
-	flags := eCmd.createFlagSet()
-
-	if err := flags.Parse(rawArgs); err != nil {
-		return err
-	}
-
-	parsedArgs := flags.Args()
-	if len(parsedArgs) < 2 {
+func (eCmd *Exec) Parse(args []string) error {
+	if len(args) < 2 {
 		return errors.New("must specify a target container and command")
 	}
 
-	targetContainer, err := strconv.Atoi(parsedArgs[0])
+	targetContainer, err := strconv.Atoi(args[0])
 	if err != nil {
-		return fmt.Errorf("target container must be a number: %s", parsedArgs[0])
+		return fmt.Errorf("target container must be a number: %s", args[0])
 	}
 
 	eCmd.targetContainer = targetContainer
-	eCmd.command = strings.Join(parsedArgs[1:], " ")
+	eCmd.command = strings.Join(args[1:], " ")
 	return nil
 }
 
 // Run finds the target continer, and executes the given command in it.
 func (eCmd *Exec) Run() int {
-	localClient, leaderClient, err := getClients(eCmd.host)
+	localClient, leaderClient, err := getClients(eCmd.common.host)
 	if err != nil {
 		log.Error(err)
 		return 1
@@ -120,9 +117,4 @@ func (eCmd *Exec) Run() int {
 	}
 
 	return 0
-}
-
-// Usage prints the usage for the ssh command.
-func (eCmd *Exec) Usage() {
-	eCmd.flags.Usage()
 }

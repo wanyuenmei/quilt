@@ -5,23 +5,26 @@ import (
 	"fmt"
 
 	log "github.com/Sirupsen/logrus"
-
-	"github.com/NetSys/quilt/api"
 )
 
 // Stop contains the options for stopping namespaces.
 type Stop struct {
-	host      string
 	namespace string
 
-	flags *flag.FlagSet
+	common *commonFlags
 }
 
-func (sCmd *Stop) createFlagSet() *flag.FlagSet {
-	flags := flag.NewFlagSet("stop", flag.ExitOnError)
+// NewStopCommand creates a new Stop command instance.
+func NewStopCommand() *Stop {
+	return &Stop{
+		common: &commonFlags{},
+	}
+}
 
-	flags.StringVar(&sCmd.host, "H", api.DefaultSocket,
-		"the host to connect to")
+// InstallFlags sets up parsing for command line flags.
+func (sCmd *Stop) InstallFlags(flags *flag.FlagSet) {
+	sCmd.common.InstallFlags(flags)
+
 	flags.StringVar(&sCmd.namespace, "namespace", "", "the namespace to stop")
 
 	flags.Usage = func() {
@@ -31,25 +34,15 @@ func (sCmd *Stop) createFlagSet() *flag.FlagSet {
 			"and sends it to the Quilt daemon to be executed.")
 		fmt.Println("The result is that resources associated with the " +
 			"namespace, such as VMs, are freed.")
-		sCmd.flags.PrintDefaults()
+		flags.PrintDefaults()
 	}
-
-	sCmd.flags = flags
-	return flags
 }
 
 // Parse parses the command line arguments for the stop command.
 func (sCmd *Stop) Parse(args []string) error {
-	flags := sCmd.createFlagSet()
-
-	if err := flags.Parse(args); err != nil {
-		return err
-	}
-
 	if sCmd.namespace == "" {
-		nonFlagArgs := flags.Args()
-		if len(nonFlagArgs) > 0 {
-			sCmd.namespace = nonFlagArgs[0]
+		if len(args) > 0 {
+			sCmd.namespace = args[0]
 		}
 	}
 
@@ -64,7 +57,7 @@ func (sCmd *Stop) Run() int {
 		specStr += fmt.Sprintf("createDeployment({namespace: %q});", namespace)
 	}
 
-	c, err := getClient(sCmd.host)
+	c, err := getClient(sCmd.common.host)
 	if err != nil {
 		log.Error(err)
 		return 1
@@ -79,9 +72,4 @@ func (sCmd *Stop) Run() int {
 	fmt.Printf("Successfully began stopping namespace `%s`.\n", namespace)
 
 	return 0
-}
-
-// Usage prints the usage for the stop command.
-func (sCmd *Stop) Usage() {
-	sCmd.flags.Usage()
 }

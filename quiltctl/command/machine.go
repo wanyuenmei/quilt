@@ -1,32 +1,28 @@
 package command
 
 import (
-	"flag"
 	"fmt"
 
 	log "github.com/Sirupsen/logrus"
 
-	"github.com/NetSys/quilt/api"
 	"github.com/NetSys/quilt/db"
 )
 
 // Machine contains the options for querying machines.
 type Machine struct {
-	host string
-
-	flags *flag.FlagSet
+	*commonFlags
 }
 
-func (mCmd *Machine) createFlagSet() {
-	flags := flag.NewFlagSet("machines", flag.ExitOnError)
-	flags.StringVar(&mCmd.host, "H", api.DefaultSocket, "the host to connect to")
-	mCmd.flags = flags
+// NewMachineCommand creates a new Machine command instance.
+func NewMachineCommand() *Machine {
+	return &Machine{
+		commonFlags: &commonFlags{},
+	}
 }
 
 // Parse parses the command line arguments for the machine command.
 func (mCmd *Machine) Parse(args []string) error {
-	mCmd.createFlagSet()
-	return mCmd.flags.Parse(args)
+	return nil
 }
 
 // Run retrieves and prints the requested machines.
@@ -57,9 +53,4 @@ func machinesStr(machines []db.Machine) string {
 	}
 
 	return machinesStr
-}
-
-// Usage prints the usage for the machine command.
-func (mCmd *Machine) Usage() {
-	mCmd.Usage()
 }

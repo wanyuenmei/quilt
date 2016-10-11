@@ -2,6 +2,7 @@ package command
 
 import (
 	"errors"
+	"flag"
 	"reflect"
 	"testing"
 
@@ -19,11 +20,11 @@ func TestMachineFlags(t *testing.T) {
 
 	expHost := "IP"
 
-	machineCmd := Machine{}
-	err := machineCmd.Parse([]string{"-H", expHost})
+	machineCmd := NewMachineCommand()
+	err := parseHelper(machineCmd, []string{"-H", expHost})
 
 	if err != nil {
-		t.Errorf("Unexpected error when parsing container args: %s", err.Error())
+		t.Errorf("Unexpected error when parsing machine args: %s", err.Error())
 		return
 	}
 
@@ -56,8 +57,8 @@ func TestContainerFlags(t *testing.T) {
 
 	expHost := "IP"
 
-	containerCmd := Container{}
-	err := containerCmd.Parse([]string{"-H", expHost})
+	containerCmd := NewContainerCommand()
+	err := parseHelper(containerCmd, []string{"-H", expHost})
 
 	if err != nil {
 		t.Errorf("Unexpected error when parsing container args: %s", err.Error())
@@ -81,8 +82,8 @@ func TestContainerOutput(t *testing.T) {
 }
 
 func checkGetParsing(t *testing.T, args []string, expImport string, expErr error) {
-	getCmd := Get{}
-	err := getCmd.Parse(args)
+	getCmd := &Get{}
+	err := parseHelper(getCmd, args)
 
 	if expErr != nil {
 		if err.Error() != expErr.Error() {
@@ -113,8 +114,8 @@ func TestGetFlags(t *testing.T) {
 }
 
 func checkRunParsing(t *testing.T, args []string, expStitch string, expErr error) {
-	runCmd := Run{}
-	err := runCmd.Parse(args)
+	runCmd := NewRunCommand()
+	err := parseHelper(runCmd, args)
 
 	if expErr != nil {
 		if err.Error() != expErr.Error() {
@@ -145,8 +146,8 @@ func TestRunFlags(t *testing.T) {
 }
 
 func checkStopParsing(t *testing.T, args []string, expNamespace string, expErr error) {
-	stopCmd := Stop{}
-	err := stopCmd.Parse(args)
+	stopCmd := NewStopCommand()
+	err := parseHelper(stopCmd, args)
 
 	if expErr != nil {
 		if err.Error() != expErr.Error() {
@@ -178,8 +179,8 @@ func TestStopFlags(t *testing.T) {
 func checkSSHParsing(t *testing.T, args []string, expMachine int,
 	expSSHArgs []string, expErr error) {
 
-	sshCmd := SSH{}
-	err := sshCmd.Parse(args)
+	sshCmd := NewSSHCommand()
+	err := parseHelper(sshCmd, args)
 
 	if expErr != nil {
 		if err.Error() != expErr.Error() {
@@ -218,8 +219,8 @@ func TestSSHFlags(t *testing.T) {
 func checkExecParsing(t *testing.T, args []string, expContainer int,
 	expKey string, expCmd string, expErr error) {
 
-	execCmd := Exec{}
-	err := execCmd.Parse(args)
+	execCmd := NewExecCommand(nil)
+	err := parseHelper(execCmd, args)
 
 	if expErr != nil {
 		if err.Error() != expErr.Error() {
@@ -297,14 +298,15 @@ func TestStopNamespace(t *testing.T) {
 		return c, nil
 	}
 
-	stopCmd := &Stop{namespace: "namespace"}
+	stopCmd := NewStopCommand()
+	stopCmd.namespace = "namespace"
 	stopCmd.Run()
 	expStitch := `createDeployment({namespace: "namespace"});`
 	if c.runStitchArg != expStitch {
 		t.Error("stop command invoked Quilt with the wrong stitch")
 	}
 
-	stopCmd = &Stop{}
+	stopCmd = NewStopCommand()
 	stopCmd.Run()
 	expStitch = ""
 	if c.runStitchArg != expStitch {
@@ -323,7 +325,8 @@ func TestRunSpec(t *testing.T) {
 	testSpec := `new Container("nginx");`
 	util.WriteFile(stitchPath, []byte(testSpec), 0644)
 
-	runCmd := &Run{stitch: stitchPath}
+	runCmd := NewRunCommand()
+	runCmd.stitch = stitchPath
 	runCmd.Run()
 
 	expStitch := `importSources = {};` + testSpec
@@ -440,8 +443,10 @@ func TestExec(t *testing.T) {
 		privateKey:      "key",
 		command:         "cat /etc/hosts",
 		targetContainer: targetContainer,
-		host:            api.DefaultSocket,
 		SSHClient:       mockSSHClient,
+		common: &commonFlags{
+			host: api.DefaultSocket,
+		},
 	}
 	workerHost := "worker"
 	getClient = func(host string) (client.Client, error) {
@@ -503,4 +508,11 @@ func TestExec(t *testing.T) {
 	execCmd.Run()
 
 	mockSSHClient.AssertExpectations(t)
+}
+
+func parseHelper(cmd SubCommand, args []string) error {
+	flags := flag.NewFlagSet("test", flag.ContinueOnError)
+	cmd.InstallFlags(flags)
+	flags.Parse(args)
+	return cmd.Parse(flags.Args())
 }

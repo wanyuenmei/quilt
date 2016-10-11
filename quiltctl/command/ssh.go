@@ -9,24 +9,26 @@ import (
 	"strconv"
 
 	log "github.com/Sirupsen/logrus"
-
-	"github.com/NetSys/quilt/api"
 )
 
 // SSH contains the options for SSHing into machines.
 type SSH struct {
-	host          string
 	targetMachine int
 	sshArgs       []string
 
-	flags *flag.FlagSet
+	common *commonFlags
 }
 
-func (sCmd *SSH) createFlagSet() *flag.FlagSet {
-	flags := flag.NewFlagSet("ssh", flag.ExitOnError)
+// NewSSHCommand creates a new SSH command instance.
+func NewSSHCommand() *SSH {
+	return &SSH{
+		common: &commonFlags{},
+	}
+}
 
-	flags.StringVar(&sCmd.host, "H", api.DefaultSocket,
-		"the host to query for machine information")
+// InstallFlags sets up parsing for command line flags.
+func (sCmd *SSH) InstallFlags(flags *flag.FlagSet) {
+	sCmd.common.InstallFlags(flags)
 
 	flags.Usage = func() {
 		fmt.Println("usage: quilt ssh [-H=<daemon_host>] <machine_num> " +
@@ -36,39 +38,29 @@ func (sCmd *SSH) createFlagSet() *flag.FlagSet {
 			"`quilt queryMachines`.")
 		fmt.Println("For example, to SSH to machine 5 with a specific " +
 			"private key: quilt ssh 5 -i ~/.ssh/quilt")
-		sCmd.flags.PrintDefaults()
+		flags.PrintDefaults()
 	}
-
-	sCmd.flags = flags
-	return flags
 }
 
 // Parse parses the command line arguments for the ssh command.
-func (sCmd *SSH) Parse(rawArgs []string) error {
-	flags := sCmd.createFlagSet()
-
-	if err := flags.Parse(rawArgs); err != nil {
-		return err
-	}
-
-	parsedArgs := flags.Args()
-	if len(parsedArgs) == 0 {
+func (sCmd *SSH) Parse(args []string) error {
+	if len(args) == 0 {
 		return errors.New("must specify a target machine")
 	}
 
-	targetMachine, err := strconv.Atoi(parsedArgs[0])
+	targetMachine, err := strconv.Atoi(args[0])
 	if err != nil {
-		return fmt.Errorf("target machine must be a number: %s", parsedArgs[0])
+		return fmt.Errorf("target machine must be a number: %s", args[0])
 	}
 
 	sCmd.targetMachine = targetMachine
-	sCmd.sshArgs = parsedArgs[1:]
+	sCmd.sshArgs = args[1:]
 	return nil
 }
 
 // Run SSHs into the given machine.
 func (sCmd *SSH) Run() int {
-	c, err := getClient(sCmd.host)
+	c, err := getClient(sCmd.common.host)
 	if err != nil {
 		log.Error(err)
 		return 1
@@ -105,11 +97,6 @@ func (sCmd *SSH) Run() int {
 		return 1
 	}
 	return 0
-}
-
-// Usage prints the usage for the ssh command.
-func (sCmd *SSH) Usage() {
-	sCmd.flags.Usage()
 }
 
 // Stored in a variable so we can mock it out for unit tests.

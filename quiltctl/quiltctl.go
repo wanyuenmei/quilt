@@ -12,15 +12,15 @@ import (
 )
 
 var commands = map[string]command.SubCommand{
-	"machines":   &command.Machine{},
-	"containers": &command.Container{},
+	"containers": command.NewContainerCommand(),
+	"exec":       command.NewExecCommand(ssh.NewNativeClient()),
 	"get":        &command.Get{},
 	"inspect":    &command.Inspect{},
-	"run":        &command.Run{},
-	"stop":       &command.Stop{},
-	"ssh":        &command.SSH{},
-	"exec":       &command.Exec{SSHClient: ssh.NewNativeClient()},
-	"logs":       &command.Log{SSHClient: ssh.NewNativeClient()},
+	"logs":       command.NewLogCommand(ssh.NewNativeClient()),
+	"machines":   command.NewMachineCommand(),
+	"run":        command.NewRunCommand(),
+	"ssh":        command.NewSSHCommand(),
+	"stop":       command.NewStopCommand(),
 }
 
 // Run parses and runs the quiltctl subcommand given the command line arguments.
@@ -50,9 +50,15 @@ func parseSubcommand(name string, args []string) (command.SubCommand, error) {
 	}
 
 	cmd := commands[name]
-	err := cmd.Parse(args)
-	if err != nil {
-		cmd.Usage()
+	flags := flag.NewFlagSet(name, flag.ExitOnError)
+	cmd.InstallFlags(flags)
+	if err := flags.Parse(args); err != nil {
+		flags.Usage()
+		return nil, err
+	}
+
+	if err := cmd.Parse(flags.Args()); err != nil {
+		flags.Usage()
 		return nil, err
 	}
 
