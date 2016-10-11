@@ -9,11 +9,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/NetSys/quilt/api"
-	"github.com/NetSys/quilt/api/server"
-	"github.com/NetSys/quilt/cluster"
-	"github.com/NetSys/quilt/db"
-	"github.com/NetSys/quilt/minion"
 	"github.com/NetSys/quilt/quiltctl"
 	"github.com/NetSys/quilt/util"
 
@@ -44,8 +39,6 @@ func main() {
 	var logOut = flag.String("log-file", "", "log output file (will be overwritten)")
 	var logLevel = flag.String("log-level", "info", "level to set logger to")
 	flag.StringVar(logLevel, "l", "info", "level to set logger to")
-	var lAddr = flag.String("H", api.DefaultSocket,
-		"Socket to listen for API requests on.")
 	flag.Parse()
 
 	level, err := parseLogLevel(*logLevel)
@@ -78,22 +71,11 @@ func main() {
 	}
 
 	subcommand := flag.Arg(0)
-	switch {
-	case subcommand == "minion":
-		minion.Run()
-	case subcommand == "daemon":
-		runDaemon(*lAddr)
-	case quiltctl.HasSubcommand(subcommand):
+	if quiltctl.HasSubcommand(subcommand) {
 		quiltctl.Run(flag.Args())
-	default:
+	} else {
 		usage()
 	}
-}
-
-func runDaemon(lAddr string) {
-	conn := db.New()
-	go server.Run(conn, lAddr)
-	cluster.Run(conn)
 }
 
 func usage() {

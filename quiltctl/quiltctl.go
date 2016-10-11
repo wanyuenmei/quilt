@@ -13,11 +13,13 @@ import (
 
 var commands = map[string]command.SubCommand{
 	"containers": command.NewContainerCommand(),
+	"daemon":     command.NewDaemonCommand(),
 	"exec":       command.NewExecCommand(ssh.NewNativeClient()),
 	"get":        &command.Get{},
 	"inspect":    &command.Inspect{},
 	"logs":       command.NewLogCommand(ssh.NewNativeClient()),
 	"machines":   command.NewMachineCommand(),
+	"minion":     &command.Minion{},
 	"run":        command.NewRunCommand(),
 	"ssh":        command.NewSSHCommand(),
 	"stop":       command.NewStopCommand(),
