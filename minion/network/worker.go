@@ -112,9 +112,6 @@ type OFRuleSlice []OFRule
 //          default gateway.
 //        * Forward arp packets to both br-int and the default gateway.
 //        * Forward packets from LOCAL to the container with the packet's dst MAC.
-// XXX: The worker additionally has several basic jobs which are currently
-// unimplemented:
-//    - ACLS should be installed to guarantee only sanctioned communication.
 
 func runWorker(conn db.Conn, dk docker.Client) {
 	minion, err := conn.MinionSelf()
