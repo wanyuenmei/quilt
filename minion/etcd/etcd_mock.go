@@ -2,6 +2,7 @@ package etcd
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -86,12 +87,6 @@ func (m mock) create(path, value string, ttl time.Duration) error {
 	tree.Children[node] = Tree{node, value, make(map[string]Tree)}
 	m.setTimer(path, ttl)
 	return nil
-}
-
-func (m mock) Update(path, value string, ttl time.Duration) error {
-	m.Lock()
-	defer m.Unlock()
-	return m.update(path, value, ttl)
 }
 
 func (m mock) update(path, value string, ttl time.Duration) error {
@@ -192,6 +187,30 @@ func (m mock) Set(path, value string, ttl time.Duration) error {
 	}
 
 	return m.update(path, value, ttl)
+}
+
+func (m mock) Refresh(path, value string, ttl time.Duration) error {
+	m.Lock()
+	defer m.Unlock()
+
+	if m.expired(path) {
+		return errors.New("path expired")
+	}
+
+	curValue, err := m.get(path)
+	if err != nil {
+		return fmt.Errorf("no such node '%s'", path)
+	}
+
+	if curValue != value {
+		return fmt.Errorf("key '%s' does not have value '%s'", path, value)
+	}
+
+	return m.update(path, value, ttl)
+}
+
+func (m mock) RefreshDir(dir string, ttl time.Duration) error {
+	return m.Refresh(dir, "", ttl)
 }
 
 func (m mock) expired(path string) bool {
