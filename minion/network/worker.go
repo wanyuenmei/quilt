@@ -3,6 +3,7 @@ package network
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -32,6 +33,9 @@ const (
 	innerMTU         int    = 1400
 	concurrencyLimit int    = 32 // Adjust to change per function goroutine limit
 )
+
+// The machine's public interface.
+var publicInterface string
 
 // This represents a network namespace
 type nsInfo struct {
@@ -126,6 +130,14 @@ func runWorker(conn db.Conn, dk docker.Client) {
 	}
 	defer odb.Close()
 
+	if publicInterface == "" {
+		if pubIntf, err := getPublicInterface(); err == nil {
+			publicInterface = pubIntf
+		} else {
+			log.WithError(err).Error("Failed to get public interface")
+		}
+	}
+
 	// XXX: By doing all the work within a transaction, we (kind of) guarantee that
 	// containers won't be removed while we're in the process of setting them up.
 	// Not ideal, but for now it's good enough.
@@ -154,7 +166,9 @@ func runWorker(conn db.Conn, dk docker.Client) {
 
 		updateNamespaces(containers)
 		updateVeths(containers)
-		updateNAT(containers, connections)
+		if publicInterface != "" {
+			updateNAT(publicInterface, containers, connections)
+		}
 		updatePorts(odb, containers)
 
 		if exists, err := linkExists("", quiltBridge); exists {
@@ -403,8 +417,10 @@ func generateCurrentVeths(containers []db.Container) (netdevSlice, error) {
 	return configs, nil
 }
 
-func updateNAT(containers []db.Container, connections []db.Connection) {
-	targetRules := generateTargetNatRules(containers, connections)
+func updateNAT(publicInterface string, containers []db.Container,
+	connections []db.Connection) {
+
+	targetRules := generateTargetNatRules(publicInterface, containers, connections)
 	currRules, err := generateCurrentNatRules()
 	if err != nil {
 		log.WithError(err).Error("failed to get NAT rules")
@@ -453,14 +469,15 @@ func generateCurrentNatRules() (ipRuleSlice, error) {
 	return rules, nil
 }
 
-func generateTargetNatRules(containers []db.Container,
+func generateTargetNatRules(publicInterface string, containers []db.Container,
 	connections []db.Connection) ipRuleSlice {
 	strRules := []string{
 		"-P PREROUTING ACCEPT",
 		"-P INPUT ACCEPT",
 		"-P OUTPUT ACCEPT",
 		"-P POSTROUTING ACCEPT",
-		"-A POSTROUTING -s 10.0.0.0/8 -o eth0 -j MASQUERADE",
+		fmt.Sprintf("-A POSTROUTING -s 10.0.0.0/8 -o %s -j MASQUERADE",
+			publicInterface),
 	}
 
 	protocols := []string{"tcp", "udp"}
@@ -495,10 +512,10 @@ func generateTargetNatRules(containers []db.Container,
 		for port := range ports {
 			for _, protocol := range protocols {
 				strRules = append(strRules, fmt.Sprintf(
-					"-A PREROUTING -i eth0 "+
-						"-p %s -m %s --dport %d -j "+
-						"DNAT --to-destination %s:%d",
-					protocol, protocol, port, ip, port))
+					"-A PREROUTING -i %[1]s "+
+						"-p %[2]s -m %[2]s --dport %[3]d -j "+
+						"DNAT --to-destination %[4]s:%[3]d",
+					publicInterface, protocol, port, ip))
 			}
 		}
 	}
@@ -1407,6 +1424,21 @@ func addNatRule(rule ipRule) error {
 		return fmt.Errorf("failed to add NAT rule %s: %s", cmd, err)
 	}
 	return nil
+}
+
+// getPublicInterface gets the interface with the default route.
+func getPublicInterface() (string, error) {
+	stdout, _, err := ipExecVerbose("", "route list")
+	if err != nil {
+		return "", err
+	}
+
+	matches := regexp.MustCompile("default .* dev (.*)").FindSubmatch(stdout)
+	if len(matches) < 2 {
+		return "", errors.New("no default route")
+	}
+
+	return strings.TrimSpace(string(matches[1])), nil
 }
 
 // The addRoute function adds a new route to the given namespace.
