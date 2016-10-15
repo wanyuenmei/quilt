@@ -26,7 +26,7 @@ func runMinionSync(conn db.Conn, store Store) {
 func readMinion(conn db.Conn, store Store) {
 	tree, err := store.GetTree("/minion/nodes")
 	if err != nil {
-		log.WithError(err).Warning("Failed to get minions form Etcd.")
+		log.WithError(err).Warning("Failed to get minions from Etcd.")
 		return
 	}
 
