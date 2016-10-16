@@ -8,6 +8,7 @@ import (
 
 	"github.com/NetSys/quilt/constants"
 	"github.com/NetSys/quilt/db"
+	"github.com/NetSys/quilt/join"
 	"github.com/NetSys/quilt/stitch"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -504,95 +505,44 @@ func (clst *amazonCluster) SetACLs(acls []string) error {
 			return err
 		}
 
-		permMap := make(map[string]bool)
-		for _, acl := range acls {
-			permMap[acl] = true
-		}
+		rangesToAdd, foundGroup, rulesToRemove := syncACLs(acls, groupID, ingress)
 
-		groupIngressExists := false
-		for i, p := range ingress {
-			if (i > 0 || p.FromPort != nil || p.ToPort != nil ||
-				*p.IpProtocol != "-1") && p.UserIdGroupPairs == nil {
-				log.Debug("Amazon: Revoke ingress security group: ", *p)
-				_, err = session.RevokeSecurityGroupIngress(
-					&ec2.RevokeSecurityGroupIngressInput{
-						GroupName: aws.String(
-							clst.namespace),
-						IpPermissions: []*ec2.IpPermission{p}})
-				if err != nil {
-					return err
-				}
-
-				continue
-			}
-
-			for _, ipr := range p.IpRanges {
-				ip := *ipr.CidrIp
-				if !permMap[ip] {
-					log.Debug("Amazon: Revoke "+
-						"ingress security group: ", ip)
-					_, err = session.RevokeSecurityGroupIngress(
-						&ec2.RevokeSecurityGroupIngressInput{
-							GroupName: aws.String(
-								clst.namespace),
-							CidrIp:     aws.String(ip),
-							FromPort:   p.FromPort,
-							IpProtocol: p.IpProtocol,
-							ToPort:     p.ToPort})
-					if err != nil {
-						return err
-					}
-				} else {
-					permMap[ip] = false
-				}
-			}
-
-			for _, grp := range p.UserIdGroupPairs {
-				if *grp.GroupId != groupID {
-					log.Debug("Amazon: Revoke "+
-						"ingress security group GroupID: ",
-						*grp.GroupId)
-					options := &ec2.RevokeSecurityGroupIngressInput{
-						GroupName: aws.String(
-							clst.namespace),
-						SourceSecurityGroupName: grp.GroupName,
-					}
-					_, err = session.RevokeSecurityGroupIngress(
-						options)
-					if err != nil {
-						return err
-					}
-				} else {
-					groupIngressExists = true
-				}
-			}
-		}
-
-		if !groupIngressExists {
-			log.Debug("Amazon: Add intragroup ACL")
+		if len(rangesToAdd) != 0 {
+			logACLs(true, rangesToAdd)
 			_, err = session.AuthorizeSecurityGroupIngress(
 				&ec2.AuthorizeSecurityGroupIngressInput{
-					GroupName: aws.String(
-						clst.namespace),
-					SourceSecurityGroupName: aws.String(
-						clst.namespace)})
+					GroupName:     aws.String(clst.namespace),
+					IpPermissions: rangesToAdd,
+				},
+			)
 			if err != nil {
 				return err
 			}
 		}
 
-		for perm, install := range permMap {
-			if !install {
-				continue
-			}
-
-			log.Debug("Amazon: Add ACL: ", perm)
+		if !foundGroup {
+			log.WithField("Group", clst.namespace).Debug("Amazon: Add group")
 			_, err = session.AuthorizeSecurityGroupIngress(
 				&ec2.AuthorizeSecurityGroupIngressInput{
-					CidrIp:     aws.String(perm),
-					GroupName:  aws.String(clst.namespace),
-					IpProtocol: aws.String("-1")})
+					GroupName: aws.String(
+						clst.namespace),
+					SourceSecurityGroupName: aws.String(
+						clst.namespace),
+				},
+			)
+			if err != nil {
+				return err
+			}
+		}
 
+		if len(rulesToRemove) != 0 {
+			logACLs(false, rulesToRemove)
+			_, err = session.RevokeSecurityGroupIngress(
+				&ec2.RevokeSecurityGroupIngressInput{
+					GroupName:     aws.String(clst.namespace),
+					IpPermissions: rulesToRemove,
+				},
+			)
 			if err != nil {
 				return err
 			}
@@ -600,4 +550,103 @@ func (clst *amazonCluster) SetACLs(acls []string) error {
 	}
 
 	return nil
+}
+
+// syncACLs returns the permissions that need to be removed and added in order
+// for the cloud ACLs to match the policy.
+// rangesToAdd is guaranteed to always have exactly one item in the IpRanges slice.
+func syncACLs(desiredACLs []string, desiredGroupID string,
+	current []*ec2.IpPermission) (rangesToAdd []*ec2.IpPermission, foundGroup bool,
+	toRemove []*ec2.IpPermission) {
+
+	var currRangeRules []*ec2.IpPermission
+	for _, perm := range current {
+		for _, ipRange := range perm.IpRanges {
+			currRangeRules = append(currRangeRules, &ec2.IpPermission{
+				IpProtocol: perm.IpProtocol,
+				FromPort:   perm.FromPort,
+				ToPort:     perm.ToPort,
+				IpRanges: []*ec2.IpRange{
+					ipRange,
+				},
+			})
+		}
+		for _, pair := range perm.UserIdGroupPairs {
+			if *pair.GroupId != desiredGroupID {
+				toRemove = append(toRemove, &ec2.IpPermission{
+					UserIdGroupPairs: []*ec2.UserIdGroupPair{
+						pair,
+					},
+				})
+			} else {
+				foundGroup = true
+			}
+		}
+	}
+
+	var desiredRangeRules []*ec2.IpPermission
+	for _, acl := range desiredACLs {
+		desiredRangeRules = append(desiredRangeRules, &ec2.IpPermission{
+			IpRanges: []*ec2.IpRange{
+				{
+					CidrIp: aws.String(acl),
+				},
+			},
+			IpProtocol: aws.String("-1"),
+		})
+	}
+
+	_, toAdd, rangesToRemove := join.HashJoin(ipPermSlice(desiredRangeRules),
+		ipPermSlice(currRangeRules), permToACLKey, permToACLKey)
+	for _, intf := range toAdd {
+		rangesToAdd = append(rangesToAdd, intf.(*ec2.IpPermission))
+	}
+	for _, intf := range rangesToRemove {
+		toRemove = append(toRemove, intf.(*ec2.IpPermission))
+	}
+
+	return rangesToAdd, foundGroup, toRemove
+}
+
+func logACLs(add bool, perms []*ec2.IpPermission) {
+	action := "Remove"
+	if add {
+		action = "Add"
+	}
+
+	for _, perm := range perms {
+		if len(perm.IpRanges) != 0 {
+			log.WithField("CidrIp",
+				*perm.IpRanges[0].CidrIp).
+				Debugf("Amazon: %s ACL", action)
+		} else {
+			log.WithField("Group",
+				*perm.UserIdGroupPairs[0].GroupName).
+				Debugf("Amazon: %s group", action)
+		}
+	}
+}
+
+type ipPermissionKey struct {
+	protocol string
+	ipRange  string
+}
+
+func permToACLKey(permIntf interface{}) interface{} {
+	perm := permIntf.(*ec2.IpPermission)
+
+	return ipPermissionKey{
+		protocol: resolveString(perm.IpProtocol),
+		ipRange:  resolveString(perm.IpRanges[0].CidrIp),
+	}
+}
+
+type ipPermSlice []*ec2.IpPermission
+
+func (slc ipPermSlice) Get(ii int) interface{} {
+	return slc[ii]
+}
+
+func (slc ipPermSlice) Len() int {
+	return len(slc)
 }

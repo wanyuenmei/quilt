@@ -160,11 +160,6 @@ func TestNewACLs(t *testing.T) {
 							},
 							IpProtocol: aws.String("-1"),
 						},
-						{
-							// An extra permission group:
-							// Should be deleted.
-							IpProtocol: aws.String("0"),
-						},
 					},
 					GroupId: aws.String(""),
 				},
@@ -196,9 +191,17 @@ func TestNewACLs(t *testing.T) {
 
 	mockClient.AssertCalled(t, "AuthorizeSecurityGroupIngress",
 		&ec2.AuthorizeSecurityGroupIngressInput{
-			CidrIp:     aws.String("bar"),
-			GroupName:  aws.String(testNamespace),
-			IpProtocol: aws.String("-1"),
+			GroupName: aws.String(testNamespace),
+			IpPermissions: []*ec2.IpPermission{
+				{
+					IpRanges: []*ec2.IpRange{
+						{
+							CidrIp: aws.String("bar"),
+						},
+					},
+					IpProtocol: aws.String("-1"),
+				},
+			},
 		},
 	)
 
@@ -207,17 +210,14 @@ func TestNewACLs(t *testing.T) {
 			GroupName: aws.String(testNamespace),
 			IpPermissions: []*ec2.IpPermission{
 				{
-					IpProtocol: aws.String("0"),
+					IpRanges: []*ec2.IpRange{
+						{
+							CidrIp: aws.String("deleteMe"),
+						},
+					},
+					IpProtocol: aws.String("-1"),
 				},
 			},
-		},
-	)
-
-	mockClient.AssertCalled(t, "RevokeSecurityGroupIngress",
-		&ec2.RevokeSecurityGroupIngressInput{
-			GroupName:  aws.String(testNamespace),
-			CidrIp:     aws.String("deleteMe"),
-			IpProtocol: aws.String("-1"),
 		},
 	)
 }
