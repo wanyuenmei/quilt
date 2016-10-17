@@ -29,7 +29,8 @@ func TestSyncIPs(t *testing.T) {
 		"c": "",
 	}
 
-	Sync(ipMap, prefix)
+	mask := net.CIDRMask(20, 32)
+	Sync(ipMap, prefix, mask)
 
 	// 10.0.0.1 is reserved for the default gateway
 	exp := sliceToSet([]string{"10.0.0.0", "10.0.0.2", "10.0.0.3"})
@@ -46,7 +47,7 @@ func TestSyncIPs(t *testing.T) {
 
 	ipMap["a"] = "junk"
 
-	Sync(ipMap, prefix)
+	Sync(ipMap, prefix, mask)
 
 	aIP := ipMap["a"]
 	expected := "10.0.0.4"
@@ -62,7 +63,7 @@ func TestSyncIPs(t *testing.T) {
 
 	ipMap["b"] = "junk"
 
-	Sync(ipMap, prefix)
+	Sync(ipMap, prefix, mask)
 
 	if ip, _ := ipMap["b"]; ip != "" {
 		t.Error(spew.Sprintf("Expected IP deletion, found %s", ip))
@@ -70,45 +71,63 @@ func TestSyncIPs(t *testing.T) {
 }
 
 func TestParseIP(t *testing.T) {
-	res := Parse("1.0.0.0", 0x01000000, 0xff000000)
-	if res != 0x01000000 {
-		t.Errorf("Parse expected 0x%x, got 0x%x", 0x01000000, res)
+	expected := net.IPv4(0x01, 0, 0, 0)
+	mask := net.CIDRMask(8, 32)
+	res := Parse("1.0.0.0", expected, mask)
+	if !res.Equal(expected) {
+		t.Errorf("parseIP expected 0x%x, got 0x%x", 0x01000000, res)
 	}
 
-	res = Parse("2.0.0.1", 0x01000000, 0xff000000)
-	if res != 0 {
-		t.Errorf("Parse expected 0x%x, got 0x%x", 0, res)
+	res = Parse("2.0.0.1", expected, mask)
+	if !res.Equal(net.IPv4zero) {
+		t.Errorf("parseIP expected 0x%x, got 0x%x", 0, res)
 	}
 
-	res = Parse("a", 0x01000000, 0xff000000)
-	if res != 0 {
-		t.Errorf("Parse expected 0x%x, got 0x%x", 0, res)
+	res = Parse("a", expected, mask)
+	if !res.Equal(net.IPv4zero) {
+		t.Errorf("parseIP expected 0x%x, got 0x%x", 0, res)
+	}
+}
+
+func TestMaskToInt(t *testing.T) {
+	mask := net.CIDRMask(16, 32)
+	if MaskToInt(mask) != 0xffff0000 {
+		t.Fatalf("Wrong mask int, expected 0xffff0000, got %x", MaskToInt(mask))
+	}
+
+	mask = net.CIDRMask(19, 32)
+	if MaskToInt(mask) != 0xffffe000 {
+		t.Fatalf("Wrong mask int, expected 0xffffe000, got %x", MaskToInt(mask))
+	}
+
+	mask = net.CIDRMask(32, 32)
+	if MaskToInt(mask) != 0xffffffff {
+		t.Fatalf("Wrong mask int, expected 0xffffffff, got %x", MaskToInt(mask))
 	}
 }
 
 func TestRandomIP(t *testing.T) {
-	prefix := uint32(0xaabbccdd)
-	mask := uint32(0xfffff000)
-
-	conflicts := map[uint32]struct{}{}
+	prefix := net.IPv4(0xaa, 0xbb, 0xcc, 0xdd)
+	mask := net.CIDRMask(20, 32)
+	conflicts := map[string]struct{}{}
 
 	// Only 4k IPs, in 0xfff00000. Guaranteed a collision
 	for i := 0; i < 5000; i++ {
-		ip := randomIP(conflicts, prefix, mask)
-		if ip == 0 {
+		ip := Random(conflicts, prefix, mask)
+		if ip.Equal(net.IPv4zero) {
 			continue
 		}
 
-		if _, ok := conflicts[ip]; ok {
+		if _, ok := conflicts[ip.String()]; ok {
 			t.Fatalf("IP Double allocation: 0x%x", ip)
 		}
 
-		if prefix&mask != ip&mask {
-			t.Fatalf("Bad IP allocation: 0x%x & 0x%x != 0x%x",
-				ip, mask, prefix&mask)
+		if !prefix.Mask(mask).Equal(ip.Mask(mask)) {
+			t.Fatalf("Bad IP allocation: %v & %v != %v",
+				ip, mask, prefix.Mask(mask))
 		}
 
-		conflicts[ip] = struct{}{}
+		conflicts[ip.String()] = struct{}{}
 	}
 
 	if len(conflicts) < 2500 || len(conflicts) > 4096 {
