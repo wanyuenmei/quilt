@@ -1,17 +1,14 @@
 package etcd
 
 import (
-	"encoding/binary"
 	"encoding/json"
-	"fmt"
-	"math/rand"
 	"net"
 	"sort"
 	"time"
 
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/join"
-	"github.com/NetSys/quilt/minion/network"
+	"github.com/NetSys/quilt/minion/ip"
 	"github.com/NetSys/quilt/util"
 
 	log "github.com/Sirupsen/logrus"
@@ -23,10 +20,6 @@ const (
 	labelToIPStore = minionDir + "/labelIP"
 	containerStore = minionDir + "/container"
 )
-
-// We store rand.Uint32() in a variable so it's easily mocked out by the unit tests.
-// Nondeterminism is hard to test.
-var rand32 = rand.Uint32
 
 // Keeping all the store data types in a struct makes it much less verbose to pass them
 // around while operating on them
@@ -209,7 +202,7 @@ func updateContainerIPs(etcdData storeData,
 		newIPMap[string(dbc.StitchID)] = sdc.IP
 	}
 
-	syncIPs(newIPMap, net.IPv4(10, 0, 0, 0))
+	ip.Sync(newIPMap, net.IPv4(10, 0, 0, 0))
 	for i := range dbContainers {
 		dbContainers[i].IP = newIPMap[string(dbContainers[i].StitchID)]
 	}
@@ -250,7 +243,7 @@ func updateEtcdLabel(s Store, etcdData storeData, containers []db.Container) (st
 
 	// No need to sync the SingleHost IPs, since they get their IPs from the dockerIP
 	// map, which was already synced in updateEtcdDocker
-	syncIPs(newMultiHosts, net.IPv4(10, 1, 0, 0))
+	ip.Sync(newMultiHosts, net.IPv4(10, 1, 0, 0))
 
 	if util.StrStrMapEqual(newMultiHosts, etcdData.multiHost) {
 		return etcdData, nil
@@ -272,10 +265,10 @@ func updateLeaderDBC(view db.Database, dbcs []db.Container, etcdData storeData) 
 	}
 
 	for _, dbc := range dbcs {
-		ip := ipMap[dbc.StitchID]
-		mac := macFromIP(ip)
-		if dbc.IP != ip || dbc.Mac != mac {
-			dbc.IP = ip
+		ipAddr := ipMap[dbc.StitchID]
+		mac := ip.ToMac(ipAddr)
+		if dbc.IP != ipAddr || dbc.Mac != mac {
+			dbc.IP = ipAddr
 			dbc.Mac = mac
 			view.Commit(dbc)
 		}
@@ -328,7 +321,7 @@ func updateWorkerDBC(view db.Database, self db.Minion, etcdData storeData) {
 		dbc.Env = etcdc.Env
 		dbc.Labels = etcdc.Labels
 		dbc.IP = etcdc.IP
-		dbc.Mac = macFromIP(dbc.IP)
+		dbc.Mac = ip.ToMac(dbc.IP)
 
 		view.Commit(dbc)
 	}
@@ -406,78 +399,6 @@ func containerJoinScore(left, right storeContainer) int {
 		score++
 	}
 	return score
-}
-
-// syncIPs takes a map of IDs to IPs and creates an IP address for every entry that's
-// missing one.
-func syncIPs(ipMap map[string]string, prefixIP net.IP) {
-	prefix := binary.BigEndian.Uint32(prefixIP.To4())
-	mask := uint32(0xffff0000)
-
-	var unassigned []string
-	ipSet := map[uint32]struct{}{}
-	for k, ipString := range ipMap {
-		ip := parseIP(ipString, prefix, mask)
-		if ip != 0 {
-			ipSet[ip] = struct{}{}
-		} else {
-			unassigned = append(unassigned, k)
-		}
-	}
-
-	// Don't assign the IP of the default gateway
-	ipSet[parseIP(network.GatewayIP, prefix, mask)] = struct{}{}
-	for _, k := range unassigned {
-		ip32 := randomIP(ipSet, prefix, mask)
-		if ip32 == 0 {
-			log.Errorf("Failed to allocate IP for %s.", k)
-			ipMap[k] = ""
-			continue
-		}
-
-		b := make([]byte, 4)
-		binary.BigEndian.PutUint32(b, ip32)
-
-		ipMap[k] = net.IP(b).String()
-		ipSet[ip32] = struct{}{}
-	}
-}
-
-func parseIP(ipStr string, prefix, mask uint32) uint32 {
-	ip := net.ParseIP(ipStr).To4()
-	if ip == nil {
-		return 0
-	}
-
-	ip32 := binary.BigEndian.Uint32(ip)
-	if ip32&mask != prefix {
-		return 0
-	}
-
-	return ip32
-}
-
-// Choose a random IP address in prefix/mask that isn't in 'conflicts'.
-// Returns 0 on failure.
-func randomIP(conflicts map[uint32]struct{}, prefix, mask uint32) uint32 {
-	for i := 0; i < 256; i++ {
-		ip32 := (rand32() & ^mask) | (prefix & mask)
-		if _, ok := conflicts[ip32]; !ok {
-			return ip32
-		}
-	}
-
-	return 0
-}
-
-func macFromIP(ipStr string) string {
-	parsedIP := net.ParseIP(ipStr)
-	if parsedIP == nil {
-		return ""
-	}
-
-	ip := parsedIP.To4()
-	return fmt.Sprintf("02:00:%02x:%02x:%02x:%02x", ip[0], ip[1], ip[2], ip[3])
 }
 
 func (cs storeContainerSlice) Len() int {
