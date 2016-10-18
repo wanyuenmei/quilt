@@ -30,12 +30,15 @@ func UpdatePolicy(conn db.Conn, stitch stitch.Stitch) error {
 }
 
 func updateTxn(view db.Database, stitch stitch.Stitch) error {
-	err := clusterTxn(view, stitch)
-	if err != nil {
+	if err := clusterTxn(view, stitch); err != nil {
 		return err
 	}
 
-	if err = machineTxn(view, stitch); err != nil {
+	if err := machineTxn(view, stitch); err != nil {
+		return err
+	}
+
+	if err := aclTxn(view, stitch); err != nil {
 		return err
 	}
 
@@ -57,8 +60,19 @@ func clusterTxn(view db.Database, stitch stitch.Stitch) error {
 
 	cluster.Namespace = namespace
 	cluster.Spec = stitch.String()
-	cluster.AdminACLs = resolveACLs(stitch.QueryAdminACL())
 	view.Commit(cluster)
+	return nil
+}
+
+func aclTxn(view db.Database, specHandle stitch.Stitch) error {
+	aclRow, err := view.GetACL()
+	if err != nil {
+		aclRow = view.InsertACL()
+	}
+
+	aclRow.Admin = resolveACLs(specHandle.QueryAdminACL())
+
+	view.Commit(aclRow)
 	return nil
 }
 

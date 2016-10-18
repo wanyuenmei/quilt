@@ -54,8 +54,9 @@ func Run(conn db.Conn) {
 
 func newCluster(conn db.Conn, namespace string) *cluster {
 	clst := &cluster{
-		conn:      conn,
-		trigger:   conn.TriggerTick(30, db.ClusterTable, db.MachineTable),
+		conn: conn,
+		trigger: conn.TriggerTick(30, db.ClusterTable, db.MachineTable,
+			db.ACLTable),
 		fm:        createForeman(conn),
 		namespace: namespace,
 		providers: make(map[db.Provider]provider.Provider),
@@ -168,8 +169,8 @@ func (clst cluster) sync() {
 	var machines []db.Machine
 	clst.conn.Transact(func(view db.Database) error {
 		machines = view.SelectFromMachine(nil)
-		dbCluster, _ := view.GetCluster()
-		adminACLs = dbCluster.AdminACLs
+		aclRow, _ := view.GetACL()
+		adminACLs = aclRow.Admin
 		return nil
 	})
 	clst.syncACLs(adminACLs, machines)

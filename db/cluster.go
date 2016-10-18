@@ -2,7 +2,6 @@ package db
 
 import (
 	"errors"
-	"fmt"
 	"log"
 )
 
@@ -11,10 +10,7 @@ type Cluster struct {
 	ID int
 
 	Namespace string // Cloud Provider Namespace
-	Spec      string
-
-	/* XXX: These belong in a separate administration table of some sort. */
-	AdminACLs []string
+	Spec      string `rowStringer:"omit"`
 }
 
 // InsertCluster creates a new Cluster and interts it into 'db'.
@@ -57,7 +53,7 @@ func (c Cluster) tt() TableType {
 }
 
 func (c Cluster) String() string {
-	return fmt.Sprintf("Cluster-%d{%s, ACL: %s}", c.ID, c.Namespace, c.AdminACLs)
+	return defaultString(c)
 }
 
 func (c Cluster) less(r row) bool {

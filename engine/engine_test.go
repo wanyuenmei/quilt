@@ -28,7 +28,7 @@ func TestEngine(t *testing.T) {
 
 	UpdatePolicy(conn, prog(t, code))
 	err := conn.Transact(func(view db.Database) error {
-		cluster, err := view.GetCluster()
+		acl, err := view.GetACL()
 		masters := view.SelectFromMachine(func(m db.Machine) bool {
 			return m.Role == db.Master
 		})
@@ -38,8 +38,8 @@ func TestEngine(t *testing.T) {
 
 		if err != nil {
 			return err
-		} else if len(cluster.AdminACLs) != 1 {
-			return fmt.Errorf("bad cluster: %s", spew.Sdump(cluster))
+		} else if len(acl.Admin) != 1 {
+			return fmt.Errorf("bad acls: %s", spew.Sdump(acl))
 		}
 
 		if len(masters) != 2 {
@@ -429,16 +429,16 @@ func TestACLs(t *testing.T) {
 	}
 	UpdatePolicy(conn, prog(t, code))
 	err := conn.Transact(func(view db.Database) error {
-		cluster, err := view.GetCluster()
+		acl, err := view.GetACL()
 
 		if err != nil {
 			return err
 		}
 
-		if !reflect.DeepEqual(cluster.AdminACLs,
+		if !reflect.DeepEqual(acl.Admin,
 			[]string{"1.2.3.4/32", "5.6.7.8/32"}) {
 			return fmt.Errorf("bad ACLs: %s",
-				spew.Sdump(cluster.AdminACLs))
+				spew.Sdump(acl.Admin))
 		}
 
 		return nil
@@ -452,15 +452,15 @@ func TestACLs(t *testing.T) {
 	}
 	UpdatePolicy(conn, prog(t, code))
 	err = conn.Transact(func(view db.Database) error {
-		cluster, err := view.GetCluster()
+		acl, err := view.GetACL()
 
 		if err != nil {
 			return err
 		}
 
-		if !reflect.DeepEqual(cluster.AdminACLs, []string{"1.2.3.4/32"}) {
+		if !reflect.DeepEqual(acl.Admin, []string{"1.2.3.4/32"}) {
 			return fmt.Errorf("bad ACLs: %s",
-				spew.Sdump(cluster.AdminACLs))
+				spew.Sdump(acl.Admin))
 		}
 
 		return nil
