@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -180,9 +179,9 @@ func updateNamespace(specfile string, namespace string) error {
 		return err
 	}
 
-	defNamespace := fmt.Sprintf(`(define Namespace "%s")`, namespace)
-	defRe := regexp.MustCompile(`(?m)^.*\(define Namespace.*$`)
-	updatedSpec := defRe.ReplaceAllString(string(specContents), defNamespace)
+	// Set the namespace of the global deployment to be `namespace`.
+	updatedSpec := specContents +
+		fmt.Sprintf("; deployment.namespace = %q;", namespace)
 
 	return overwrite(specfile, updatedSpec)
 }

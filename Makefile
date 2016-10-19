@@ -6,7 +6,8 @@ LINE_LENGTH_EXCLUDE=./constants/awsConstants.go \
 		    ./cluster/provider/cloud_config.go \
 		    ./minion/network/link_test.go \
 		    ./minion/pb/pb.pb.go \
-		    ./api/pb/pb.pb.go
+		    ./api/pb/pb.pb.go \
+		    ./stitch/bindings.js.go \
 
 REPO = quilt
 DOCKER = docker

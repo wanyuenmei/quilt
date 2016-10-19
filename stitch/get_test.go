@@ -93,15 +93,15 @@ func (mr *mockRepo) root() string {
 func TestImportExists(t *testing.T) {
 	util.AppFs = afero.NewMemMapFs()
 
-	util.WriteFile("test.spec", []byte(`(import "existingImport")`), 0644)
-	util.WriteFile("existingImport.spec", []byte("(define dummy 1)"), 0644)
+	util.WriteFile("test.js", []byte(`require("existingImport")`), 0644)
+	util.WriteFile("existingImport.js", []byte(""), 0644)
 
 	logger := newRepoLogger()
 	getter := ImportGetter{
 		Path:        ".",
 		repoFactory: logger.newRepoFactory(nil),
 	}
-	if err := getter.checkSpec("test.spec", nil, nil); err != nil {
+	if err := getter.checkSpec("test.js", nil, nil); err != nil {
 		t.Error(err)
 		return
 	}
@@ -115,7 +115,7 @@ func TestAutoDownload(t *testing.T) {
 
 	repoName := "autodownload"
 	importPath := filepath.Join(repoName, "foo")
-	util.WriteFile("test.spec", []byte(fmt.Sprintf("(import %q)", importPath)), 0644)
+	util.WriteFile("test.js", []byte(fmt.Sprintf("require(%q);", importPath)), 0644)
 
 	logger := newRepoLogger()
 	getter := ImportGetter{
@@ -123,8 +123,9 @@ func TestAutoDownload(t *testing.T) {
 		repoFactory: logger.newRepoFactory(nil),
 	}
 
-	expErr := fmt.Sprintf("unable to open import %[1]s (path=%[1]s.spec)", importPath)
-	err := getter.checkSpec("test.spec", nil, nil)
+	expErr := fmt.Sprintf("StitchError: unable to open import %[1]s (path=%[1]s.js)",
+		importPath)
+	err := getter.checkSpec("test.js", nil, nil)
 	if err == nil || err.Error() != expErr {
 		t.Errorf("Wrong error, expected %q, got %v", expErr, err)
 		return
@@ -178,13 +179,13 @@ func TestGetWalk(t *testing.T) {
 		repoFactory: logger.newRepoFactory(map[string][]file{
 			importOne: {
 				{
-					name:     "foo.spec",
-					contents: fmt.Sprintf("(import %q)", importTwo),
+					name:     "foo.js",
+					contents: fmt.Sprintf("require(%q);", importTwo),
 				},
 			},
 			importTwo: {
 				{
-					name: fmt.Sprintf("%s.spec", fileTwo),
+					name: fmt.Sprintf("%s.js", fileTwo),
 				},
 			},
 		}),

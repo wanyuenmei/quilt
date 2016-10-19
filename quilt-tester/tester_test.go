@@ -80,18 +80,18 @@ func TestUpdateNamespace(t *testing.T) {
 	appFs = afero.NewMemMapFs()
 
 	specPath := "/test.spec"
-	err := overwrite(specPath, `(import "spark")
-(define Namespace "replace")
-(machine)`)
+	err := overwrite(specPath, `require("spark");
+var deployment = createDeployment({namespace: "replace"});
+deployment.deploy(new Machine({}));`)
 	if err != nil {
 		t.Errorf("Unexpected error: %s", err.Error())
 	}
 	updateNamespace(specPath, "test-namespace")
 
 	res, err := fileContents(specPath)
-	exp := `(import "spark")
-(define Namespace "test-namespace")
-(machine)`
+	exp := `require("spark");
+var deployment = createDeployment({namespace: "replace"});
+deployment.deploy(new Machine({}));; deployment.namespace = "test-namespace";`
 	if err != nil {
 		t.Errorf("Unexpected error: %s", err.Error())
 		return

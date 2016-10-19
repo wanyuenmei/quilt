@@ -20,7 +20,7 @@ const (
 	testRoot           = "/tests"
 	quiltPath          = "/.quilt"
 	infrastructureSpec = quiltPath + "/github.com/NetSys/quilt/quilt-tester/" +
-		"config/infrastructure.spec"
+		"config/infrastructure-runner.js"
 	slackEndpoint = "https://hooks.slack.com/services/T04Q3TL41/B0M25TWP5/" +
 		"soKJeP5HbWcjkUJzEHh7ylYm"
 	testerImport = "github.com/NetSys/quilt"
@@ -107,7 +107,7 @@ func (t *tester) generateTestSuites(testRoot string) error {
 		for _, file := range files {
 			path := filepath.Join(testSuiteFolder, file.Name())
 			switch {
-			case strings.HasSuffix(file.Name(), ".spec"):
+			case strings.HasSuffix(file.Name(), ".js"):
 				spec = path
 				if err := updateNamespace(spec, namespace); err != nil {
 					l.infoln(fmt.Sprintf(
@@ -319,10 +319,10 @@ func (ts *testSuite) run(machines []db.Machine) error {
 	l := log.testerLogger
 
 	l.infoln(fmt.Sprintf("Test Suite: %s", ts.name))
-	l.infoln("Start " + ts.name + ".spec")
+	l.infoln("Start " + ts.name + ".js")
 	contents, _ := fileContents(ts.spec)
 	l.println(contents)
-	l.infoln("End " + ts.name + ".spec")
+	l.infoln("End " + ts.name + ".js")
 
 	runSpec(ts.spec)
 

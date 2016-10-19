@@ -4,19 +4,18 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+
+	"github.com/robertkrimen/otto"
 )
 
-type key interface {
-	keys() ([]string, error)
-
-	ast
-}
+// HTTPGet is the function used to make the HTTP GET request for the GitHub keys.
+// Exported so that we can run specs in tests without actually interacting
+// with the network.
+var HTTPGet = http.Get
 
 var githubCache = make(map[string][]string)
-var httpGet = http.Get
 
-func (githubKey astGithubKey) keys() ([]string, error) {
-	username := string(githubKey)
+func githubKeys(username string) ([]string, error) {
 	if keys, ok := githubCache[username]; ok {
 		return keys, nil
 	}
@@ -28,12 +27,8 @@ func (githubKey astGithubKey) keys() ([]string, error) {
 	return keys, nil
 }
 
-func (plaintextKey astPlaintextKey) keys() ([]string, error) {
-	return []string{string(plaintextKey)}, nil
-}
-
 func getGithubKeys(keyURL string) ([]string, error) {
-	res, err := httpGet(keyURL)
+	res, err := HTTPGet(keyURL)
 	if err != nil {
 		return nil, err
 	}
@@ -45,4 +40,28 @@ func getGithubKeys(keyURL string) ([]string, error) {
 	keys := strings.TrimSpace(string(keyBytes))
 	keyStrings := strings.Split(keys, "\n")
 	return keyStrings, nil
+}
+
+func githubKeysImpl(call otto.FunctionCall) (otto.Value, error) {
+	if len(call.ArgumentList) < 1 {
+		panic(call.Otto.MakeRangeError(
+			"githubKeys requires the username as an argument"))
+	}
+
+	username, err := call.Argument(0).ToString()
+	if err != nil {
+		return otto.Value{}, err
+	}
+
+	keys, err := githubKeys(username)
+	if err != nil {
+		return otto.Value{}, err
+	}
+
+	keysVal, err := call.Otto.ToValue(keys)
+	if err != nil {
+		return otto.Value{}, err
+	}
+
+	return keysVal, nil
 }

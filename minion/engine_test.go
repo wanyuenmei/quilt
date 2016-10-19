@@ -3,9 +3,7 @@ package minion
 import (
 	"fmt"
 	"reflect"
-	"strings"
 	"testing"
-	"text/scanner"
 	"time"
 
 	"github.com/NetSys/quilt/db"
@@ -28,7 +26,9 @@ func TestContainerTxn(t *testing.T) {
 		t.Error("Unexpected Database Change")
 	}
 
-	spec = `(label "a" (docker "alpine" "tail"))`
+	spec = `deployment.deploy(
+		new Service("a", [new Container("alpine", ["tail"])])
+	)`
 	if err := testContainerTxn(conn, spec); err != "" {
 		t.Error(err)
 	}
@@ -43,8 +43,11 @@ func TestContainerTxn(t *testing.T) {
 		t.Error("Unexpected Database Change")
 	}
 
-	spec = `(label "b" (docker "alpine" "tail"))
-		 (label "a" "b" (docker "alpine" "tail"))`
+	spec = `var b = new Container("alpine", ["tail"]);
+	deployment.deploy([
+		new Service("b", [b]),
+		new Service("a", [b, new Container("alpine", ["tail"])])
+	]);`
 	if err := testContainerTxn(conn, spec); err != "" {
 		t.Error(err)
 	}
@@ -52,8 +55,12 @@ func TestContainerTxn(t *testing.T) {
 		t.Error("Expected Database Change")
 	}
 
-	spec = `(label "b" (docker "alpine" "cat"))
-		 (label "a" "b" (docker "ubuntu" "tail"))`
+	spec = `var b = new Service("b", [new Container("alpine", ["cat"])]);
+	deployment.deploy([
+		b,
+		new Service("a",
+			b.containers.concat([new Container("alpine", ["tail"])])),
+	]);`
 	if err := testContainerTxn(conn, spec); err != "" {
 		t.Error(err)
 	}
@@ -61,8 +68,12 @@ func TestContainerTxn(t *testing.T) {
 		t.Error("Expected Database Change")
 	}
 
-	spec = `(label "b" (docker "ubuntu" "cat"))
-		 (label "a" "b" (docker "alpine" "tail"))`
+	spec = `var b = new Service("b", [new Container("ubuntu", ["cat"])]);
+	deployment.deploy([
+		b,
+		new Service("a",
+			b.containers.concat([new Container("alpine", ["tail"])])),
+	]);`
 	if err := testContainerTxn(conn, spec); err != "" {
 		t.Error(err)
 	}
@@ -70,7 +81,12 @@ func TestContainerTxn(t *testing.T) {
 		t.Error("Expected Database Change")
 	}
 
-	spec = `(label "a" (makeList 2 (docker "alpine" "cat")))`
+	spec = `deployment.deploy(
+		new Service("a", [
+			new Container("alpine", ["cat"]),
+			new Container("alpine", ["cat"])
+		])
+	);`
 	if err := testContainerTxn(conn, spec); err != "" {
 		t.Error(err)
 	}
@@ -78,7 +94,9 @@ func TestContainerTxn(t *testing.T) {
 		t.Error("Expected Database Change")
 	}
 
-	spec = `(label "a" (docker "alpine"))`
+	spec = `deployment.deploy(
+		new Service("a", [new Container("alpine")])
+	)`
 	if err := testContainerTxn(conn, spec); err != "" {
 		t.Error(err)
 	}
@@ -86,9 +104,13 @@ func TestContainerTxn(t *testing.T) {
 		t.Error("Expected Database Change")
 	}
 
-	spec = `(label "b" (docker "alpine"))
-	        (label "c" (docker "alpine"))
-	        (label "a" "b" "c")`
+	spec = `var b = new Service("b", [new Container("alpine")]);
+	var c = new Service("c", [new Container("alpine")]);
+	deployment.deploy([
+		b,
+		c,
+		new Service("a", b.containers.concat(c.containers)),
+	])`
 	if err := testContainerTxn(conn, spec); err != "" {
 		t.Error(err)
 	}
@@ -112,13 +134,7 @@ func testContainerTxn(conn db.Conn, spec string) string {
 		return nil
 	})
 
-	var sc scanner.Scanner
-	compiledStr, err := stitch.Compile(*sc.Init(strings.NewReader(spec)),
-		stitch.DefaultImportGetter)
-	if err != nil {
-		return err.Error()
-	}
-	compiled, err := stitch.New(compiledStr)
+	compiled, err := stitch.New(spec, stitch.DefaultImportGetter)
 	if err != nil {
 		return err.Error()
 	}
@@ -152,6 +168,11 @@ func TestConnectionTxn(t *testing.T) {
 	conn := db.New()
 	trigg := conn.Trigger(db.ConnectionTable).C
 
+	pre := `var a = new Service("a", [new Container("alpine")]);
+	var b = new Service("b", [new Container("alpine")]);
+	var c = new Service("c", [new Container("alpine")]);
+	deployment.deploy([a, b, c]);`
+
 	spec := ""
 	if err := testConnectionTxn(conn, spec); err != "" {
 		t.Error(err)
@@ -160,8 +181,7 @@ func TestConnectionTxn(t *testing.T) {
 		t.Error("Unexpected Database Change")
 	}
 
-	spec = `(label "a" (docker "alpine"))
-	        (connect 80 "a" "a")`
+	spec = pre + `a.connect(80, a);`
 	if err := testConnectionTxn(conn, spec); err != "" {
 		t.Error(err)
 	}
@@ -175,8 +195,7 @@ func TestConnectionTxn(t *testing.T) {
 		t.Error("Unexpected Database Change")
 	}
 
-	spec = `(label "a" (docker "alpine"))
-	        (connect 90 "a" "a")`
+	spec = pre + `a.connect(90, a);`
 	if err := testConnectionTxn(conn, spec); err != "" {
 		t.Error(err)
 	}
@@ -190,12 +209,10 @@ func TestConnectionTxn(t *testing.T) {
 		t.Error("Unexpected Database Change")
 	}
 
-	spec = `(label "a" (docker "alpine"))
-                (label "b" (docker "alpine"))
-                (label "c" (docker "alpine"))
-	        (connect 90 "b" "a" "c")
-	        (connect 100 "b" "b")
-	        (connect 101 "c" "a")`
+	spec = pre + `b.connect(90, a);
+	b.connect(90, c);
+	b.connect(100, b);
+	c.connect(101, a);`
 	if err := testConnectionTxn(conn, spec); err != "" {
 		t.Error(err)
 	}
@@ -209,9 +226,7 @@ func TestConnectionTxn(t *testing.T) {
 		t.Error("Unexpected Database Change")
 	}
 
-	spec = `(label "a" (docker "alpine"))
-                (label "b" (docker "alpine"))
-                (label "c" (docker "alpine"))`
+	spec = pre
 	if err := testConnectionTxn(conn, spec); err != "" {
 		t.Error(err)
 	}
@@ -234,13 +249,7 @@ func testConnectionTxn(conn db.Conn, spec string) string {
 		return nil
 	})
 
-	var sc scanner.Scanner
-	compiledStr, err := stitch.Compile(*sc.Init(strings.NewReader(spec)),
-		stitch.DefaultImportGetter)
-	if err != nil {
-		return err.Error()
-	}
-	compiled, err := stitch.New(compiledStr)
+	compiled, err := stitch.New(spec, stitch.DefaultImportGetter)
 	if err != nil {
 		return err.Error()
 	}
@@ -311,10 +320,13 @@ func TestPlacementTxn(t *testing.T) {
 		}
 	}
 
+	pre := `var foo = new Service("foo", [new Container("foo")]);
+	var bar = new Service("bar", [new Container("bar")]);
+	var baz = new Service("baz", [new Container("bar")]);
+	deployment.deploy([foo, bar, baz]);`
+
 	// Create an exclusive placement.
-	spec := `(label "foo" (docker "foo"))
-	(label "bar" (docker "bar"))
-	(place (labelRule "exclusive" "foo") "bar")`
+	spec := pre + `bar.place(new LabelRule(true, foo));`
 	checkPlacement(spec,
 		db.Placement{
 			TargetLabel: "bar",
@@ -324,9 +336,7 @@ func TestPlacementTxn(t *testing.T) {
 	)
 
 	// Change the placement from "exclusive" to "on".
-	spec = `(label "foo" (docker "foo"))
-	(label "bar" (docker "bar"))
-	(place (labelRule "on" "foo") "bar")`
+	spec = pre + `bar.place(new LabelRule(false, foo));`
 	checkPlacement(spec,
 		db.Placement{
 			TargetLabel: "bar",
@@ -336,10 +346,8 @@ func TestPlacementTxn(t *testing.T) {
 	)
 
 	// Add another placement constraint.
-	spec = `(label "foo" (docker "foo"))
-	(label "bar" (docker "bar"))
-	(place (labelRule "on" "foo") "bar")
-	(place (labelRule "exclusive" "bar") "bar")`
+	spec = pre + `bar.place(new LabelRule(false, foo));
+	bar.place(new LabelRule(true, bar));`
 	checkPlacement(spec,
 		db.Placement{
 			TargetLabel: "bar",
@@ -353,56 +361,8 @@ func TestPlacementTxn(t *testing.T) {
 		},
 	)
 
-	// Multiple placement targets.
-	spec = `(label "foo" (docker "foo"))
-	(label "bar" (docker "bar"))
-	(label "qux" (docker "qux"))
-	(place (labelRule "exclusive" "qux") "foo" "bar")`
-	checkPlacement(spec,
-		db.Placement{
-			TargetLabel: "bar",
-			Exclusive:   true,
-			OtherLabel:  "qux",
-		},
-		db.Placement{
-			TargetLabel: "foo",
-			Exclusive:   true,
-			OtherLabel:  "qux",
-		},
-	)
-
-	// Multiple exclusive labels.
-	spec = `(label "foo" (docker "foo"))
-	(label "bar" (docker "bar"))
-	(label "baz" (docker "baz"))
-	(label "qux" (docker "qux"))
-	(place (labelRule "exclusive" "foo" "bar") "baz" "qux")`
-	checkPlacement(spec,
-		db.Placement{
-			TargetLabel: "baz",
-			Exclusive:   true,
-			OtherLabel:  "foo",
-		},
-		db.Placement{
-			TargetLabel: "baz",
-			Exclusive:   true,
-			OtherLabel:  "bar",
-		},
-		db.Placement{
-			TargetLabel: "qux",
-			Exclusive:   true,
-			OtherLabel:  "foo",
-		},
-		db.Placement{
-			TargetLabel: "qux",
-			Exclusive:   true,
-			OtherLabel:  "bar",
-		},
-	)
-
 	// Machine placement
-	spec = `(label "foo" (docker "foo"))
-	(place (machineRule "on" (size "m4.large")) "foo")`
+	spec = pre + `foo.place(new MachineRule(false, {size: "m4.large"}));`
 	checkPlacement(spec,
 		db.Placement{
 			TargetLabel: "foo",
@@ -412,9 +372,8 @@ func TestPlacementTxn(t *testing.T) {
 	)
 
 	// Port placement
-	spec = `(label "foo" (docker "foo"))
-	(connect 80 "public" "foo")
-	(connect 81 "public" "foo")`
+	spec = pre + `publicInternet.connect(80, foo);
+	publicInternet.connect(81, foo);`
 	checkPlacement(spec,
 		db.Placement{
 			TargetLabel: "foo",
@@ -423,14 +382,12 @@ func TestPlacementTxn(t *testing.T) {
 		},
 	)
 
-	spec = `(label "foo" (docker "foo"))
-                (label "bar" (docker "bar"))
-                (label "baz" (docker "baz"))
-                (connect 80 "public" "foo")
-                (connect 80 "public" "bar")
-		((lambda ()
-			(connect 81 "public" "bar")
-			(connect 81 "public" "baz")))`
+	spec = pre + `publicInternet.connect(80, foo);
+	publicInternet.connect(80, bar);
+	(function() {
+		publicInternet.connect(81, bar);
+		publicInternet.connect(81, baz);
+	})()`
 
 	checkPlacement(spec,
 		db.Placement{
@@ -446,6 +403,12 @@ func TestPlacementTxn(t *testing.T) {
 		},
 
 		db.Placement{
+			TargetLabel: "foo",
+			Exclusive:   true,
+			OtherLabel:  "bar",
+		},
+
+		db.Placement{
 			TargetLabel: "bar",
 			Exclusive:   true,
 			OtherLabel:  "foo",
@@ -453,6 +416,12 @@ func TestPlacementTxn(t *testing.T) {
 
 		db.Placement{
 			TargetLabel: "baz",
+			Exclusive:   true,
+			OtherLabel:  "baz",
+		},
+
+		db.Placement{
+			TargetLabel: "bar",
 			Exclusive:   true,
 			OtherLabel:  "baz",
 		},
