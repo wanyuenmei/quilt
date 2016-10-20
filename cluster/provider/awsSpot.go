@@ -98,7 +98,7 @@ func (clst amazonCluster) Boot(bootSet []Machine) error {
 	bootReqMap := make(map[bootReq]int64) // From boot request to an instance count.
 	for _, m := range bootSet {
 		br := bootReq{
-			cfg:      cloudConfigUbuntu(m.SSHKeys, "wily"),
+			cfg:      cloudConfigUbuntu(m.SSHKeys, "xenial"),
 			size:     m.Size,
 			region:   m.Region,
 			diskSize: m.DiskSize,
