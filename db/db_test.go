@@ -200,6 +200,58 @@ func SelectMachineCheck(db Database, do func(Machine) bool, expected []Machine) 
 	return nil
 }
 
+type prefixedString struct {
+	prefix string
+	str    string
+}
+
+func (ps prefixedString) String() string {
+	return ps.prefix + ps.str
+}
+
+type testStringerRow struct {
+	ID         int
+	FieldOne   string
+	FieldTwo   int `rowStringer:"omit"`
+	FieldThree int `rowStringer:"three: %s"`
+	FieldFour  prefixedString
+	FieldFive  int
+}
+
+func (r testStringerRow) String() string {
+	return ""
+}
+
+func (r testStringerRow) getID() int {
+	return -1
+}
+
+func (r testStringerRow) less(arg row) bool {
+	return true
+}
+
+func TestStringer(t *testing.T) {
+	testRow := testStringerRow{
+		ID:         5,
+		FieldOne:   "one",
+		FieldThree: 3,
+
+		// Should always omit.
+		FieldTwo: 2,
+
+		// Should evaluate String() method.
+		FieldFour: prefixedString{"pre", "foo"},
+
+		// Should omit because value is zero value.
+		FieldFive: 0,
+	}
+	exp := "testStringerRow-5{FieldOne=one, three: 3, FieldFour=prefoo}"
+	actual := defaultString(testRow)
+	if exp != actual {
+		t.Errorf("Bad defaultStringer output: expected %q, got %q.", exp, actual)
+	}
+}
+
 type mSort []Machine
 
 func (machines mSort) sort() {
