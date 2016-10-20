@@ -17,6 +17,41 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
+// EC2Client defines an interface that can be mocked out for interacting with EC2.
+type EC2Client interface {
+	AuthorizeSecurityGroupIngress(*ec2.AuthorizeSecurityGroupIngressInput) (
+		*ec2.AuthorizeSecurityGroupIngressOutput, error)
+
+	CancelSpotInstanceRequests(*ec2.CancelSpotInstanceRequestsInput) (
+		*ec2.CancelSpotInstanceRequestsOutput, error)
+
+	CreateSecurityGroup(*ec2.CreateSecurityGroupInput) (
+		*ec2.CreateSecurityGroupOutput, error)
+
+	CreateTags(*ec2.CreateTagsInput) (*ec2.CreateTagsOutput, error)
+
+	DescribeSecurityGroups(*ec2.DescribeSecurityGroupsInput) (
+		*ec2.DescribeSecurityGroupsOutput, error)
+
+	DescribeInstances(*ec2.DescribeInstancesInput) (
+		*ec2.DescribeInstancesOutput, error)
+
+	DescribeSpotInstanceRequests(*ec2.DescribeSpotInstanceRequestsInput) (
+		*ec2.DescribeSpotInstanceRequestsOutput, error)
+
+	DescribeVolumes(*ec2.DescribeVolumesInput) (
+		*ec2.DescribeVolumesOutput, error)
+
+	RevokeSecurityGroupIngress(*ec2.RevokeSecurityGroupIngressInput) (
+		*ec2.RevokeSecurityGroupIngressOutput, error)
+
+	TerminateInstances(*ec2.TerminateInstancesInput) (
+		*ec2.TerminateInstancesOutput, error)
+
+	RequestSpotInstances(*ec2.RequestSpotInstancesInput) (
+		*ec2.RequestSpotInstancesOutput, error)
+}
+
 const spotPrice = "0.5"
 
 // Ubuntu 16.04, 64-bit hvm-ssd
@@ -26,8 +61,34 @@ var amis = map[string]string{
 	"us-west-2":      "ami-e1fe2281",
 }
 
+func newAmazonCluster(sessionGetter func(string) EC2Client) *amazonCluster {
+	return &amazonCluster{
+		sessions:      make(map[string]EC2Client),
+		sessionGetter: sessionGetter,
+	}
+}
+
+func newEC2Session(region string) EC2Client {
+	session := session.New()
+	session.Config.Region = aws.String(region)
+	return ec2.New(session)
+}
+
+// blockDevice returns the block device we use for our AWS machines.
+func blockDevice(diskSize int) *ec2.BlockDeviceMapping {
+	return &ec2.BlockDeviceMapping{
+		DeviceName: aws.String("/dev/sda1"),
+		Ebs: &ec2.EbsBlockDevice{
+			DeleteOnTermination: aws.Bool(true),
+			VolumeSize:          aws.Int64(int64(diskSize)),
+			VolumeType:          aws.String("gp2"),
+		},
+	}
+}
+
 type amazonCluster struct {
-	sessions map[string]*ec2.EC2
+	sessionGetter func(string) EC2Client
+	sessions      map[string]EC2Client
 
 	namespace string
 }
@@ -60,7 +121,6 @@ func groupByRegion(ids []awsID) map[string][]awsID {
 }
 
 func (clst *amazonCluster) Connect(namespace string) error {
-	clst.sessions = make(map[string]*ec2.EC2)
 	clst.namespace = strings.ToLower(namespace)
 
 	if _, err := clst.List(); err != nil {
@@ -69,18 +129,12 @@ func (clst *amazonCluster) Connect(namespace string) error {
 	return nil
 }
 
-func (clst amazonCluster) getSession(region string) *ec2.EC2 {
-	if _, ok := clst.sessions[region]; ok {
-		return clst.sessions[region]
+func (clst amazonCluster) getSession(region string) EC2Client {
+	if _, ok := clst.sessions[region]; !ok {
+		clst.sessions[region] = clst.sessionGetter(region)
 	}
 
-	session := session.New()
-	session.Config.Region = aws.String(region)
-
-	newEC2 := ec2.New(session)
-	clst.sessions[region] = newEC2
-
-	return newEC2
+	return clst.sessions[region]
 }
 
 func (clst amazonCluster) Boot(bootSet []Machine) error {
@@ -108,15 +162,6 @@ func (clst amazonCluster) Boot(bootSet []Machine) error {
 
 	var awsIDs []awsID
 	for br, count := range bootReqMap {
-		bd := &ec2.BlockDeviceMapping{
-			DeviceName: aws.String("/dev/sda1"),
-			Ebs: &ec2.EbsBlockDevice{
-				DeleteOnTermination: aws.Bool(true),
-				VolumeSize:          aws.Int64(int64(br.diskSize)),
-				VolumeType:          aws.String("gp2"),
-			},
-		}
-
 		session := clst.getSession(br.region)
 		groupID, _, err := clst.GetCreateSecurityGroup(session)
 		if err != nil {
@@ -127,11 +172,13 @@ func (clst amazonCluster) Boot(bootSet []Machine) error {
 		resp, err := session.RequestSpotInstances(&ec2.RequestSpotInstancesInput{
 			SpotPrice: aws.String(spotPrice),
 			LaunchSpecification: &ec2.RequestSpotLaunchSpecification{
-				ImageId:             aws.String(amis[br.region]),
-				InstanceType:        aws.String(br.size),
-				UserData:            &cloudConfig64,
-				SecurityGroupIds:    []*string{aws.String(groupID)},
-				BlockDeviceMappings: []*ec2.BlockDeviceMapping{bd},
+				ImageId:          aws.String(amis[br.region]),
+				InstanceType:     aws.String(br.size),
+				UserData:         &cloudConfig64,
+				SecurityGroupIds: []*string{aws.String(groupID)},
+				BlockDeviceMappings: []*ec2.BlockDeviceMapping{
+					blockDevice(br.diskSize),
+				},
 			},
 			InstanceCount: &count,
 		})
@@ -151,11 +198,7 @@ func (clst amazonCluster) Boot(bootSet []Machine) error {
 		return err
 	}
 
-	if err := clst.wait(awsIDs, true); err != nil {
-		return err
-	}
-
-	return nil
+	return clst.wait(awsIDs, true)
 }
 
 func (clst amazonCluster) Stop(machines []Machine) error {
@@ -410,7 +453,7 @@ OuterLoop:
 	return errors.New("timed out")
 }
 
-func (clst *amazonCluster) GetCreateSecurityGroup(session *ec2.EC2) (
+func (clst *amazonCluster) GetCreateSecurityGroup(session EC2Client) (
 	string, []*ec2.IpPermission, error) {
 
 	resp, err := session.DescribeSecurityGroups(

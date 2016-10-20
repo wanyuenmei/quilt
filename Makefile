@@ -8,6 +8,7 @@ LINE_LENGTH_EXCLUDE=./constants/awsConstants.go \
 		    ./minion/pb/pb.pb.go \
 		    ./api/pb/pb.pb.go \
 		    ./stitch/bindings.js.go \
+		    ./cluster/provider/mocks/EC2Client.go
 
 REPO = quilt
 DOCKER = docker
@@ -31,7 +32,7 @@ COV_SKIP= /minion/pb /minion/pprofile /api/pb /constants /scripts /quilt-tester 
 		  /quilt-tester/tests/basic /quilt-tester/tests/basic/check_docker.go \
 		  /quilt-tester/tests/basic/check_logs.go \
 		  /quilt-tester/tests/spark /quilt-tester/tests/spark/check_spark_monly.go \
-			/quiltctl/testutils
+		  /quiltctl/testutils /cluster/provider/mocks
 
 COV_PKG = $(subst github.com/NetSys/quilt,,$(PACKAGES))
 coverage: $(addsuffix .cov, $(filter-out $(COV_SKIP), $(COV_PKG)))
@@ -78,7 +79,8 @@ go-get:
 	    github.com/golang/lint/golint \
 	    github.com/mattn/goveralls \
 	    github.com/modocache/gover \
-	    github.com/tools/godep
+	    github.com/tools/godep \
+	    github.com/vektra/mockery
 
 tests:
 	cd -P quilt-tester && \

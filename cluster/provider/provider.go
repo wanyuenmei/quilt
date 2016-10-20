@@ -38,7 +38,7 @@ type Provider interface {
 func New(dbp db.Provider) Provider {
 	switch dbp {
 	case db.Amazon:
-		return &amazonCluster{}
+		return newAmazonCluster(newEC2Session)
 	case db.Google:
 		return &gceCluster{}
 	case db.Vagrant:

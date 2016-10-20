@@ -153,8 +153,6 @@ func TestGroupBy(t *testing.T) {
 }
 
 func TestCloudConfig(t *testing.T) {
-	t.Parallel()
-
 	cloudConfigFormat = "(%v) (%v) (%v)"
 
 	res := cloudConfigUbuntu([]string{"a", "b"}, "1")
