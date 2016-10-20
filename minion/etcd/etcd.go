@@ -135,7 +135,7 @@ func (s store) Update(path, value string, ttl time.Duration) error {
 }
 
 func (s store) Set(path, value string, ttl time.Duration) error {
-	_, err := s.kapi.Set(ctx(), path, value, nil)
+	_, err := s.kapi.Set(ctx(), path, value, &client.SetOptions{TTL: ttl})
 	return err
 }
 
