@@ -103,13 +103,13 @@ func (m mock) update(path, value string, ttl time.Duration) error {
 	return nil
 }
 
-func (m mock) Mkdir(dir string) error {
+func (m mock) Mkdir(dir string, ttl time.Duration) error {
 	m.Lock()
 	defer m.Unlock()
-	return m.mkdir(dir)
+	return m.mkdir(dir, ttl)
 }
 
-func (m mock) mkdir(dir string) error {
+func (m mock) mkdir(dir string, ttl time.Duration) error {
 	if dir == "/" {
 		return nil
 	}
@@ -182,7 +182,7 @@ func (m mock) Set(path, value string, ttl time.Duration) error {
 
 func (m mock) createPrefix(path string) (Tree, string, error) {
 	dir, node := dirPath(path)
-	m.mkdir(dir)
+	m.mkdir(dir, 0)
 
 	tree, err := m.getTree(dir)
 	return tree, node, err

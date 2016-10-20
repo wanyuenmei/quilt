@@ -21,7 +21,7 @@ func Run(conn db.Conn) {
 
 func createMinionDir(store Store) {
 	for {
-		err := store.Mkdir(minionDir)
+		err := store.Mkdir(minionDir, 0)
 		if err == nil {
 			return
 		}

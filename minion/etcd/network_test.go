@@ -15,7 +15,7 @@ import (
 
 func TestUpdateEtcdContainers(t *testing.T) {
 	store := newTestMock()
-	store.Mkdir(minionDir)
+	store.Mkdir(minionDir, 0)
 	conn := db.New()
 	var containers []db.Container
 	conn.Transact(func(view db.Database) error {
@@ -158,7 +158,7 @@ func TestUpdateEtcdContainers(t *testing.T) {
 
 func TestUpdateEtcdLabel(t *testing.T) {
 	store := newTestMock()
-	store.Mkdir(minionDir)
+	store.Mkdir(minionDir, 0)
 	conn := db.New()
 	var containers []db.Container
 	conn.Transact(func(view db.Database) error {

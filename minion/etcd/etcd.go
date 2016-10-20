@@ -13,7 +13,7 @@ import (
 // A Store implements a consistent distributed key value store similar to Etcd.
 type Store interface {
 	Watch(path string, rateLimit time.Duration) chan struct{}
-	Mkdir(dir string) error
+	Mkdir(dir string, ttl time.Duration) error
 	GetTree(dir string) (Tree, error)
 	Get(path string) (string, error)
 	Delete(path string) error
@@ -61,10 +61,11 @@ func (s store) Watch(path string, rateLimit time.Duration) chan struct{} {
 	return c
 }
 
-func (s store) Mkdir(dir string) error {
+func (s store) Mkdir(dir string, ttl time.Duration) error {
 	_, err := s.kapi.Set(ctx(), dir, "", &client.SetOptions{
 		Dir:       true,
 		PrevExist: client.PrevNoExist,
+		TTL:       ttl,
 	})
 	return err
 }

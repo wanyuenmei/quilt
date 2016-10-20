@@ -85,7 +85,7 @@ func TestReadMinion(t *testing.T) {
 	}
 
 	store = NewMock()
-	store.Mkdir("/minion/nodes")
+	store.Mkdir("/minion/nodes", 0)
 	readMinion(conn, store)
 	minions = conn.SelectFromMinion(nil)
 	if len(minions) > 0 {
