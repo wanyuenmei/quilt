@@ -101,15 +101,22 @@ func FromInt(ip32 uint32) net.IP {
 func Random(conflicts map[string]struct{}, pre net.IP, subnetMask net.IPMask) net.IP {
 	prefix := ToInt(pre)
 	mask := MaskToInt(subnetMask)
-	for i := 0; i < 256; i++ {
-		ip32 := (Rand32() & ^mask) | (prefix & mask)
+
+	randStart := Rand32() & ^mask
+	randIP := randStart
+	for {
+		ip32 := randIP | (prefix & mask)
 		ip := FromInt(ip32)
 		if _, ok := conflicts[ip.String()]; !ok {
 			return ip
 		}
-	}
 
-	return net.IPv4zero
+		randIP = (randIP + 1) & ^mask
+		// Prevent infinite looping in the case that all IPs are taken
+		if randIP == randStart {
+			return net.IPv4zero
+		}
+	}
 }
 
 // ToMac converts the given IP address string into an internal MAC address.

@@ -45,11 +45,11 @@ func TestSyncIPs(t *testing.T) {
 			ipSet, exp, ipMap))
 	}
 
-	ipMap["a"] = "junk"
+	ipMap["d"] = "junk"
 
 	Sync(ipMap, prefix, mask)
 
-	aIP := ipMap["a"]
+	aIP := ipMap["d"]
 	expected := "10.0.0.4"
 	if aIP != expected {
 		t.Error(spew.Sprintf("Unexpected IP allocations.\nFound %s\nExpected %s",
@@ -61,11 +61,14 @@ func TestSyncIPs(t *testing.T) {
 		return 4
 	}
 
-	ipMap["b"] = "junk"
+	ipMap["a"] = "10.0.0.0"
+	ipMap["b"] = "10.0.0.2"
+	ipMap["c"] = "10.0.0.3"
+	ipMap["d"] = "junk"
 
-	Sync(ipMap, prefix, mask)
+	Sync(ipMap, prefix, net.CIDRMask(30, 32)) // only 3 viable address in this mask
 
-	if ip, _ := ipMap["b"]; ip != "" {
+	if ip, _ := ipMap["d"]; ip != "" {
 		t.Error(spew.Sprintf("Expected IP deletion, found %s", ip))
 	}
 }
