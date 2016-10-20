@@ -284,47 +284,47 @@ func (clst amazonCluster) List() ([]Machine, error) {
 				Provider: db.Amazon,
 			}
 
-			if inst == nil {
-				continue
-			}
-			if *inst.State.Name != ec2.InstanceStateNamePending &&
-				*inst.State.Name != ec2.InstanceStateNameRunning {
-				continue
-			}
+			if inst != nil {
+				if *inst.State.Name != ec2.InstanceStateNamePending &&
+					*inst.State.Name != ec2.InstanceStateNameRunning {
+					continue
+				}
 
-			if inst.PublicIpAddress != nil {
-				machine.PublicIP = *inst.PublicIpAddress
-			}
+				if inst.PublicIpAddress != nil {
+					machine.PublicIP = *inst.PublicIpAddress
+				}
 
-			if inst.PrivateIpAddress != nil {
-				machine.PrivateIP = *inst.PrivateIpAddress
-			}
+				if inst.PrivateIpAddress != nil {
+					machine.PrivateIP = *inst.PrivateIpAddress
+				}
 
-			if inst.InstanceType != nil {
-				machine.Size = *inst.InstanceType
-			}
+				if inst.InstanceType != nil {
+					machine.Size = *inst.InstanceType
+				}
 
-			if len(inst.BlockDeviceMappings) != 0 {
-				volumeID := inst.BlockDeviceMappings[0].Ebs.VolumeId
-				filters := []*ec2.Filter{
-					{
-						Name: aws.String("volume-id"),
-						Values: []*string{
-							aws.String(*volumeID),
+				if len(inst.BlockDeviceMappings) != 0 {
+					volumeID := inst.BlockDeviceMappings[0].
+						Ebs.VolumeId
+					filters := []*ec2.Filter{
+						{
+							Name: aws.String("volume-id"),
+							Values: []*string{
+								aws.String(*volumeID),
+							},
 						},
-					},
-				}
+					}
 
-				volumeInfo, err := session.DescribeVolumes(
-					&ec2.DescribeVolumesInput{
-						Filters: filters,
-					})
-				if err != nil {
-					return nil, err
-				}
-				if len(volumeInfo.Volumes) == 1 {
-					machine.DiskSize = int(
-						*volumeInfo.Volumes[0].Size)
+					volumeInfo, err := session.DescribeVolumes(
+						&ec2.DescribeVolumesInput{
+							Filters: filters,
+						})
+					if err != nil {
+						return nil, err
+					}
+					if len(volumeInfo.Volumes) == 1 {
+						machine.DiskSize = int(
+							*volumeInfo.Volumes[0].Size)
+					}
 				}
 			}
 
