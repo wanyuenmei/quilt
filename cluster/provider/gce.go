@@ -22,12 +22,12 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"sort"
 	"strings"
 	"time"
 
 	"github.com/NetSys/quilt/constants"
 	"github.com/NetSys/quilt/db"
+	"github.com/NetSys/quilt/join"
 	"github.com/NetSys/quilt/stitch"
 
 	log "github.com/Sirupsen/logrus"
@@ -55,7 +55,6 @@ type gceCluster struct {
 	baseURL   string // gce project specific url prefix
 	ipv4Range string // ipv4 range of the internal network
 	intFW     string // gce internal firewall name
-	extFW     string // gce external firewall name
 
 	ns string // cluster namespace
 	id int    // the id of the cluster, used externally
@@ -82,7 +81,6 @@ func (clst *gceCluster) Connect(namespace string) error {
 	clst.baseURL = fmt.Sprintf("%s/%s", computeBaseURL, clst.projID)
 	clst.ipv4Range = "192.168.0.0/16"
 	clst.intFW = fmt.Sprintf("%s-internal", clst.ns)
-	clst.extFW = fmt.Sprintf("%s-external", clst.ns)
 
 	if err := clst.netInit(); err != nil {
 		log.WithError(err).Debug("failed to start up gce network")
@@ -344,27 +342,79 @@ func (clst *gceCluster) SetACLs(acls []string) error {
 	if err != nil {
 		return err
 	}
-	var fw *compute.Firewall
-	for _, val := range list.Items {
-		if val.Name == clst.extFW {
-			fw = val
-			break
+
+	var currACLs []string
+	for _, fw := range list.Items {
+		if fw.Name == clst.intFW {
+			continue
 		}
-	}
-	sort.Strings(fw.SourceRanges)
-	sort.Strings(acls)
-	if fw == nil || reflect.DeepEqual(fw.SourceRanges, acls) {
-		return nil
+		currACLs = append(currACLs, fw.SourceRanges...)
 	}
 
-	op, err := clst.firewallPatch(clst.extFW, acls)
+	pair, toAdd, _ := join.HashJoin(
+		join.StringSlice(acls), join.StringSlice(currACLs), nil, nil)
+
+	var toSetRanges []string
+	for _, intf := range toAdd {
+		toSetRanges = append(toSetRanges, intf.(string))
+	}
+	for _, p := range pair {
+		toSetRanges = append(toSetRanges, p.L.(string))
+	}
+
+	adminFw, err := clst.getCreateFirewall(1, 65535)
 	if err != nil {
 		return err
 	}
-	if err = clst.operationWait([]*compute.Operation{op}, global); err != nil {
+
+	if reflect.DeepEqual(adminFw.SourceRanges, toSetRanges) {
+		return nil
+	}
+
+	log.WithField("CidrIPs", toSetRanges).
+		Debug("Google: Setting ACLs")
+	op, err := clst.firewallPatch(adminFw.Name, toSetRanges)
+	if err != nil {
 		return err
 	}
-	return nil
+	return clst.operationWait([]*compute.Operation{op}, global)
+}
+
+func (clst *gceCluster) getFirewall(name string) (*compute.Firewall, error) {
+	list, err := gceService.Firewalls.List(clst.projID).Do()
+	if err != nil {
+		return nil, err
+	}
+	for _, val := range list.Items {
+		if val.Name == name {
+			return val, nil
+		}
+	}
+
+	return nil, nil
+}
+
+func (clst *gceCluster) getCreateFirewall(minPort int, maxPort int) (
+	*compute.Firewall, error) {
+
+	ports := fmt.Sprintf("%d-%d", minPort, maxPort)
+	fwName := fmt.Sprintf("%s-%s", clst.ns, ports)
+
+	if fw, _ := clst.getFirewall(fwName); fw != nil {
+		return fw, nil
+	}
+
+	log.WithField("name", fwName).Debug("Creating firewall")
+	op, err := clst.insertFirewall(fwName, ports, []string{"127.0.0.1/32"})
+	if err != nil {
+		return nil, err
+	}
+
+	if err := clst.operationWait([]*compute.Operation{op}, global); err != nil {
+		return nil, err
+	}
+
+	return clst.getFirewall(fwName)
 }
 
 // Creates the network for the cluster.
@@ -394,7 +444,7 @@ func (clst *gceCluster) networkExists(name string) (bool, error) {
 // This creates a firewall but does nothing else
 //
 // XXX: Assumes there is only one network
-func (clst *gceCluster) insertFirewall(name, sourceRange string) (
+func (clst *gceCluster) insertFirewall(name, ports string, sourceRanges []string) (
 	*compute.Operation, error) {
 	firewall := &compute.Firewall{
 		Name: name,
@@ -404,17 +454,17 @@ func (clst *gceCluster) insertFirewall(name, sourceRange string) (
 		Allowed: []*compute.FirewallAllowed{
 			{
 				IPProtocol: "tcp",
-				Ports:      []string{"0-65535"},
+				Ports:      []string{ports},
 			},
 			{
 				IPProtocol: "udp",
-				Ports:      []string{"0-65535"},
+				Ports:      []string{ports},
 			},
 			{
 				IPProtocol: "icmp",
 			},
 		},
-		SourceRanges: []string{sourceRange},
+		SourceRanges: sourceRanges,
 	}
 
 	op, err := gceService.Firewalls.Insert(clst.projID, firewall).Do()
@@ -422,16 +472,8 @@ func (clst *gceCluster) insertFirewall(name, sourceRange string) (
 }
 
 func (clst *gceCluster) firewallExists(name string) (bool, error) {
-	list, err := gceService.Firewalls.List(clst.projID).Do()
-	if err != nil {
-		return false, err
-	}
-	for _, val := range list.Items {
-		if val.Name == name {
-			return true, nil
-		}
-	}
-	return false, nil
+	fw, err := clst.getFirewall(name)
+	return fw != nil, err
 }
 
 // Updates the firewall using PATCH semantics.
@@ -534,20 +576,8 @@ func (clst *gceCluster) fwInit() error {
 		log.Debug("internal firewall already exists")
 	} else {
 		log.Debug("creating internal firewall")
-		op, err := clst.insertFirewall(clst.intFW, clst.ipv4Range)
-		if err != nil {
-			return err
-		}
-		ops = append(ops, op)
-	}
-
-	if exists, err := clst.firewallExists(clst.extFW); err != nil {
-		return err
-	} else if exists {
-		log.Debug("external firewall already exists")
-	} else {
-		log.Debug("creating external firewall")
-		op, err := clst.insertFirewall(clst.extFW, "127.0.0.1/32")
+		op, err := clst.insertFirewall(
+			clst.intFW, "1-65535", []string{clst.ipv4Range})
 		if err != nil {
 			return err
 		}
