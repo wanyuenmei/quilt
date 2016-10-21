@@ -161,6 +161,7 @@ func TestTrigger(t *testing.T) {
 		return
 	}
 	triggerRecv(t, mt)
+	triggerNoRecv(t, mt2)
 
 	mt.Stop()
 	ct.Stop()
@@ -170,6 +171,38 @@ func TestTrigger(t *testing.T) {
 	triggerRecv(t, fast)
 	triggerRecv(t, fast)
 	triggerRecv(t, fast)
+}
+
+func TestTriggerTickStop(t *testing.T) {
+	conn := New()
+
+	mt := conn.TriggerTick(100, MachineTable)
+
+	// The initial tick.
+	triggerRecv(t, mt)
+
+	triggerNoRecv(t, mt)
+	err := conn.Transact(func(db Database) error {
+		db.InsertMachine()
+		return nil
+	})
+	if err != nil {
+		t.Fail()
+		return
+	}
+
+	triggerRecv(t, mt)
+
+	mt.Stop()
+	err = conn.Transact(func(db Database) error {
+		db.InsertMachine()
+		return nil
+	})
+	if err != nil {
+		t.Fail()
+		return
+	}
+	triggerNoRecv(t, mt)
 }
 
 func triggerRecv(t *testing.T, trig Trigger) {
