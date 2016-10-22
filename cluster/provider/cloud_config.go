@@ -94,8 +94,6 @@ setup_user() {
 	sudo groupadd $user
 	sudo useradd $user -s /bin/bash -g $user
 	sudo usermod -aG sudo $user
-	# Allow the user to use docker without sudo
-	sudo usermod -aG docker $user
 
 	user_dir=/home/$user
 
@@ -112,13 +110,16 @@ date >> /var/log/bootscript.log
 
 export DEBIAN_FRONTEND=noninteractive
 
+ssh_keys="%[2]s"
+setup_user quilt "$ssh_keys"
+
 install_docker
 initialize_ovs
 initialize_docker
 initialize_minion
 
-ssh_keys="%[2]s"
-setup_user quilt "$ssh_keys"
+# Allow the user to use docker without sudo
+sudo usermod -aG docker quilt
 
 # Reload because we replaced the docker.service provided by the package
 systemctl daemon-reload
