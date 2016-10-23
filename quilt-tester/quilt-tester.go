@@ -12,7 +12,6 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
-	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/stitch"
 )
 
@@ -216,17 +215,12 @@ func (t *tester) setup() error {
 func (t tester) runTestSuites() error {
 	l := log.testerLogger
 
-	machines, err := queryMachines()
-	if err != nil {
-		l.infoln("Unable to query test machines. Can't conduct tests.")
-		return err
-	}
-
 	l.infoln("Wait 5 minutes for containers to start up")
 	time.Sleep(5 * time.Minute)
 
+	var err error
 	for _, suite := range t.testSuites {
-		if e := suite.run(machines); e != nil && err == nil {
+		if e := suite.run(); e != nil && err == nil {
 			err = e
 		}
 	}
@@ -315,7 +309,7 @@ type testSuite struct {
 	failed int
 }
 
-func (ts *testSuite) run(machines []db.Machine) error {
+func (ts *testSuite) run() error {
 	l := log.testerLogger
 
 	l.infoln(fmt.Sprintf("Test Suite: %s", ts.name))
@@ -331,31 +325,19 @@ func (ts *testSuite) run(machines []db.Machine) error {
 	time.Sleep(5 * time.Minute)
 	l.infoln("Starting Tests")
 	var err error
-	for _, machine := range machines {
-		l.println("\n" + machine.PublicIP)
-		for _, test := range ts.tests {
-			if strings.Contains(test, "monly") && machine.Role != "Master" {
-				continue
-			}
+	for _, test := range ts.tests {
+		l.println(".. " + filepath.Base(test))
+		if e := runTest(test); e == nil {
+			l.println(".... Passed")
+			ts.passed++
+		} else {
+			l.println(".... Failed")
+			ts.failed++
 
-			l.println(".. " + filepath.Base(test))
-			passed, e := runTest(test, machine)
-			if passed {
-				l.println(".... Passed")
-				ts.passed++
-			} else {
-				l.println(".... Failed")
-				ts.failed++
-			}
-
-			if e != nil {
-				l.println("...... Test init error: " + e.Error())
-				if err == nil {
-					err = e
-				}
+			if err == nil {
+				err = e
 			}
 		}
-		l.println("")
 	}
 
 	l.infoln("Finished Tests")
@@ -364,25 +346,16 @@ func (ts *testSuite) run(machines []db.Machine) error {
 	return err
 }
 
-func runTest(testPath string, m db.Machine) (bool, error) {
-	_, testName := filepath.Split(testPath)
-
-	// Run the test on the remote machine.
-	if err := scp(m.PublicIP, testPath, testName); err != nil {
-		return false, fmt.Errorf("failed to scp test: %s", err.Error())
-	}
-	sshCmd := sshGen(m.PublicIP, exec.Command(fmt.Sprintf("./%s", testName)))
-	output, err := sshCmd.CombinedOutput()
-	if err != nil {
-		return false, fmt.Errorf("failed to run test: %s", output)
-	}
-
+func runTest(testPath string) error {
 	testPassed := true
-	if !strings.Contains(string(output), "PASSED") {
+
+	output, err := exec.Command(testPath).CombinedOutput()
+	if err != nil || !strings.Contains(string(output), "PASSED") {
 		testPassed = false
 	}
 
-	l := log.testLogger(testPassed, testName, m.PublicIP)
+	_, testName := filepath.Split(testPath)
+	l := log.testLogger(testPassed, testName)
 	if !testPassed {
 		l.infoln("Failed!")
 	}
@@ -400,5 +373,8 @@ func runTest(testPath string, m db.Machine) (bool, error) {
 	l.println(string(output))
 	l.infoln("End test output")
 
-	return testPassed, nil
+	if !testPassed {
+		return fmt.Errorf("test failed: %s", testName)
+	}
+	return nil
 }

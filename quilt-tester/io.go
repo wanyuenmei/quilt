@@ -27,10 +27,10 @@ type logger struct {
 	ip           string
 }
 
-// Creates a new fileLogger for the given test and machine, in the appropriate
+// Creates a new fileLogger for the given test, in the appropriate
 // "passed" or "failed" directory.
-func (l logger) testLogger(passed bool, testName string, testMachine string) fileLogger {
-	filename := fmt.Sprintf("%s-%s.txt", testName, testMachine)
+func (l logger) testLogger(passed bool, testName string) fileLogger {
+	filename := fmt.Sprintf("%s.txt", testName)
 	folder := filepath.Join(l.rootDir, "passed")
 	if !passed {
 		folder = filepath.Join(l.rootDir, "failed")
