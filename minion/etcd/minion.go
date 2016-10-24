@@ -67,7 +67,13 @@ func readMinion(conn db.Conn, store Store) {
 	var storeMinions []db.Minion
 	for _, t := range tree.Children {
 		var m db.Minion
-		minion := t.Children[selfNode].Value
+		selfData, ok := t.Children[selfNode]
+		if !ok {
+			log.Debugf("Minion %s has no self in etcd yet", t.Key)
+			continue
+		}
+
+		minion := selfData.Value
 		if err := json.Unmarshal([]byte(minion), &m); err != nil {
 			log.WithField("json", minion).Warning("Failed to parse Minion.")
 			continue
@@ -180,16 +186,19 @@ func generateSubnet(store Store, minion db.Minion) (string, error) {
 }
 
 func updateSubnet(conn db.Conn, store Store, minion db.Minion) db.Minion {
-	err := store.Refresh(subnetKey(minion.Subnet), minion.PrivateIP,
-		subnetTTL)
-	if err == nil {
-		return minion
-	}
-	log.WithError(err).Infof("Failed to refresh subnet '%s', "+
-		"generating a new one.", minion.Subnet)
+	var err error
+	if minion.Subnet != "" {
+		err = store.Refresh(subnetKey(minion.Subnet), minion.PrivateIP,
+			subnetTTL)
+		if err == nil {
+			return minion
+		}
+		log.WithError(err).Infof("Failed to refresh subnet '%s', "+
+			"generating a new one.", minion.Subnet)
 
-	// Invalidate the subnet until we get a new one.
-	minion = setMinionSubnet(conn, "")
+		// Invalidate the subnet until we get a new one.
+		minion = setMinionSubnet(conn, "")
+	}
 
 	// If we failed to refresh, someone took our subnet or we never had one.
 	for {
