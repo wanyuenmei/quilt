@@ -23,4 +23,4 @@ var baseMachine = new Machine({
 
 // Create Master and Worker Machines.
 deployment.deploy(baseMachine.asMaster())
-          .deploy(baseMachine.asWorker().replicate(2));
+deployment.deploy(baseMachine.asWorker().replicate(2));

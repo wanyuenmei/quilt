@@ -44,6 +44,7 @@ func TestConfigs(t *testing.T) {
 
 	testConfig("../quilt-tester/tests/basic/basic.js", quiltPath)
 	testConfig("../quilt-tester/tests/spark/spark.js", quiltPath)
+	testConfig("./example.js", quiltPath)
 	testConfig("./spark/sparkPI.js", quiltPath)
 	testConfig("./wordpress/wordpress-example.js", quiltPath)
 	testConfig("./etcd/etcd-example.js", quiltPath)
