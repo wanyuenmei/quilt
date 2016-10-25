@@ -8,6 +8,7 @@ import (
 	"github.com/NetSys/quilt/stitch"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/robertkrimen/otto"
 )
 
 // Get contains the options for downloading imports.
@@ -55,7 +56,11 @@ func (gCmd *Get) Parse(args []string) error {
 // Run downloads the requested import.
 func (gCmd *Get) Run() int {
 	if err := stitch.DefaultImportGetter.Get(gCmd.importPath); err != nil {
-		log.WithError(err).Errorf("Error getting import `%s`.", gCmd.importPath)
+		// Print the stacktrace if it's an Otto error.
+		if ottoError, ok := err.(*otto.Error); ok {
+			log.Error(ottoError.String())
+		}
+		log.Errorf("Error getting import `%s`.", gCmd.importPath)
 		return 1
 	}
 
