@@ -166,7 +166,7 @@ func (getter *ImportGetter) requireImpl(call otto.FunctionCall) (otto.Value, err
 	// An import cycle exists if a spec imports one of its parents.
 	// We detect this by keeping track of the path to get to the current import.
 	// This slice is maintained by adding imports to the path when they're
-	// intially imported, and removing them when all their children have finished
+	// initially imported, and removing them when all their children have finished
 	// importing.
 	if contains(getter.importPath, name) {
 		return otto.Value{},
