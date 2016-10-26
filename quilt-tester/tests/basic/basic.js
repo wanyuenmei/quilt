@@ -1,6 +1,7 @@
 var infrastructure = require("github.com/NetSys/quilt/quilt-tester/config/infrastructure")
 
-var deployment = createDeployment({}).deploy(infrastructure);
+var deployment = createDeployment({});
+deployment.deploy(infrastructure);
 
 var nWorker = 1;
 var red = new Service("red", new Container("google/pause").replicate(nWorker));
