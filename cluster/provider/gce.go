@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -337,47 +338,107 @@ func (clst *gceCluster) instanceDel(name, zone string) (*compute.Operation, erro
 	return op, err
 }
 
-func (clst *gceCluster) SetACLs(acls []string) error {
+func (clst *gceCluster) parseACLs(fws []*compute.Firewall) (acls []ACL) {
+	for _, fw := range fws {
+		if fw.Name == clst.intFW {
+			continue
+		}
+		for _, cidrIP := range fw.SourceRanges {
+			for _, allowed := range fw.Allowed {
+				for _, portsStr := range allowed.Ports {
+					for _, ports := range strings.Split(
+						portsStr, ",") {
+
+						portRange := strings.Split(ports, "-")
+						var minPort, maxPort int
+						switch len(portRange) {
+						case 0:
+							minPort, maxPort = 1, 65535
+						case 1:
+							port, _ := strconv.Atoi(
+								portRange[0])
+							minPort, maxPort = port, port
+						default:
+							minPort, _ = strconv.Atoi(
+								portRange[0])
+							maxPort, _ = strconv.Atoi(
+								portRange[1])
+						}
+						acls = append(acls, ACL{
+							CidrIP:  cidrIP,
+							MinPort: minPort,
+							MaxPort: maxPort,
+						})
+					}
+				}
+			}
+		}
+	}
+
+	return acls
+}
+
+func (clst *gceCluster) SetACLs(acls []ACL) error {
 	list, err := gceService.Firewalls.List(clst.projID).Do()
 	if err != nil {
 		return err
 	}
 
-	var currACLs []string
-	for _, fw := range list.Items {
-		if fw.Name == clst.intFW {
-			continue
-		}
-		currACLs = append(currACLs, fw.SourceRanges...)
-	}
+	currACLs := clst.parseACLs(list.Items)
+	pair, toAdd, toRemove := join.HashJoin(ACLSlice(acls), ACLSlice(currACLs),
+		nil, nil)
 
-	pair, toAdd, _ := join.HashJoin(
-		join.StringSlice(acls), join.StringSlice(currACLs), nil, nil)
-
-	var toSetRanges []string
-	for _, intf := range toAdd {
-		toSetRanges = append(toSetRanges, intf.(string))
+	var toSet []ACL
+	for _, acl := range toAdd {
+		toSet = append(toSet, acl.(ACL))
 	}
 	for _, p := range pair {
-		toSetRanges = append(toSetRanges, p.L.(string))
+		toSet = append(toSet, p.L.(ACL))
+	}
+	for _, acl := range toRemove {
+		toSet = append(toSet, ACL{
+			MinPort: acl.(ACL).MinPort,
+			MaxPort: acl.(ACL).MaxPort,
+			CidrIP:  "", // Remove all currently allowed IPs.
+		})
 	}
 
-	adminFw, err := clst.getCreateFirewall(1, 65535)
-	if err != nil {
-		return err
+	for acl, cidrIPs := range groupACLsByPorts(toSet) {
+		fw, err := clst.getCreateFirewall(acl.MinPort, acl.MaxPort)
+		if err != nil {
+			return err
+		}
+
+		if reflect.DeepEqual(fw.SourceRanges, cidrIPs) {
+			continue
+		}
+
+		var op *compute.Operation
+		if len(cidrIPs) == 0 {
+			log.WithField("ports", fmt.Sprintf(
+				"%d-%d", acl.MinPort, acl.MaxPort)).
+				Debug("Google: Deleting firewall")
+			op, err = clst.firewallDelete(fw.Name)
+			if err != nil {
+				return err
+			}
+		} else {
+			log.WithField("ports", fmt.Sprintf(
+				"%d-%d", acl.MinPort, acl.MaxPort)).
+				WithField("CidrIPs", cidrIPs).
+				Debug("Google: Setting ACLs")
+			op, err = clst.firewallPatch(fw.Name, cidrIPs)
+			if err != nil {
+				return err
+			}
+		}
+		if err := clst.operationWait(
+			[]*compute.Operation{op}, global); err != nil {
+			return err
+		}
 	}
 
-	if reflect.DeepEqual(adminFw.SourceRanges, toSetRanges) {
-		return nil
-	}
-
-	log.WithField("CidrIPs", toSetRanges).
-		Debug("Google: Setting ACLs")
-	op, err := clst.firewallPatch(adminFw.Name, toSetRanges)
-	if err != nil {
-		return err
-	}
-	return clst.operationWait([]*compute.Operation{op}, global)
+	return nil
 }
 
 func (clst *gceCluster) getFirewall(name string) (*compute.Firewall, error) {
@@ -495,6 +556,11 @@ func (clst *gceCluster) firewallPatch(name string,
 	return op, err
 }
 
+// Deletes the given firewall
+func (clst *gceCluster) firewallDelete(name string) (*compute.Operation, error) {
+	return gceService.Firewalls.Delete(clst.projID, name).Do()
+}
+
 // Initialize GCE.
 //
 // Authenication and the client are things that are re-used across clusters.
@@ -588,4 +654,21 @@ func (clst *gceCluster) fwInit() error {
 		return err
 	}
 	return nil
+}
+
+func groupACLsByPorts(acls []ACL) map[ACL][]string {
+	grouped := make(map[ACL][]string)
+	for _, acl := range acls {
+		key := ACL{
+			MinPort: acl.MinPort,
+			MaxPort: acl.MaxPort,
+		}
+		if _, ok := grouped[key]; !ok {
+			grouped[key] = nil
+		}
+		if acl.CidrIP != "" {
+			grouped[key] = append(grouped[key], acl.CidrIP)
+		}
+	}
+	return grouped
 }

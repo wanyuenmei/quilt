@@ -216,34 +216,47 @@ func (clst cluster) syncMachines() (bootSet, terminateSet []provider.Machine) {
 }
 
 func (clst cluster) syncACLs(adminACLs []string, machines []db.Machine) {
-	acls := adminACLs
 
 	// Always allow traffic from the Quilt controller.
 	ip, err := myIP()
 	if err == nil {
-		acls = append(acls, ip+"/32")
+		adminACLs = append(adminACLs, ip+"/32")
 	} else {
 		log.WithError(err).Error("Couldn't retrieve our IP address.")
+	}
+
+	var acls []provider.ACL
+	for _, adminACL := range adminACLs {
+		acls = append(acls, provider.ACL{
+			CidrIP:  adminACL,
+			MinPort: 1,
+			MaxPort: 65535,
+		})
 	}
 
 	// Providers with at least one machine.
 	prvdrSet := map[db.Provider]struct{}{}
 	for _, m := range machines {
 		if m.PublicIP != "" {
-			acls = append(acls, m.PublicIP+"/32")
+			// XXX: Look into the minimal set of necessary ports.
+			acls = append(acls, provider.ACL{
+				CidrIP:  m.PublicIP + "/32",
+				MinPort: 1,
+				MaxPort: 65535,
+			})
 		}
 		prvdrSet[m.Provider] = struct{}{}
 	}
 
-	for name, provider := range clst.providers {
+	for name, prvdr := range clst.providers {
 		// For this providers with no specified machines, we remove all ACLs.
 		// Otherwise we set acls to what's specified.
-		var setACLs []string
+		var setACLs []provider.ACL
 		if _, ok := prvdrSet[name]; ok {
 			setACLs = acls
 		}
 
-		if err := provider.SetACLs(setACLs); err != nil {
+		if err := prvdr.SetACLs(setACLs); err != nil {
 			log.WithError(err).Warnf("Could not update ACLs on %s.", name)
 		}
 	}

@@ -114,7 +114,7 @@ func (clst vagrantCluster) Stop(machines []Machine) error {
 	return nil
 }
 
-func (clst vagrantCluster) SetACLs(acls []string) error {
+func (clst vagrantCluster) SetACLs(acls []ACL) error {
 	return nil
 }
 

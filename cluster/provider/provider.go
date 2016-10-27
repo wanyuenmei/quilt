@@ -19,6 +19,13 @@ type Machine struct {
 	Region    string
 }
 
+// ACL represents allowed traffic to a machine.
+type ACL struct {
+	CidrIP  string
+	MinPort int
+	MaxPort int
+}
+
 // Provider defines an interface for interacting with cloud providers.
 type Provider interface {
 	Connect(namespace string) error
@@ -29,7 +36,7 @@ type Provider interface {
 
 	Stop([]Machine) error
 
-	SetACLs(acls []string) error
+	SetACLs(acls []ACL) error
 
 	ChooseSize(ram stitch.Range, cpu stitch.Range, maxPrice float64) string
 }
@@ -90,4 +97,24 @@ func resolveString(ptr *string) string {
 		return ""
 	}
 	return *ptr
+}
+
+func resolveInt64(ptr *int64) int64 {
+	if ptr == nil {
+		return 0
+	}
+	return *ptr
+}
+
+// ACLSlice is an alias for []ACL to allow for joins
+type ACLSlice []ACL
+
+// Get returns the value contained at the given index
+func (slc ACLSlice) Get(ii int) interface{} {
+	return slc[ii]
+}
+
+// Len returns the number of items in the slice
+func (slc ACLSlice) Len() int {
+	return len(slc)
 }

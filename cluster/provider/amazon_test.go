@@ -3,6 +3,8 @@ package provider
 
 import (
 	"encoding/base64"
+	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -154,11 +156,27 @@ func TestNewACLs(t *testing.T) {
 						{
 							IpRanges: []*ec2.IpRange{
 								{CidrIp: aws.String(
-									"foo")},
-								{CidrIp: aws.String(
 									"deleteMe")},
 							},
 							IpProtocol: aws.String("-1"),
+						},
+						{
+							IpRanges: []*ec2.IpRange{
+								{CidrIp: aws.String(
+									"foo")},
+							},
+							FromPort:   aws.Int64(1),
+							ToPort:     aws.Int64(65535),
+							IpProtocol: aws.String("tcp"),
+						},
+						{
+							IpRanges: []*ec2.IpRange{
+								{CidrIp: aws.String(
+									"foo")},
+							},
+							FromPort:   aws.Int64(1),
+							ToPort:     aws.Int64(65535),
+							IpProtocol: aws.String("udp"),
 						},
 					},
 					GroupId: aws.String(""),
@@ -178,32 +196,20 @@ func TestNewACLs(t *testing.T) {
 	})
 	cluster.namespace = testNamespace
 
-	err := cluster.SetACLs([]string{"foo", "bar"})
+	err := cluster.SetACLs([]ACL{
+		{
+			CidrIP:  "foo",
+			MinPort: 1,
+			MaxPort: 65535,
+		},
+		{
+			CidrIP:  "bar",
+			MinPort: 80,
+			MaxPort: 80,
+		},
+	})
 
 	assert.Nil(t, err)
-
-	mockClient.AssertCalled(t, "AuthorizeSecurityGroupIngress",
-		&ec2.AuthorizeSecurityGroupIngressInput{
-			GroupName:               aws.String(testNamespace),
-			SourceSecurityGroupName: aws.String(testNamespace),
-		},
-	)
-
-	mockClient.AssertCalled(t, "AuthorizeSecurityGroupIngress",
-		&ec2.AuthorizeSecurityGroupIngressInput{
-			GroupName: aws.String(testNamespace),
-			IpPermissions: []*ec2.IpPermission{
-				{
-					IpRanges: []*ec2.IpRange{
-						{
-							CidrIp: aws.String("bar"),
-						},
-					},
-					IpProtocol: aws.String("-1"),
-				},
-			},
-		},
-	)
 
 	mockClient.AssertCalled(t, "RevokeSecurityGroupIngress",
 		&ec2.RevokeSecurityGroupIngressInput{
@@ -220,6 +226,80 @@ func TestNewACLs(t *testing.T) {
 			},
 		},
 	)
+
+	mockClient.AssertCalled(t, "AuthorizeSecurityGroupIngress",
+		&ec2.AuthorizeSecurityGroupIngressInput{
+			GroupName:               aws.String(testNamespace),
+			SourceSecurityGroupName: aws.String(testNamespace),
+		},
+	)
+
+	// Manually extract and compare the ingress rules for allowing traffic based
+	// on IP ranges so that we can sort them because HashJoin returns results
+	// in a non-deterministic order.
+	var perms []*ec2.IpPermission
+	var foundCall bool
+	for _, call := range mockClient.Calls {
+		if call.Method == "AuthorizeSecurityGroupIngress" {
+			arg := call.Arguments.Get(0).(*ec2.
+				AuthorizeSecurityGroupIngressInput)
+			if len(arg.IpPermissions) != 0 {
+				foundCall = true
+				perms = arg.IpPermissions
+				break
+			}
+		}
+	}
+	if !foundCall {
+		t.Errorf("Expected call to AuthorizeSecurityGroupIngress to set IP ACLs")
+	}
+
+	sort.Sort(ipPermSlice(perms))
+	exp := []*ec2.IpPermission{
+		{
+			IpRanges: []*ec2.IpRange{
+				{
+					CidrIp: aws.String("bar"),
+				},
+			},
+			FromPort:   aws.Int64(-1),
+			ToPort:     aws.Int64(-1),
+			IpProtocol: aws.String("icmp"),
+		},
+		{
+			IpRanges: []*ec2.IpRange{
+				{CidrIp: aws.String(
+					"foo")},
+			},
+			FromPort:   aws.Int64(-1),
+			ToPort:     aws.Int64(-1),
+			IpProtocol: aws.String("icmp"),
+		},
+		{
+			IpRanges: []*ec2.IpRange{
+				{
+					CidrIp: aws.String("bar"),
+				},
+			},
+			FromPort:   aws.Int64(80),
+			ToPort:     aws.Int64(80),
+			IpProtocol: aws.String("tcp"),
+		},
+		{
+			IpRanges: []*ec2.IpRange{
+				{
+					CidrIp: aws.String("bar"),
+				},
+			},
+			FromPort:   aws.Int64(80),
+			ToPort:     aws.Int64(80),
+			IpProtocol: aws.String("udp"),
+		},
+	}
+	if !reflect.DeepEqual(perms, exp) {
+		t.Errorf("Bad args to AuthorizeSecurityGroupIngress: "+
+			"Expected %v, got %v.", exp, perms)
+	}
 }
 
 func TestBoot(t *testing.T) {

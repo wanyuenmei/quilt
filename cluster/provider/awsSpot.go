@@ -3,6 +3,7 @@ package provider
 import (
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -496,7 +497,7 @@ func (clst *amazonCluster) GetCreateSecurityGroup(session EC2Client) (
 	return *csgResp.GroupId, nil, nil
 }
 
-func (clst *amazonCluster) SetACLs(acls []string) error {
+func (clst *amazonCluster) SetACLs(acls []ACL) error {
 	for region := range amis {
 		session := clst.getSession(region)
 
@@ -555,7 +556,7 @@ func (clst *amazonCluster) SetACLs(acls []string) error {
 // syncACLs returns the permissions that need to be removed and added in order
 // for the cloud ACLs to match the policy.
 // rangesToAdd is guaranteed to always have exactly one item in the IpRanges slice.
-func syncACLs(desiredACLs []string, desiredGroupID string,
+func syncACLs(desiredACLs []ACL, desiredGroupID string,
 	current []*ec2.IpPermission) (rangesToAdd []*ec2.IpPermission, foundGroup bool,
 	toRemove []*ec2.IpPermission) {
 
@@ -587,12 +588,32 @@ func syncACLs(desiredACLs []string, desiredGroupID string,
 	var desiredRangeRules []*ec2.IpPermission
 	for _, acl := range desiredACLs {
 		desiredRangeRules = append(desiredRangeRules, &ec2.IpPermission{
+			FromPort: aws.Int64(int64(acl.MinPort)),
+			ToPort:   aws.Int64(int64(acl.MaxPort)),
 			IpRanges: []*ec2.IpRange{
 				{
-					CidrIp: aws.String(acl),
+					CidrIp: aws.String(acl.CidrIP),
 				},
 			},
-			IpProtocol: aws.String("-1"),
+			IpProtocol: aws.String("tcp"),
+		}, &ec2.IpPermission{
+			FromPort: aws.Int64(int64(acl.MinPort)),
+			ToPort:   aws.Int64(int64(acl.MaxPort)),
+			IpRanges: []*ec2.IpRange{
+				{
+					CidrIp: aws.String(acl.CidrIP),
+				},
+			},
+			IpProtocol: aws.String("udp"),
+		}, &ec2.IpPermission{
+			FromPort: aws.Int64(-1),
+			ToPort:   aws.Int64(-1),
+			IpRanges: []*ec2.IpRange{
+				{
+					CidrIp: aws.String(acl.CidrIP),
+				},
+			},
+			IpProtocol: aws.String("icmp"),
 		})
 	}
 
@@ -616,8 +637,20 @@ func logACLs(add bool, perms []*ec2.IpPermission) {
 
 	for _, perm := range perms {
 		if len(perm.IpRanges) != 0 {
-			log.WithField("CidrIp",
-				*perm.IpRanges[0].CidrIp).
+			// Each rule has three variants (TCP, UDP, and ICMP), but
+			// we only want to log once.
+			protocol := *perm.IpProtocol
+			if protocol != "tcp" {
+				continue
+			}
+
+			cidrIP := *perm.IpRanges[0].CidrIp
+			ports := fmt.Sprintf("%d", *perm.FromPort)
+			if *perm.FromPort != *perm.ToPort {
+				ports += fmt.Sprintf("-%d", *perm.ToPort)
+			}
+			log.WithField("ACL",
+				fmt.Sprintf("%s:%s", cidrIP, ports)).
 				Debugf("Amazon: %s ACL", action)
 		} else {
 			log.WithField("Group",
@@ -630,6 +663,8 @@ func logACLs(add bool, perms []*ec2.IpPermission) {
 type ipPermissionKey struct {
 	protocol string
 	ipRange  string
+	minPort  int
+	maxPort  int
 }
 
 func permToACLKey(permIntf interface{}) interface{} {
@@ -638,6 +673,8 @@ func permToACLKey(permIntf interface{}) interface{} {
 	return ipPermissionKey{
 		protocol: resolveString(perm.IpProtocol),
 		ipRange:  resolveString(perm.IpRanges[0].CidrIp),
+		minPort:  int(resolveInt64(perm.FromPort)),
+		maxPort:  int(resolveInt64(perm.ToPort)),
 	}
 }
 
@@ -649,4 +686,12 @@ func (slc ipPermSlice) Get(ii int) interface{} {
 
 func (slc ipPermSlice) Len() int {
 	return len(slc)
+}
+
+func (slc ipPermSlice) Less(i, j int) bool {
+	return strings.Compare(slc[i].String(), slc[j].String()) < 0
+}
+
+func (slc ipPermSlice) Swap(i, j int) {
+	slc[i], slc[j] = slc[j], slc[i]
 }

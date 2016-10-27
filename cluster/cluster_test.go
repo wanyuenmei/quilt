@@ -34,7 +34,7 @@ type fakeProvider struct {
 
 	bootRequests []bootRequest
 	stopRequests []string
-	aclRequests  []string
+	aclRequests  []provider.ACL
 }
 
 func newFakeProvider(cloudConfig string) *fakeProvider {
@@ -47,7 +47,7 @@ func newFakeProvider(cloudConfig string) *fakeProvider {
 func (p *fakeProvider) clearLogs() {
 	p.bootRequests = []bootRequest{}
 	p.stopRequests = []string{}
-	p.aclRequests = []string{}
+	p.aclRequests = []provider.ACL{}
 }
 
 func (p *fakeProvider) List() ([]provider.Machine, error) {
@@ -78,7 +78,7 @@ func (p *fakeProvider) Stop(machines []provider.Machine) error {
 	return nil
 }
 
-func (p *fakeProvider) SetACLs(acls []string) error {
+func (p *fakeProvider) SetACLs(acls []provider.ACL) error {
 	p.aclRequests = acls
 	return nil
 }
@@ -284,7 +284,23 @@ func TestACLs(t *testing.T) {
 		},
 	)
 
-	exp := []string{"admin", "5.6.7.8/32", "8.8.8.8/32"}
+	exp := []provider.ACL{
+		{
+			CidrIP:  "admin",
+			MinPort: 1,
+			MaxPort: 65535,
+		},
+		{
+			CidrIP:  "5.6.7.8/32",
+			MinPort: 1,
+			MaxPort: 65535,
+		},
+		{
+			CidrIP:  "8.8.8.8/32",
+			MinPort: 1,
+			MaxPort: 65535,
+		},
+	}
 	actual := clst.providers[FakeAmazon].(*fakeProvider).aclRequests
 
 	if !reflect.DeepEqual(exp, actual) {
