@@ -275,6 +275,12 @@ func TestACLs(t *testing.T) {
 
 	clst := newTestCluster()
 	clst.syncACLs([]string{"admin"},
+		[]db.PortRange{
+			{
+				MinPort: 80,
+				MaxPort: 80,
+			},
+		},
 		[]db.Machine{
 			{
 				Provider: FakeAmazon,
@@ -294,6 +300,11 @@ func TestACLs(t *testing.T) {
 			CidrIP:  "5.6.7.8/32",
 			MinPort: 1,
 			MaxPort: 65535,
+		},
+		{
+			CidrIP:  "0.0.0.0/0",
+			MinPort: 80,
+			MaxPort: 80,
 		},
 		{
 			CidrIP:  "8.8.8.8/32",

@@ -2,6 +2,7 @@ package db
 
 import (
 	"errors"
+	"fmt"
 	"log"
 )
 
@@ -9,7 +10,22 @@ import (
 type ACL struct {
 	ID int
 
-	Admin []string
+	Admin            []string
+	ApplicationPorts []PortRange
+}
+
+// PortRange represents a range of ports for which to allow traffic.
+type PortRange struct {
+	MinPort int
+	MaxPort int
+}
+
+func (pr PortRange) String() string {
+	port := fmt.Sprintf("%d", pr.MinPort)
+	if pr.MaxPort != pr.MinPort {
+		port += fmt.Sprintf("-%d", pr.MaxPort)
+	}
+	return port
 }
 
 // InsertACL creates a new ACL row and inserts it into 'db'.

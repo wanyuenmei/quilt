@@ -166,14 +166,16 @@ func (clst cluster) sync() {
 	// when the Quilt controller restarts, even if there are running cloud
 	// machines that still need to communicate.
 	var adminACLs []string
+	var appACLs []db.PortRange
 	var machines []db.Machine
 	clst.conn.Transact(func(view db.Database) error {
 		machines = view.SelectFromMachine(nil)
 		aclRow, _ := view.GetACL()
 		adminACLs = aclRow.Admin
+		appACLs = aclRow.ApplicationPorts
 		return nil
 	})
-	clst.syncACLs(adminACLs, machines)
+	clst.syncACLs(adminACLs, appACLs, machines)
 }
 
 func (clst cluster) syncMachines() (bootSet, terminateSet []provider.Machine) {
@@ -215,7 +217,8 @@ func (clst cluster) syncMachines() (bootSet, terminateSet []provider.Machine) {
 	return bootSet, terminateSet
 }
 
-func (clst cluster) syncACLs(adminACLs []string, machines []db.Machine) {
+func (clst cluster) syncACLs(adminACLs []string, appACLs []db.PortRange,
+	machines []db.Machine) {
 
 	// Always allow traffic from the Quilt controller.
 	ip, err := myIP()
@@ -231,6 +234,13 @@ func (clst cluster) syncACLs(adminACLs []string, machines []db.Machine) {
 			CidrIP:  adminACL,
 			MinPort: 1,
 			MaxPort: 65535,
+		})
+	}
+	for _, appACL := range appACLs {
+		acls = append(acls, provider.ACL{
+			CidrIP:  "0.0.0.0/0",
+			MinPort: appACL.MinPort,
+			MaxPort: appACL.MaxPort,
 		})
 	}
 

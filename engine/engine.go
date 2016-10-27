@@ -72,6 +72,17 @@ func aclTxn(view db.Database, specHandle stitch.Stitch) error {
 
 	aclRow.Admin = resolveACLs(specHandle.QueryAdminACL())
 
+	var applicationPorts []db.PortRange
+	for _, conn := range specHandle.QueryConnections() {
+		if conn.From == stitch.PublicInternetLabel {
+			applicationPorts = append(applicationPorts, db.PortRange{
+				MinPort: conn.MinPort,
+				MaxPort: conn.MaxPort,
+			})
+		}
+	}
+	aclRow.ApplicationPorts = applicationPorts
+
 	view.Commit(aclRow)
 	return nil
 }
