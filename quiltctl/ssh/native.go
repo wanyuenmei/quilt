@@ -3,13 +3,16 @@ package ssh
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
+	"github.com/NetSys/quilt/util"
+
 	log "github.com/Sirupsen/logrus"
+	homedir "github.com/mitchellh/go-homedir"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 	"golang.org/x/crypto/ssh/terminal"
@@ -29,14 +32,15 @@ func NewNativeClient() *NativeClient {
 // Connect establishes an SSH session with reasonable, quilt-specific defaults.
 func (c *NativeClient) Connect(host string, keyPath string) error {
 	var auth ssh.AuthMethod
-	if keyPath == "" {
-		if sa, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK")); err == nil {
-			auth = ssh.PublicKeysCallback(agent.NewClient(sa).Signers)
+	if keyPath != "" {
+		signer, err := signerFromFile(keyPath)
+		if err != nil {
+			return err
 		}
+		auth = ssh.PublicKeys(signer)
 	} else {
-		auth = publicKeyFile(keyPath)
+		auth = ssh.PublicKeys(defaultSigners()...)
 	}
-
 	sshConfig := &ssh.ClientConfig{
 		User: "quilt",
 		Auth: []ssh.AuthMethod{auth},
@@ -52,6 +56,40 @@ func (c *NativeClient) Connect(host string, keyPath string) error {
 		return err
 	}
 	return nil
+}
+
+var defaultKeys = []string{"id_rsa", "id_dsa", "id_ecdsa", "id_ed25519"}
+
+// Gets the signers for the default private key locations if possible
+func defaultSigners() []ssh.Signer {
+	var signers []ssh.Signer
+	if sa, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK")); err == nil {
+		agentSigners, err := agent.NewClient(sa).Signers()
+		if err != nil {
+			log.Warning("Error getting keys from ssh-agent")
+		} else {
+			signers = agentSigners
+		}
+	}
+
+	dir, err := homedir.Dir()
+	if err != nil {
+		log.WithError(err).Warn("Error getting path of home directory")
+		return signers
+	}
+
+	sshDir := filepath.Join(dir, ".ssh")
+	for _, keyName := range defaultKeys {
+		identityPath := filepath.Join(sshDir, keyName)
+		key, err := signerFromFile(identityPath)
+		if err != nil {
+			log.WithError(err).WithField("path", identityPath).
+				Debug("Unable to load default identity file")
+			continue
+		}
+		signers = append(signers, key)
+	}
+	return signers
 }
 
 // RequestPTY requests a pseudo-terminal on the remote server.
@@ -185,16 +223,15 @@ func (p *pty) monitorWindowSize() {
 	}
 }
 
-func publicKeyFile(file string) ssh.AuthMethod {
-	buffer, err := ioutil.ReadFile(file)
+func signerFromFile(file string) (ssh.Signer, error) {
+	fileStr, err := util.ReadFile(file)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
-	key, err := ssh.ParsePrivateKey(buffer)
+	key, err := ssh.ParsePrivateKey([]byte(fileStr))
 	if err != nil {
-		return nil
+		return nil, err
 	}
-
-	return ssh.PublicKeys(key)
+	return key, nil
 }
