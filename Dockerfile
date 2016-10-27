@@ -17,7 +17,7 @@ RUN VER=1.7 \
 && go get -u github.com/NetSys/quilt \
 && go test github.com/NetSys/quilt/... \
 && go install github.com/NetSys/quilt \
-&& cp $GOPATH/bin/* /\
+&& cp $GOPATH/bin/* /usr/local/bin\
 && git -C "$GOPATH/src/github.com/NetSys/quilt/" show --pretty=medium --no-patch \
 	> /buildinfo \
 && rm -rf /tmp/build \

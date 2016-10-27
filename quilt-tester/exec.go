@@ -23,7 +23,7 @@ var sleep = time.Sleep
 // runSpecUntilConnected runs the given spec, and blocks until either all
 // machines have connected back to the daemon, or 500 seconds have passed.
 func runSpecUntilConnected(spec string) (string, string, error) {
-	cmd := exec.Command("/quilt", "run", spec)
+	cmd := exec.Command("quilt", "run", spec)
 	stdout, stderr, err := execCmd(cmd, "INFRA")
 	if err != nil {
 		return stdout, stderr, err
@@ -50,7 +50,7 @@ func runSpecUntilConnected(spec string) (string, string, error) {
 // stop stops the given namespace, and blocks until there are no more machines
 // in the namespace, or 2 minutes have passed.
 func stop(namespace string) (string, string, error) {
-	cmd := exec.Command("/quilt", "stop", namespace)
+	cmd := exec.Command("quilt", "stop", namespace)
 
 	stdout, stderr, err := execCmd(cmd, "STOP")
 	if err != nil {
@@ -73,20 +73,20 @@ func stop(namespace string) (string, string, error) {
 
 // downloadSpecs gets the given import path.
 func downloadSpecs(importPath string) (string, string, error) {
-	cmd := exec.Command("/quilt", "get", importPath)
+	cmd := exec.Command("quilt", "get", importPath)
 	return execCmd(cmd, "GET")
 }
 
 // runSpec runs the given spec. Note that it does not block on the connection
 // status of the machines.
 func runSpec(spec string) (string, string, error) {
-	cmd := exec.Command("/quilt", "run", spec)
+	cmd := exec.Command("quilt", "run", spec)
 	return execCmd(cmd, "RUN")
 }
 
 // runQuiltDaemon starts the daemon.
 func runQuiltDaemon() {
-	cmd := exec.Command("/quilt", "-l", "debug", "daemon")
+	cmd := exec.Command("quilt", "-l", "debug", "daemon")
 	execCmd(cmd, "QUILT")
 }
 
