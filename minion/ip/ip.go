@@ -2,6 +2,7 @@ package ip
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"math"
 	"math/rand"
@@ -35,6 +36,49 @@ var (
 	MaxMinionCount = int(math.Pow(2, float64(minionMaskBits-quiltMaskBits))+0.5) - 1
 )
 
+// Pool represents a set of IP addresses that can be given out to requestors.
+type Pool struct {
+	net.IPNet
+	ipSet map[string]struct{}
+}
+
+// NewPool creates a Pool that gives out IP addresses within the given CIDR subnet.
+func NewPool(prefix net.IP, mask net.IPMask) Pool {
+	return Pool{
+		IPNet: net.IPNet{IP: prefix, Mask: mask},
+		ipSet: map[string]struct{}{},
+	}
+}
+
+// AddIP adds the given IP to this Pool's IP set.
+// It is an error to attempt to add an IP outside the Pool's subnet.
+func (p Pool) AddIP(ip string) error {
+	if addr := net.ParseIP(ip); !p.Contains(addr) {
+		return fmt.Errorf("warning: IP (%s) not in subnet (%s)", ip, p)
+	}
+	p.ipSet[ip] = struct{}{}
+	return nil
+}
+
+// Allocate selects a random IP address from the pool that hasn't already been given out.
+func (p Pool) Allocate() (net.IP, error) {
+	prefix := ToInt(p.IP)
+	mask := MaskToInt(p.Mask)
+
+	randStart := Rand32() & ^mask
+	for offset := uint32(0); offset <= ^mask; offset++ {
+		randIP := (randStart + offset) & ^mask
+		ip32 := randIP | (prefix & mask)
+		ip := FromInt(ip32)
+		if _, ok := p.ipSet[ip.String()]; !ok {
+			p.ipSet[ip.String()] = struct{}{}
+			return ip, nil
+		}
+	}
+
+	return nil, errors.New("IP pool exhausted")
+}
+
 // MaskToInt takes in a CIDR Mask and return the integer representation of it.
 func MaskToInt(mask net.IPMask) uint32 {
 	bits, _ := mask.Size()
@@ -46,30 +90,6 @@ func FromInt(ip32 uint32) net.IP {
 	b := make([]byte, 4)
 	binary.BigEndian.PutUint32(b, ip32)
 	return net.IP(b)
-}
-
-// Random selects a random IP address in the given prefix and mask that isn't already
-// present in conflicts.
-// Returns 0 on failure.
-func Random(conflicts map[string]struct{}, pre net.IP, subnetMask net.IPMask) net.IP {
-	prefix := ToInt(pre)
-	mask := MaskToInt(subnetMask)
-
-	randStart := Rand32() & ^mask
-	randIP := randStart
-	for {
-		ip32 := randIP | (prefix & mask)
-		ip := FromInt(ip32)
-		if _, ok := conflicts[ip.String()]; !ok {
-			return ip
-		}
-
-		randIP = (randIP + 1) & ^mask
-		// Prevent infinite looping in the case that all IPs are taken
-		if randIP == randStart {
-			return net.IPv4zero
-		}
-	}
 }
 
 // ToMac converts the given IP address string into an internal MAC address.

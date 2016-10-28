@@ -525,29 +525,23 @@ func updateDBLabels(view db.Database, etcdData storeData, ipMap map[string]strin
 // missing one.
 func syncIPs(ipMap map[string]string, prefixIP net.IP, mask net.IPMask) {
 	var unassigned []string
-	ipSet := map[string]struct{}{}
-	subnet := net.IPNet{IP: prefixIP, Mask: mask}
+	pool := ip.NewPool(prefixIP, mask)
 	for k, ipString := range ipMap {
-		ip := net.ParseIP(ipString)
-		if ip != nil && subnet.Contains(ip) {
-			ipSet[ip.String()] = struct{}{}
-		} else {
+		if err := pool.AddIP(ipString); err != nil {
 			unassigned = append(unassigned, k)
 		}
 	}
 
-	// Don't assign the IP of the default gateway
-	ipSet[network.GatewayIP] = struct{}{}
+	pool.AddIP(network.GatewayIP)
 	for _, k := range unassigned {
-		addr := ip.Random(ipSet, prefixIP, mask)
-		if addr.Equal(net.IPv4zero) {
-			log.Errorf("Failed to allocate IP for %s.", k)
+		ip, err := pool.Allocate()
+		if err != nil {
+			log.WithError(err).Errorf("Failed to allocate IP for %s.", k)
 			ipMap[k] = ""
 			continue
 		}
 
-		ipMap[k] = addr.String()
-		ipSet[addr.String()] = struct{}{}
+		ipMap[k] = ip.String()
 	}
 }
 
