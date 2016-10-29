@@ -50,4 +50,5 @@ func TestConfigs(t *testing.T) {
 	testConfig("./etcd/etcd-example.js", quiltPath)
 	testConfig("./zookeeper/zookeeper-example.js", quiltPath)
 	testConfig("./redis/redis-example.js", quiltPath)
+	testConfig("./mean/example.js", quiltPath)
 }
