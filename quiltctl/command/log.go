@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/NetSys/quilt/api"
+	"github.com/NetSys/quilt/api/client"
+	"github.com/NetSys/quilt/api/client/getter"
+	"github.com/NetSys/quilt/api/util"
 	"github.com/NetSys/quilt/quiltctl/ssh"
+
 	log "github.com/Sirupsen/logrus"
 )
 
@@ -20,6 +23,7 @@ type Log struct {
 
 	targetContainer int
 	SSHClient       ssh.Client
+	clientGetter    client.Getter
 
 	common *commonFlags
 }
@@ -27,8 +31,9 @@ type Log struct {
 // NewLogCommand creates a new Log command instance.
 func NewLogCommand(c ssh.Client) *Log {
 	return &Log{
-		SSHClient: c,
-		common:    &commonFlags{},
+		SSHClient:    c,
+		clientGetter: getter.New(),
+		common:       &commonFlags{},
 	}
 }
 
@@ -71,35 +76,26 @@ func (lCmd *Log) Parse(args []string) error {
 
 // Run finds the target continer and outputs logs.
 func (lCmd *Log) Run() int {
-	localClient, leaderClient, err := getClients(lCmd.common.host)
+	localClient, err := lCmd.clientGetter.Client(lCmd.common.host)
 	if err != nil {
 		log.Error(err)
 		return 1
 	}
 	defer localClient.Close()
-	defer leaderClient.Close()
 
-	containerHost, err := getContainerHost(localClient, leaderClient,
-		lCmd.targetContainer)
+	containerClient, err := lCmd.clientGetter.ContainerClient(
+		localClient, lCmd.targetContainer)
 	if err != nil {
-		log.WithError(err).
-			Error("Error getting the host on which the container is running.")
+		log.WithError(err).Error("Error getting container client.")
 		return 1
 	}
 
-	containerClient, err := getClient(api.RemoteAddress(containerHost))
+	container, err := util.GetContainer(containerClient, lCmd.targetContainer)
 	if err != nil {
-		log.WithError(err).Error("Error connecting to container client.")
+		log.WithError(err).Error("Error getting container information.")
 		return 1
 	}
-	defer containerClient.Close()
 
-	container, err := getContainer(containerClient, lCmd.targetContainer)
-	if err != nil {
-		log.WithError(err).Error("Error retrieving the container information " +
-			"from the container host.")
-		return 1
-	}
 	dockerCmd := "docker logs"
 	if lCmd.sinceTimestamp != "" {
 		dockerCmd += fmt.Sprintf(" --since=%s", lCmd.sinceTimestamp)
@@ -112,7 +108,7 @@ func (lCmd *Log) Run() int {
 	}
 	dockerCmd += " " + container.DockerID
 
-	err = lCmd.SSHClient.Connect(containerHost, lCmd.privateKey)
+	err = lCmd.SSHClient.Connect(containerClient.Host(), lCmd.privateKey)
 	if err != nil {
 		log.WithError(err).Info("Error opening SSH connection")
 		return 1

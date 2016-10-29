@@ -38,11 +38,28 @@ type Client interface {
 
 	// Deploy makes a request to the Quilt daemon to deploy the given deployment.
 	Deploy(deployment string) error
+
+	// Host returns the server address the Client is connected to.
+	Host() string
+}
+
+// Getter provides methods for obtaining Quilt clients connected to various servers.
+type Getter interface {
+	// Client obtains a client connected to the given address.
+	Client(string) (Client, error)
+
+	// ContainerClient obtains a client connected to the host running the given
+	// container.
+	ContainerClient(Client, int) (Client, error)
+
+	// LeaderClient obtains a client connected to cluster leader.
+	LeaderClient(Client) (Client, error)
 }
 
 type clientImpl struct {
-	pbClient pb.APIClient
-	cc       *grpc.ClientConn
+	pbClient   pb.APIClient
+	cc         *grpc.ClientConn
+	serverHost string
 }
 
 // New creates a new Quilt client connected to `lAddr`.
@@ -62,10 +79,12 @@ func New(lAddr string) (Client, error) {
 	}
 
 	pbClient := pb.NewAPIClient(cc)
+	host, _, _ := net.SplitHostPort(addr)
 	return clientImpl{
-		pbClient: pbClient,
-		cc:       cc,
-	}, nil
+		pbClient:   pbClient,
+		cc:         cc,
+		serverHost: host,
+	}, err
 }
 
 func query(pbClient pb.APIClient, table db.TableType) (interface{}, error) {
@@ -140,4 +159,8 @@ func (c clientImpl) Deploy(deployment string) error {
 	ctx, _ := context.WithTimeout(context.Background(), requestTimeout)
 	_, err := c.pbClient.Deploy(ctx, &pb.DeployRequest{Deployment: deployment})
 	return err
+}
+
+func (c clientImpl) Host() string {
+	return c.serverHost
 }

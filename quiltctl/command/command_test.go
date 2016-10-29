@@ -6,8 +6,10 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
+
 	"github.com/NetSys/quilt/api"
-	"github.com/NetSys/quilt/api/client"
+	clientMock "github.com/NetSys/quilt/api/client/mocks"
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/quiltctl/testutils"
 )
@@ -230,142 +232,26 @@ func TestExecFlags(t *testing.T) {
 		errors.New("must specify a target container and command"))
 }
 
-type mockClient struct {
-	machineReturn   []db.Machine
-	containerReturn []db.Container
-	etcdReturn      []db.Etcd
-	deployArg       string
-}
-
-func (c *mockClient) QueryMachines() ([]db.Machine, error) {
-	return c.machineReturn, nil
-}
-
-func (c *mockClient) QueryContainers() ([]db.Container, error) {
-	return c.containerReturn, nil
-}
-
-func (c *mockClient) QueryEtcd() ([]db.Etcd, error) {
-	return c.etcdReturn, nil
-}
-
-func (c *mockClient) Close() error {
-	return nil
-}
-
-func (c *mockClient) Deploy(deployment string) error {
-	c.deployArg = deployment
-	return nil
-}
-
 func TestStopNamespace(t *testing.T) {
-	c := &mockClient{}
-	getClient = func(host string) (client.Client, error) {
-		return c, nil
-	}
+	t.Parallel()
+
+	mockGetter := new(testutils.Getter)
+	c := &clientMock.Client{}
+	mockGetter.On("Client", mock.Anything).Return(c, nil)
 
 	stopCmd := NewStopCommand()
+	stopCmd.clientGetter = mockGetter
 	stopCmd.namespace = "namespace"
 	stopCmd.Run()
 	expStitch := `{"namespace": "namespace"}`
-	if c.deployArg != expStitch {
+	if c.DeployArg != expStitch {
 		t.Error("stop command invoked Quilt with the wrong stitch")
 	}
 }
 
-func TestGetLeaderClient(t *testing.T) {
-	passedClient := &mockClient{}
-	getClient = func(host string) (client.Client, error) {
-		switch host {
-		// One machine doesn't know the LeaderIP
-		case api.RemoteAddress("8.8.8.8"):
-			return &mockClient{
-				etcdReturn: []db.Etcd{
-					{
-						LeaderIP: "",
-					},
-				},
-			}, nil
-		// The other machine knows the LeaderIP
-		case api.RemoteAddress("9.9.9.9"):
-			return &mockClient{
-				etcdReturn: []db.Etcd{
-					{
-						LeaderIP: "leader-priv",
-					},
-				},
-			}, nil
-		// The leader. getLeaderClient() should return an instance of this.
-		case api.RemoteAddress("leader"):
-			return passedClient, nil
-		default:
-			t.Errorf("Unexpected call to getClient with host %s", host)
-			t.Fail()
-		}
-		panic("unreached")
-	}
-
-	localClient := &mockClient{
-		machineReturn: []db.Machine{
-			{
-				PublicIP: "8.8.8.8",
-			},
-			{
-				PublicIP: "9.9.9.9",
-			},
-			{
-				PublicIP:  "leader",
-				PrivateIP: "leader-priv",
-			},
-		},
-	}
-	res, err := getLeaderClient(localClient)
-	if err != nil {
-		t.Errorf("Unexpected error when getting lead minion: %s", err.Error())
-		return
-	}
-
-	if res != passedClient {
-		t.Errorf("Didn't retrieve the proper client for the lead minion: "+
-			"expected %v, got %v", passedClient, res)
-	}
-}
-
-func TestNoLeader(t *testing.T) {
-	getClient = func(host string) (client.Client, error) {
-		// No client knows the leader IP.
-		return &mockClient{
-			etcdReturn: []db.Etcd{
-				{
-					LeaderIP: "",
-				},
-			},
-		}, nil
-	}
-
-	localClient := &mockClient{
-		machineReturn: []db.Machine{
-			{
-				PublicIP: "8.8.8.8",
-			},
-			{
-				PublicIP: "9.9.9.9",
-			},
-		},
-	}
-	_, err := getLeaderClient(localClient)
-	expErr := "no leader found"
-	if err == nil {
-		t.Errorf("Expected an error when the leader IP is not set.")
-		return
-	}
-
-	if err.Error() != expErr {
-		t.Errorf("Got wrong error: expected %s, got %s", expErr, err.Error())
-	}
-}
-
 func TestSSHCommandCreation(t *testing.T) {
+	t.Parallel()
+
 	exp := []string{"ssh", "quilt@host", "-o", "StrictHostKeyChecking=no",
 		"-o", "UserKnownHostsFile=/dev/null", "-i", "~/.ssh/quilt"}
 	res := runSSHCommand("host", []string{"-i", "~/.ssh/quilt"})
@@ -375,67 +261,34 @@ func TestSSHCommandCreation(t *testing.T) {
 }
 
 func TestExec(t *testing.T) {
-	mockSSHClient := new(testutils.MockSSHClient)
+	t.Parallel()
+
+	workerHost := "worker"
 	targetContainer := 1
+
+	mockGetter := new(testutils.Getter)
+	mockGetter.On("Client", mock.Anything).Return(&clientMock.Client{}, nil)
+	mockGetter.On("ContainerClient", mock.Anything, mock.Anything).Return(
+		&clientMock.Client{
+			ContainerReturn: []db.Container{
+				{
+					StitchID: targetContainer,
+					DockerID: "foo",
+				},
+			},
+			HostReturn: workerHost,
+		}, nil)
+
+	mockSSHClient := new(testutils.MockSSHClient)
 	execCmd := Exec{
 		privateKey:      "key",
 		command:         "cat /etc/hosts",
 		targetContainer: targetContainer,
 		SSHClient:       mockSSHClient,
+		clientGetter:    mockGetter,
 		common: &commonFlags{
 			host: api.DefaultSocket,
 		},
-	}
-	workerHost := "worker"
-	getClient = func(host string) (client.Client, error) {
-		switch host {
-		// The local client. Used by getLeaderClient to figure out machine
-		// information.
-		case api.DefaultSocket:
-			return &mockClient{
-				machineReturn: []db.Machine{
-					{
-						PublicIP:  "leader",
-						PrivateIP: "leader-priv",
-					},
-					{
-						PrivateIP: "worker-priv",
-						PublicIP:  workerHost,
-					},
-				},
-			}, nil
-		case api.RemoteAddress("leader"):
-			return &mockClient{
-				containerReturn: []db.Container{
-					{
-						StitchID: targetContainer,
-						Minion:   "worker-priv",
-					},
-					{
-						StitchID: 5,
-						Minion:   "bad",
-					},
-				},
-				etcdReturn: []db.Etcd{
-					{
-						LeaderIP: "leader-priv",
-					},
-				},
-			}, nil
-		case api.RemoteAddress(workerHost):
-			return &mockClient{
-				containerReturn: []db.Container{
-					{
-						StitchID: targetContainer,
-						DockerID: "foo",
-					},
-				},
-			}, nil
-		default:
-			t.Errorf("Unexpected call to getClient with host %s", host)
-			t.Fail()
-		}
-		panic("unreached")
 	}
 
 	mockSSHClient.On("Connect", workerHost, "key").Return(nil)

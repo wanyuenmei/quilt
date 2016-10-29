@@ -7,10 +7,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/NetSys/quilt/quiltctl/ssh"
 	log "github.com/Sirupsen/logrus"
 
-	"github.com/NetSys/quilt/api"
+	"github.com/NetSys/quilt/api/client"
+	"github.com/NetSys/quilt/api/client/getter"
+	"github.com/NetSys/quilt/api/util"
+	"github.com/NetSys/quilt/quiltctl/ssh"
 )
 
 // Exec contains the options for running commands in containers.
@@ -21,14 +23,16 @@ type Exec struct {
 
 	common *commonFlags
 
-	SSHClient ssh.Client
+	SSHClient    ssh.Client
+	clientGetter client.Getter
 }
 
 // NewExecCommand creates a new Exec command instance.
 func NewExecCommand(c ssh.Client) *Exec {
 	return &Exec{
-		common:    &commonFlags{},
-		SSHClient: c,
+		common:       &commonFlags{},
+		SSHClient:    c,
+		clientGetter: getter.New(),
 	}
 }
 
@@ -69,37 +73,28 @@ func (eCmd *Exec) Parse(args []string) error {
 
 // Run finds the target continer, and executes the given command in it.
 func (eCmd *Exec) Run() int {
-	localClient, leaderClient, err := getClients(eCmd.common.host)
+	localClient, err := eCmd.clientGetter.Client(eCmd.common.host)
 	if err != nil {
 		log.Error(err)
 		return 1
 	}
 	defer localClient.Close()
-	defer leaderClient.Close()
 
-	containerHost, err := getContainerHost(localClient, leaderClient,
-		eCmd.targetContainer)
+	containerClient, err := eCmd.clientGetter.ContainerClient(
+		localClient, eCmd.targetContainer)
 	if err != nil {
-		log.WithError(err).
-			Error("Error getting the host on which the container is running.")
+		log.WithError(err).Error("Error getting container client")
 		return 1
 	}
 
-	containerClient, err := getClient(api.RemoteAddress(containerHost))
+	container, err := util.GetContainer(containerClient, eCmd.targetContainer)
 	if err != nil {
-		log.WithError(err).Error("Error connecting to container client.")
-		return 1
-	}
-	defer containerClient.Close()
-
-	container, err := getContainer(containerClient, eCmd.targetContainer)
-	if err != nil {
-		log.WithError(err).Error("Error retrieving the container information " +
-			"from the container host.")
+		log.WithError(err).Error("Error getting container information")
 		return 1
 	}
 
-	if err = eCmd.SSHClient.Connect(containerHost, eCmd.privateKey); err != nil {
+	err = eCmd.SSHClient.Connect(containerClient.Host(), eCmd.privateKey)
+	if err != nil {
 		log.WithError(err).Info("Error opening SSH connection")
 		return 1
 	}

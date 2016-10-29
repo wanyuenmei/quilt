@@ -5,6 +5,9 @@ import (
 	"fmt"
 
 	log "github.com/Sirupsen/logrus"
+
+	"github.com/NetSys/quilt/api/client"
+	"github.com/NetSys/quilt/api/client/getter"
 )
 
 // The default namespace to use when stopping. This should match the default
@@ -15,13 +18,15 @@ const defaultNamespace = "default-namespace"
 type Stop struct {
 	namespace string
 
-	common *commonFlags
+	common       *commonFlags
+	clientGetter client.Getter
 }
 
 // NewStopCommand creates a new Stop command instance.
 func NewStopCommand() *Stop {
 	return &Stop{
-		common: &commonFlags{},
+		clientGetter: getter.New(),
+		common:       &commonFlags{},
 	}
 }
 
@@ -54,7 +59,7 @@ func (sCmd *Stop) Parse(args []string) error {
 
 // Run stops the given namespace.
 func (sCmd *Stop) Run() int {
-	c, err := getClient(sCmd.common.host)
+	c, err := sCmd.clientGetter.Client(sCmd.common.host)
 	if err != nil {
 		log.Error(err)
 		return 1

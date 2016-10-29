@@ -9,8 +9,10 @@ import (
 	logrusTestHook "github.com/Sirupsen/logrus/hooks/test"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 
-	"github.com/NetSys/quilt/api/client"
+	clientMock "github.com/NetSys/quilt/api/client/mocks"
+	"github.com/NetSys/quilt/quiltctl/testutils"
 	"github.com/NetSys/quilt/util"
 )
 
@@ -76,21 +78,22 @@ func TestRunSpec(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		c := &mockClient{}
-		getClient = func(host string) (client.Client, error) {
-			return c, nil
-		}
 		util.AppFs = afero.NewMemMapFs()
+
+		mockGetter := new(testutils.Getter)
+		c := &clientMock.Client{}
+		mockGetter.On("Client", mock.Anything).Return(c, nil)
 
 		logHook := logrusTestHook.NewGlobal()
 
 		util.WriteFile(test.file.path, []byte(test.file.contents), 0644)
 		runCmd := NewRunCommand()
+		runCmd.clientGetter = mockGetter
 		runCmd.stitch = test.path
 		exitCode := runCmd.Run()
 
 		assert.Equal(t, test.expExitCode, exitCode)
-		assert.Equal(t, test.expDeployArg, c.deployArg)
+		assert.Equal(t, test.expDeployArg, c.DeployArg)
 
 		assert.Equal(t, len(test.expEntries), len(logHook.Entries))
 		for i, entry := range logHook.Entries {

@@ -11,6 +11,8 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/robertkrimen/otto"
 
+	"github.com/NetSys/quilt/api/client"
+	"github.com/NetSys/quilt/api/client/getter"
 	"github.com/NetSys/quilt/stitch"
 )
 
@@ -18,13 +20,15 @@ import (
 type Run struct {
 	stitch string
 
-	common *commonFlags
+	common       *commonFlags
+	clientGetter client.Getter
 }
 
 // NewRunCommand creates a new Run command instance.
 func NewRunCommand() *Run {
 	return &Run{
-		common: &commonFlags{},
+		common:       &commonFlags{},
+		clientGetter: getter.New(),
 	}
 }
 
@@ -57,7 +61,7 @@ func (rCmd *Run) Parse(args []string) error {
 
 // Run starts the run for the provided Stitch.
 func (rCmd *Run) Run() int {
-	c, err := getClient(rCmd.common.host)
+	c, err := rCmd.clientGetter.Client(rCmd.common.host)
 	if err != nil {
 		log.Error(err)
 		return 1

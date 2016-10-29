@@ -9,6 +9,9 @@ import (
 	"strconv"
 
 	log "github.com/Sirupsen/logrus"
+
+	"github.com/NetSys/quilt/api/client"
+	"github.com/NetSys/quilt/api/client/getter"
 )
 
 // SSH contains the options for SSHing into machines.
@@ -16,13 +19,15 @@ type SSH struct {
 	targetMachine int
 	sshArgs       []string
 
-	common *commonFlags
+	common       *commonFlags
+	clientGetter client.Getter
 }
 
 // NewSSHCommand creates a new SSH command instance.
 func NewSSHCommand() *SSH {
 	return &SSH{
-		common: &commonFlags{},
+		clientGetter: getter.New(),
+		common:       &commonFlags{},
 	}
 }
 
@@ -60,7 +65,7 @@ func (sCmd *SSH) Parse(args []string) error {
 
 // Run SSHs into the given machine.
 func (sCmd *SSH) Run() int {
-	c, err := getClient(sCmd.common.host)
+	c, err := sCmd.clientGetter.Client(sCmd.common.host)
 	if err != nil {
 		log.Error(err)
 		return 1

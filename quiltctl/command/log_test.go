@@ -4,8 +4,10 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
+
 	"github.com/NetSys/quilt/api"
-	"github.com/NetSys/quilt/api/client"
+	clientMock "github.com/NetSys/quilt/api/client/mocks"
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/quiltctl/testutils"
 )
@@ -38,8 +40,24 @@ func TestLogFlags(t *testing.T) {
 }
 
 func TestLog(t *testing.T) {
-	mockSSHClient := new(testutils.MockSSHClient)
+	t.Parallel()
+
+	workerHost := "worker"
 	targetContainer := 1
+
+	mockGetter := new(testutils.Getter)
+	mockGetter.On("Client", mock.Anything).Return(&clientMock.Client{}, nil)
+	mockGetter.On("ContainerClient", mock.Anything, mock.Anything).Return(
+		&clientMock.Client{
+			ContainerReturn: []db.Container{
+				{
+					StitchID: targetContainer,
+					DockerID: "foo",
+				},
+			},
+			HostReturn: workerHost,
+		}, nil)
+	mockSSHClient := new(testutils.MockSSHClient)
 	logsCmd := Log{
 		privateKey:      "key",
 		targetContainer: targetContainer,
@@ -47,61 +65,10 @@ func TestLog(t *testing.T) {
 		showTimestamps:  true,
 		sinceTimestamp:  "2006-01-02T15:04:05",
 		SSHClient:       mockSSHClient,
+		clientGetter:    mockGetter,
 		common: &commonFlags{
 			host: api.DefaultSocket,
 		},
-	}
-
-	workerHost := "worker"
-	getClient = func(host string) (client.Client, error) {
-		switch host {
-		// The local client. Used by getLeaderClient to figure out machine
-		// information.
-		case api.DefaultSocket:
-			return &mockClient{
-				machineReturn: []db.Machine{
-					{
-						PublicIP:  "leader",
-						PrivateIP: "leader-priv",
-					},
-					{
-						PrivateIP: "worker-priv",
-						PublicIP:  workerHost,
-					},
-				},
-			}, nil
-		case api.RemoteAddress("leader"):
-			return &mockClient{
-				containerReturn: []db.Container{
-					{
-						StitchID: targetContainer,
-						Minion:   "worker-priv",
-					},
-					{
-						StitchID: 5,
-						Minion:   "bad",
-					},
-				},
-				etcdReturn: []db.Etcd{
-					{
-						LeaderIP: "leader-priv",
-					},
-				},
-			}, nil
-		case api.RemoteAddress(workerHost):
-			return &mockClient{
-				containerReturn: []db.Container{
-					{
-						StitchID: targetContainer,
-						DockerID: "foo",
-					},
-				},
-			}, nil
-		default:
-			t.Errorf("Unexpected call to getClient with host %s", host)
-			t.Fail()
-		}
-		panic("unreached")
 	}
 
 	mockSSHClient.On("Connect", workerHost, "key").Return(nil)

@@ -5,18 +5,22 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 
+	"github.com/NetSys/quilt/api/client"
+	"github.com/NetSys/quilt/api/client/getter"
 	"github.com/NetSys/quilt/db"
 )
 
 // Container contains the options for querying containers.
 type Container struct {
 	*commonFlags
+	clientGetter client.Getter
 }
 
 // NewContainerCommand creates a new Container command instance.
 func NewContainerCommand() *Container {
 	return &Container{
-		commonFlags: &commonFlags{},
+		clientGetter: getter.New(),
+		commonFlags:  &commonFlags{},
 	}
 }
 
@@ -27,13 +31,13 @@ func (cCmd *Container) Parse(args []string) error {
 
 // Run retrieves and prints the requested containers.
 func (cCmd *Container) Run() int {
-	localClient, err := getClient(cCmd.host)
+	localClient, err := cCmd.clientGetter.Client(cCmd.host)
 	if err != nil {
 		log.Error(err)
 		return 1
 	}
 
-	c, err := getLeaderClient(localClient)
+	c, err := cCmd.clientGetter.LeaderClient(localClient)
 	localClient.Close()
 	if err != nil {
 		log.WithError(err).Error("Error connecting to leader.")
