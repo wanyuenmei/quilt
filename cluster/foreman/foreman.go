@@ -125,13 +125,14 @@ func RunOnce(conn db.Conn) {
 		}
 
 		newConfig := pb.MinionConfig{
-			Role:        db.RoleToPB(m.machine.Role),
-			PrivateIP:   m.machine.PrivateIP,
-			Spec:        spec,
-			Provider:    string(m.machine.Provider),
-			Size:        m.machine.Size,
-			Region:      m.machine.Region,
-			EtcdMembers: etcdIPs,
+			Role:           db.RoleToPB(m.machine.Role),
+			PrivateIP:      m.machine.PrivateIP,
+			Spec:           spec,
+			Provider:       string(m.machine.Provider),
+			Size:           m.machine.Size,
+			Region:         m.machine.Region,
+			EtcdMembers:    etcdIPs,
+			AuthorizedKeys: m.machine.SSHKeys,
 		}
 
 		if reflect.DeepEqual(newConfig, m.config) {

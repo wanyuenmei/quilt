@@ -3,6 +3,7 @@ package minion
 import (
 	"net"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/NetSys/quilt/db"
@@ -50,6 +51,7 @@ func (s server) GetMinionConfig(cts context.Context,
 		cfg.Provider = m.Provider
 		cfg.Size = m.Size
 		cfg.Region = m.Region
+		cfg.AuthorizedKeys = strings.Split(m.AuthorizedKeys, "\n")
 	} else {
 		cfg.Role = db.RoleToPB(db.None)
 	}
@@ -79,6 +81,7 @@ func (s server) SetMinionConfig(ctx context.Context,
 		minion.Provider = msg.Provider
 		minion.Size = msg.Size
 		minion.Region = msg.Region
+		minion.AuthorizedKeys = strings.Join(msg.AuthorizedKeys, "\n")
 		minion.Self = true
 		view.Commit(minion)
 

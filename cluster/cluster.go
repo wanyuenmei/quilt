@@ -225,7 +225,6 @@ func (clst cluster) join() (joinResult, error) {
 				dbm.DiskSize = m.DiskSize
 			}
 			dbm.Provider = m.Provider
-			// XXX: Get the SSH keys?
 			view.Commit(dbm)
 		}
 		return nil

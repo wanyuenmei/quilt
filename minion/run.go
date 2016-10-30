@@ -37,6 +37,7 @@ func Run() {
 	go scheduler.Run(conn, dk)
 	go network.Run(conn, dk)
 	go etcd.Run(conn)
+	go syncAuthorizedKeys(conn)
 
 	go apiServer.Run(conn, fmt.Sprintf("tcp://0.0.0.0:%d", api.DefaultRemotePort))
 

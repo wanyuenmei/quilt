@@ -7,9 +7,10 @@ import "errors"
 type Minion struct {
 	ID int `json:"-"`
 
-	Self   bool   `json:"-"`
-	Spec   string `json:"-"`
-	Subnet string `json:"-"` // no need to include in the JSON, stored in Etcd
+	Self           bool   `json:"-"`
+	Spec           string `json:"-"`
+	Subnet         string `json:"-"` // no need to include in the JSON, stored in Etcd
+	AuthorizedKeys string `json:"-" rowStringer:"omit"`
 
 	// Below fields are included in the JSON encoding.
 	Role      Role

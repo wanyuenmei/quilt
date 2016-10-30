@@ -130,6 +130,7 @@ func diffMinion(dbMinions, storeMinions []db.Minion) (del, add []db.Minion) {
 		m.ID = 0
 		m.Spec = ""
 		m.Self = false
+		m.AuthorizedKeys = ""
 		return m
 	}
 

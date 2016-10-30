@@ -16,22 +16,24 @@ func TestSetMinionConfig(t *testing.T) {
 	s := server{db.New()}
 
 	cfg := pb.MinionConfig{
-		Role:        pb.MinionConfig_MASTER,
-		PrivateIP:   "priv",
-		Spec:        "spec",
-		Provider:    "provider",
-		Size:        "size",
-		Region:      "region",
-		EtcdMembers: []string{"etcd1", "etcd2"},
+		Role:           pb.MinionConfig_MASTER,
+		PrivateIP:      "priv",
+		Spec:           "spec",
+		Provider:       "provider",
+		Size:           "size",
+		Region:         "region",
+		EtcdMembers:    []string{"etcd1", "etcd2"},
+		AuthorizedKeys: []string{"key1", "key2"},
 	}
 	expMinion := db.Minion{
-		Self:      true,
-		Spec:      "spec",
-		Role:      db.Master,
-		PrivateIP: "priv",
-		Provider:  "provider",
-		Size:      "size",
-		Region:    "region",
+		Self:           true,
+		Spec:           "spec",
+		Role:           db.Master,
+		PrivateIP:      "priv",
+		Provider:       "provider",
+		Size:           "size",
+		Region:         "region",
+		AuthorizedKeys: "key1\nkey2",
 	}
 	_, err := s.SetMinionConfig(nil, &cfg)
 	assert.NoError(t, err)
@@ -112,6 +114,7 @@ func TestGetMinionConfig(t *testing.T) {
 		m.Provider = "provider"
 		m.Size = "size"
 		m.Region = "region"
+		m.AuthorizedKeys = "key1\nkey2"
 		view.Commit(m)
 		return nil
 	})
@@ -133,12 +136,13 @@ func TestGetMinionConfig(t *testing.T) {
 	cfg, err = s.GetMinionConfig(nil, &pb.Request{})
 	assert.NoError(t, err)
 	assert.Equal(t, pb.MinionConfig{
-		Role:        pb.MinionConfig_MASTER,
-		PrivateIP:   "priv",
-		Spec:        "spec",
-		Provider:    "provider",
-		Size:        "size",
-		Region:      "region",
-		EtcdMembers: []string{"etcd1", "etcd2"},
+		Role:           pb.MinionConfig_MASTER,
+		PrivateIP:      "priv",
+		Spec:           "spec",
+		Provider:       "provider",
+		Size:           "size",
+		Region:         "region",
+		EtcdMembers:    []string{"etcd1", "etcd2"},
+		AuthorizedKeys: []string{"key1", "key2"},
 	}, *cfg)
 }
