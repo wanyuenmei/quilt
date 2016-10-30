@@ -78,7 +78,7 @@ func (s server) SetMinionConfig(ctx context.Context,
 		return nil
 	})
 
-	return &pb.Reply{Success: true}, nil
+	return &pb.Reply{}, nil
 }
 
 func (s server) BootEtcd(ctx context.Context,
@@ -103,5 +103,5 @@ func (s server) BootEtcd(ctx context.Context,
 		return nil
 	})
 
-	return &pb.Reply{Success: true}, nil
+	return &pb.Reply{}, nil
 }

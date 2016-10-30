@@ -23,8 +23,6 @@ message MinionConfig {
 }
 
 message Reply {
-    bool Success = 1;
-    string Error = 2;
 }
 
 message Request {

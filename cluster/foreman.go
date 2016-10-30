@@ -1,8 +1,6 @@
 package cluster
 
 import (
-	"errors"
-	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -152,6 +150,7 @@ func (fm *foreman) runOnce() {
 		}
 
 		if err := m.client.setMinion(newConfig); err != nil {
+			log.WithError(err).Error("Failed to set minion config.")
 			return
 		}
 
@@ -224,35 +223,14 @@ func (c clientImpl) getMinion() (pb.MinionConfig, error) {
 
 func (c clientImpl) setMinion(cfg pb.MinionConfig) error {
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-	reply, err := c.SetMinionConfig(ctx, &cfg)
-	if err != nil {
-		if ctx.Err() == nil {
-			log.WithError(err).Error("Failed to set minion config.")
-		}
-		return err
-	} else if reply.Success == false {
-		err := errors.New(reply.Error)
-		log.WithError(err).Error("Unsuccessful minion reply.")
-		return err
-	}
-
-	return nil
+	_, err := c.SetMinionConfig(ctx, &cfg)
+	return err
 }
 
 func (c clientImpl) bootEtcd(members pb.EtcdMembers) error {
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-	reply, err := c.BootEtcd(ctx, &members)
-	if err != nil {
-		if ctx.Err() != nil {
-			return nil
-		}
-		return err
-	} else if reply.Success == false {
-		err := fmt.Errorf("unsuccessful minion reply: %s", reply.Error)
-		return err
-	}
-
-	return nil
+	_, err := c.BootEtcd(ctx, &members)
+	return err
 }
 
 func (c clientImpl) Close() {
