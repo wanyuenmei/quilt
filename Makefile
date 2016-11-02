@@ -1,6 +1,6 @@
 export GO15VENDOREXPERIMENT=1
 PACKAGES=$(shell GO15VENDOREXPERIMENT=1 go list ./... | grep -v vendor)
-NOVENDOR=$(shell find . -path ./vendor -prune -o -name '*.go' -print)
+NOVENDOR=$(shell find . -path ./specs/**/*/vendor -prune -o -path ./vendor -prune -o -name '*.go' -print)
 LINE_LENGTH_EXCLUDE=./constants/awsConstants.go \
 		    ./constants/gceConstants.go \
 		    ./cluster/provider/cloud_config.go \
