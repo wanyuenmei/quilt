@@ -254,7 +254,7 @@ func testConnectionTxn(conn db.Conn, spec string) string {
 		return err.Error()
 	}
 
-	exp := compiled.QueryConnections()
+	exp := compiled.Connections
 	for _, e := range exp {
 		found := false
 		for i, c := range connections {

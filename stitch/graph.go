@@ -40,28 +40,28 @@ func InitializeGraph(spec Stitch) (Graph, error) {
 		Machines:     []Machine{},
 	}
 
-	for _, label := range spec.QueryLabels() {
+	for _, label := range spec.Labels {
 		for _, cid := range label.IDs {
 			g.addNode(fmt.Sprintf("%d", cid), label.Name, label.Annotations)
 		}
 	}
 	g.addNode(PublicInternetLabel, PublicInternetLabel, []string{})
 
-	for _, conn := range spec.QueryConnections() {
+	for _, conn := range spec.Connections {
 		err := g.addConnection(conn.From, conn.To)
 		if err != nil {
 			return Graph{}, err
 		}
 	}
 
-	for _, pl := range spec.QueryPlacements() {
+	for _, pl := range spec.Placements {
 		err := g.addPlacementRule(pl)
 		if err != nil {
 			return Graph{}, err
 		}
 	}
 
-	for _, m := range spec.QueryMachines() {
+	for _, m := range spec.Machines {
 		g.Machines = append(g.Machines, m)
 	}
 

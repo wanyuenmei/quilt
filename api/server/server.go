@@ -96,7 +96,7 @@ func (s server) Run(cts context.Context, runReq *pb.RunRequest) (*pb.RunReply, e
 		return &pb.RunReply{}, err
 	}
 
-	if len(stitch.QueryMachines()) > ip.MaxMinionCount {
+	if len(stitch.Machines) > ip.MaxMinionCount {
 		return &pb.RunReply{}, fmt.Errorf("cannot boot more than %d "+
 			"machines", ip.MaxMinionCount)
 	}

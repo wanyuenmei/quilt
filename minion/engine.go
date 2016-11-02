@@ -35,7 +35,7 @@ func updatePolicy(view db.Database, role db.Role, spec string) {
 
 func updatePlacements(view db.Database, spec stitch.Stitch) {
 	var placements db.PlacementSlice
-	for _, sp := range spec.QueryPlacements() {
+	for _, sp := range spec.Placements {
 		placements = append(placements, db.Placement{
 			TargetLabel: sp.TargetLabel,
 			Exclusive:   sp.Exclusive,
@@ -69,7 +69,7 @@ func updatePlacements(view db.Database, spec stitch.Stitch) {
 }
 
 func updateConnections(view db.Database, spec stitch.Stitch) {
-	scs, vcs := stitch.ConnectionSlice(spec.QueryConnections()),
+	scs, vcs := stitch.ConnectionSlice(spec.Connections),
 		view.SelectFromConnection(nil)
 
 	dbcKey := func(val interface{}) interface{} {
@@ -106,7 +106,7 @@ func updateConnections(view db.Database, spec stitch.Stitch) {
 
 func queryContainers(spec stitch.Stitch) []db.Container {
 	containers := map[int]*db.Container{}
-	for _, c := range spec.QueryContainers() {
+	for _, c := range spec.Containers {
 		containers[c.ID] = &db.Container{
 			StitchID: c.ID,
 			Command:  c.Command,
@@ -115,7 +115,7 @@ func queryContainers(spec stitch.Stitch) []db.Container {
 		}
 	}
 
-	for _, label := range spec.QueryLabels() {
+	for _, label := range spec.Labels {
 		for _, id := range label.IDs {
 			containers[id].Labels = append(containers[id].Labels, label.Name)
 		}

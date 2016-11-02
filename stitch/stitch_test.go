@@ -481,13 +481,13 @@ func TestQuery(t *testing.T) {
 	t.Parallel()
 
 	namespaceChecker := queryChecker(func(handle Stitch) interface{} {
-		return handle.QueryNamespace()
+		return handle.Namespace
 	})
 	maxPriceChecker := queryChecker(func(handle Stitch) interface{} {
-		return handle.QueryMaxPrice()
+		return handle.MaxPrice
 	})
 	adminACLChecker := queryChecker(func(handle Stitch) interface{} {
-		return handle.QueryAdminACL()
+		return handle.AdminACL
 	})
 
 	namespaceChecker(t, `createDeployment({namespace: "myNamespace"});`,
@@ -563,31 +563,31 @@ func queryChecker(
 }
 
 var checkMachines = queryChecker(func(s Stitch) interface{} {
-	return s.QueryMachines()
+	return s.Machines
 })
 
 var checkContainers = queryChecker(func(s Stitch) interface{} {
 	// Convert the slice to a map because the ordering is non-deterministic.
 	containersMap := make(map[int]Container)
-	for _, c := range s.QueryContainers() {
+	for _, c := range s.Containers {
 		containersMap[c.ID] = c
 	}
 	return containersMap
 })
 
 var checkPlacements = queryChecker(func(s Stitch) interface{} {
-	return s.QueryPlacements()
+	return s.Placements
 })
 
 var checkLabels = queryChecker(func(s Stitch) interface{} {
 	// Convert the slice to a map because the ordering is non-deterministic.
 	labelsMap := make(map[string]Label)
-	for _, label := range s.QueryLabels() {
+	for _, label := range s.Labels {
 		labelsMap[label.Name] = label
 	}
 	return labelsMap
 })
 
 var checkConnections = queryChecker(func(s Stitch) interface{} {
-	return s.QueryConnections()
+	return s.Connections
 })

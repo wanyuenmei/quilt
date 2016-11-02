@@ -17,8 +17,18 @@ import (
 
 // A Stitch is an abstract representation of the policy language.
 type Stitch struct {
-	code string
-	ctx  *evalCtx
+	Containers  []Container
+	Labels      []Label
+	Connections []Connection
+	Placements  []Placement
+	Machines    []Machine
+
+	AdminACL  []string
+	MaxPrice  float64
+	Namespace string
+
+	Invariants []invariant
+	code       string
 }
 
 // A Placement constraint guides where containers may be scheduled, either relative to
@@ -90,21 +100,6 @@ const PublicInternetLabel = "public"
 // or if no max is specified and `x` is larger than `stitchr.min`.
 func (stitchr Range) Accepts(x float64) bool {
 	return stitchr.Min <= x && (stitchr.Max == 0 || x <= stitchr.Max)
-}
-
-// Even though `evalCtx` isn't exported, we have to export its fields so that
-// we can unmarshal it with `encoding/json`.
-type evalCtx struct {
-	Containers  []Container
-	Labels      []Label
-	Connections []Connection
-	Placements  []Placement
-	Machines    []Machine
-	Invariants  []invariant
-
-	AdminACL  []string
-	MaxPrice  float64
-	Namespace string
 }
 
 func run(vm *otto.Otto, filename string, code string) (otto.Value, error) {
@@ -188,18 +183,14 @@ func New(specStr string, getter ImportGetter) (Stitch, error) {
 		return Stitch{}, err
 	}
 
-	ctx, err := parseContext(vm)
+	spec, err := parseContext(vm)
 	if err != nil {
 		return Stitch{}, err
 	}
-	ctx.createPortRules()
+	spec.createPortRules()
+	spec.code = specStr
 
-	spec := Stitch{
-		code: specStr,
-		ctx:  &ctx,
-	}
-
-	if len(ctx.Invariants) == 0 {
+	if len(spec.Invariants) == 0 {
 		return spec, nil
 	}
 
@@ -208,17 +199,17 @@ func New(specStr string, getter ImportGetter) (Stitch, error) {
 		return Stitch{}, err
 	}
 
-	if err := checkInvariants(graph, ctx.Invariants); err != nil {
+	if err := checkInvariants(graph, spec.Invariants); err != nil {
 		return Stitch{}, err
 	}
 
 	return spec, nil
 }
 
-func parseContext(vm *otto.Otto) (ctx evalCtx, err error) {
+func parseContext(vm *otto.Otto) (stc Stitch, err error) {
 	vmCtx, err := vm.Run("deployment.toQuiltRepresentation()")
 	if err != nil {
-		return ctx, err
+		return stc, err
 	}
 
 	// Export() always returns `nil` as the error (it's only present for
@@ -226,17 +217,17 @@ func parseContext(vm *otto.Otto) (ctx evalCtx, err error) {
 	exp, _ := vmCtx.Export()
 	ctxStr, err := json.Marshal(exp)
 	if err != nil {
-		return ctx, err
+		return stc, err
 	}
-	err = json.Unmarshal(ctxStr, &ctx)
-	return ctx, err
+	err = json.Unmarshal(ctxStr, &stc)
+	return stc, err
 }
 
 // createPortRules creates exclusive placement rules such that no two containers
 // listening on the same public port get placed on the same machine.
-func (ctx *evalCtx) createPortRules() {
+func (stitch *Stitch) createPortRules() {
 	ports := make(map[int][]string)
-	for _, c := range ctx.Connections {
+	for _, c := range stitch.Connections {
 		if c.From != PublicInternetLabel && c.To != PublicInternetLabel {
 			continue
 		}
@@ -253,7 +244,7 @@ func (ctx *evalCtx) createPortRules() {
 	for _, labels := range ports {
 		for _, tgt := range labels {
 			for _, other := range labels {
-				ctx.Placements = append(ctx.Placements,
+				stitch.Placements = append(stitch.Placements,
 					Placement{
 						Exclusive:   true,
 						TargetLabel: tgt,
@@ -262,50 +253,6 @@ func (ctx *evalCtx) createPortRules() {
 			}
 		}
 	}
-}
-
-// QueryLabels retrieves all labels declared in the Stitch.
-func (stitch Stitch) QueryLabels() []Label {
-	return stitch.ctx.Labels
-}
-
-// QueryContainers retrieves all containers declared in stitch.
-func (stitch Stitch) QueryContainers() []Container {
-	var containers []Container
-	for _, c := range stitch.ctx.Containers {
-		containers = append(containers, c)
-	}
-	return containers
-}
-
-// QueryMachines returns all machines declared in the stitch.
-func (stitch Stitch) QueryMachines() []Machine {
-	return stitch.ctx.Machines
-}
-
-// QueryConnections returns the connections declared in the stitch.
-func (stitch Stitch) QueryConnections() []Connection {
-	return stitch.ctx.Connections
-}
-
-// QueryPlacements returns the placements declared in the stitch.
-func (stitch Stitch) QueryPlacements() []Placement {
-	return stitch.ctx.Placements
-}
-
-// QueryMaxPrice returns the max allowable machine price declared in the stitch.
-func (stitch Stitch) QueryMaxPrice() float64 {
-	return stitch.ctx.MaxPrice
-}
-
-// QueryNamespace returns the namespace declared in the stitch.
-func (stitch Stitch) QueryNamespace() string {
-	return stitch.ctx.Namespace
-}
-
-// QueryAdminACL returns the admin ACLs declared in the stitch.
-func (stitch Stitch) QueryAdminACL() []string {
-	return stitch.ctx.AdminACL
 }
 
 // String returns the stitch in its code form.
