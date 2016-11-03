@@ -78,6 +78,57 @@ Outer:
 	}
 }
 
+// Compute the peer labels map if it is nil, otherwise just return it
+func computePeerLabels(peerLabels map[string]struct{}, m minion,
+	dbcID int) map[string]struct{} {
+
+	if peerLabels != nil {
+		return peerLabels
+	}
+
+	peerLabels = map[string]struct{}{}
+	for _, peer := range m.containers {
+		if peer.ID == dbcID {
+			continue
+		}
+
+		for _, label := range peer.Labels {
+			peerLabels[label] = struct{}{}
+		}
+	}
+	return peerLabels
+}
+
+// Check that the placement is not violated by both directions of the constraint
+func validExclusion(target, other string, cLabels, pLabels map[string]struct{}) bool {
+	_, tcOK := cLabels[target]
+	_, tpOK := pLabels[other]
+	tValid := !tcOK || !tpOK
+
+	_, ocOK := cLabels[other]
+	_, opOK := pLabels[target]
+	oValid := !ocOK || !opOK
+
+	return tValid && oValid
+}
+
+func checkExclusionConstraint(constraint db.Placement, cLabels,
+	pLabels map[string]struct{}) bool {
+
+	if !constraint.Exclusive {
+		// XXX: Inclusive OtherLabel is hard because we can't
+		// make placement decisions without considering all the
+		// containers on all of the minions.
+		log.WithField("constraint", constraint).Warning(
+			"Quilt currently does not support inclusive" +
+				" label placement constraints")
+		return true
+	}
+
+	return validExclusion(constraint.TargetLabel, constraint.OtherLabel,
+		cLabels, pLabels)
+}
+
 func validPlacement(constraints []db.Placement, m minion, dbc *db.Container) bool {
 	cLabels := map[string]struct{}{}
 	for _, label := range dbc.Labels {
@@ -86,37 +137,16 @@ func validPlacement(constraints []db.Placement, m minion, dbc *db.Container) boo
 
 	var peerLabels map[string]struct{}
 	for _, constraint := range constraints {
-		if _, ok := cLabels[constraint.TargetLabel]; !ok {
-			continue
+		if constraint.OtherLabel != "" {
+			peerLabels = computePeerLabels(peerLabels, m, dbc.ID)
+			ok := checkExclusionConstraint(constraint, cLabels, peerLabels)
+			if !ok {
+				return false
+			}
 		}
 
-		if constraint.OtherLabel != "" {
-			// Initialize the peerLabels only if we need it.
-			if peerLabels == nil {
-				peerLabels = map[string]struct{}{}
-				for _, peer := range m.containers {
-					if peer.ID == dbc.ID {
-						continue
-					}
-
-					for _, label := range peer.Labels {
-						peerLabels[label] = struct{}{}
-					}
-				}
-			}
-
-			if constraint.Exclusive {
-				if _, ok := peerLabels[constraint.OtherLabel]; ok {
-					return false
-				}
-			} else {
-				// XXX: Inclusive OtherLabel is hard because we can't
-				// make placement decisions without considering all the
-				// containers on all of the minions.
-				log.WithField("constraint", constraint).Warning(
-					"Quilt currently does not support inclusive" +
-						" label placement constraints")
-			}
+		if _, ok := cLabels[constraint.TargetLabel]; !ok {
+			continue
 		}
 
 		if constraint.Provider != "" {

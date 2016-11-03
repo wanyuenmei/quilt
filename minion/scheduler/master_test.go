@@ -281,6 +281,57 @@ func TestMakeContext(t *testing.T) {
 	}
 }
 
+func TestValidPlacementTwoWay(t *testing.T) {
+	t.Parallel()
+
+	dbc := &db.Container{ID: 1, Labels: []string{"red"}}
+	m := minion{
+		db.Minion{
+			PrivateIP: "1.2.3.4",
+			Provider:  "Provider",
+			Size:      "Size",
+			Region:    "Region",
+		},
+		[]*db.Container{{ID: 2, Labels: []string{"blue"}}},
+	}
+
+	dbc1 := &db.Container{ID: 4, Labels: []string{"blue"}}
+	m1 := minion{
+		db.Minion{
+			PrivateIP: "1.2.3.4",
+			Provider:  "Provider",
+			Size:      "Size",
+			Region:    "Region",
+		},
+		[]*db.Container{{ID: 3, Labels: []string{"red"}}},
+	}
+
+	constraints := []db.Placement{
+		{
+			Exclusive:   true,
+			TargetLabel: "blue",
+			OtherLabel:  "red",
+		},
+	}
+
+	testCases := []struct {
+		dbc *db.Container
+		m   minion
+	}{
+		{dbc, m},
+		{dbc1, m1},
+	}
+
+	for _, testCase := range testCases {
+		res := validPlacement(constraints, testCase.m, testCase.dbc)
+		if res {
+			t.Fatalf("Succeeded with bad placement: %s on %s",
+				testCase.dbc.Labels[0],
+				testCase.m.containers[0].Labels[0])
+		}
+	}
+}
+
 func TestValidPlacementLabel(t *testing.T) {
 	t.Parallel()
 
