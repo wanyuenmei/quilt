@@ -1,104 +1,117 @@
-[![Build Status](https://travis-ci.org/NetSys/quilt.svg?branch=master)](https://travis-ci.org/NetSys/quilt)
-[![Go Report Card](https://goreportcard.com/badge/github.com/NetSys/quilt)](https://goreportcard.com/report/github.com/NetSys/quilt)
-[![Coverage Status](https://coveralls.io/repos/github/NetSys/quilt/badge.svg?branch=master)](https://coveralls.io/github/NetSys/quilt?branch=master)
-
 # Quilt
 
-Quilt aims to be the easiest way to deploy and network containers.
+<img src="./docs/images/quilt_mean.gif">
 
-Traditional container orchestrators have a procedural API focused narrowly on
-compute.  The network, usually an afterthought, must be managed by a separate
-system with its own independent API.  This leaves operators with a complex
-task: write a deployment script that configures everything necessary to get
-their application up and running.
+Quilt is a simple way to use JavaScript to build and manage anything from website backends to complex distributed systems. As shown above, a few simple commands will get your system up and running.
 
-Quilt takes a different approach.  It relies on a new domain specific language,
-Stitch, to _specify_ distributed applications, independent of the specific
-infrastructure they run on.  Given a stitch, Quilt can automatically deploy in
-a variety of environments: Amazon EC2, and Google Compute
-Engine, with more coming soon.  Furthermore it can do this with **no setup** --
-just point Quilt at a stitch and it will take care of the rest: booting virtual
-machines, starting containers on those VMs, and ensuring they can communicate.
+Building infrastructure and running applications with Quilt is simple, intuitive, and flexible. With Quilt.js, you specify your infrastructure declaratively in JavaScript, and Quilt then takes care of deploying it on one or more cloud providers. Subsequently scaling and modifying the infrastructure then becomes a matter of simply changing a few lines of JavaScript code.
 
-Quilt is currently in alpha and under heavy development. Please try it out!
-We are eager for feedback!
+The Quilt.js JavaScript framework allows for development, versioning, and testing of infrastructure in the same way we do for application code. Additionally, Quilt.js code is shareable, reusable and composable, making it easy to set up and manage systems without being an expert in system administration.
 
-You can find setup instructions and a quick tutorial at
-[GettingStarted.md](docs/GettingStarted.md).
+Quilt is a research project out of UC Berkeley. It is currently under heavy development, but please try it out - we are eager for feedback!
 
-## Stitch
+## Example: Deploying a MEAN Stack App with Quilt
+The MEAN stack (MongoDB, Express, AngularJS, and Node.js) is a popular fullstack JavaScript framework used for web development. Deploying a flexible, multi-node MEAN stack app can be both time consuming and costly, but Quilt simplifies this process.
 
-Stitch is a domain specific language based on Scheme and has many of the tools
-one would expect: modules, functions, variables, arithmetic, etc.  In addition,
-it has some primitives for describing an application -- the collection of
-containers that should be running, and precisely which are _allowed_ to
-communicate.
-
-## A Simple Stitch
-
-To declare 3 docker containers with the latest Ubuntu image and a postgres database, one would use the following stitch:
+With Quilt, it takes less than 10 lines of JavaScript code to set up a replicated Node.js application, connect it to MongoDB, and hook it up with a web proxy:
 
 [//]: # (b1)
 ```javascript
-    var containers = new Service("containers", new Container("ubuntu").replicate(3));
-    var database = new Service("database", [new Container("postgres")]);
+    // `App` is a Node.js application using Express, AngluarJS, and MongoDB.
+    var App = require("github.com/NetSys/quilt/specs/mean/app");
+    var HaProxy = require("github.com/NetSys/quilt/specs/haproxy/haproxy").Haproxy;
+    var Mongo = require("github.com/NetSys/quilt/specs/mongo/mongo");
 
-    deployment.deploy([containers, database]);
+    // Create 3 replicated instances of each service.
+    var mongo = new Mongo(3);
+    var app = new App(3, 8080, { MONGO_URI: mongo.uri("mean-example") });
+    var haproxy = new HaProxy(3, app.services(), 8080);
+
+    // Connect the app and database.
+    mongo.connect(27017, app);
+    app.connect(27017, mongo);
+    // Make the proxy accessible from the public internet on port 80.
+    haproxy.public();
 ```
+The application is infrastructure agnostic, so it can be deployed on any - and possibly many - of the Quilt supported cloud providers. Here, we specify a possible multi-node setup on AWS:
 
-This will produce a simple network:
-
-<img src="./docs/images/quiltSimple.png">
-
-Next, suppose we'd like to expand with a batch processing system and 5 Apache
-containers. By default containers can't communicate, so we will have to add
-some network connections.
-
-[//]: # (b2)
+[//]: # (b1)
 ```javascript
-    // Create 5 Apache containers, and label them "webTier"
-    var webTier = new Service("webTier", new Container("httpd").replicate(5));
+    // `App` is a Node.js application using Express, AngluarJS, and MongoDB.
+    var App = require("github.com/NetSys/quilt/specs/mean/app");
+    var HaProxy = require("github.com/NetSys/quilt/specs/haproxy/haproxy").Haproxy;
+    var Mongo = require("github.com/NetSys/quilt/specs/mongo/mongo");
 
-    // Create 2 Spark containers, and label them "batch"
-    var batch = new Service("batch", new Container("spark").replicate(2));
+    // Create 3 replicated instances of each service.
+    var mongo = new Mongo(3);
+    var app = new App(3, 8080, { MONGO_URI: mongo.uri("mean-example") });
+    var haproxy = new HaProxy(3, app.services(), 8080);
 
-    // Create a Postgres container, and label it "database"
-    var database = new Service("database", [new Container("postgres")]);
+    // Connect the app and database.
+    mongo.connect(27017, app);
+    app.connect(27017, mongo);
+    // Make the proxy accessible from the public internet on port 80.
+    haproxy.public();
+```
+The application is infrastructure agnostic, so it can be deployed on any - and possibly many - of the Quilt supported cloud providers. Here, we specify a possible multi-node setup on AWS:
 
-    // Allow the public internet to connect to the webTier over port 80
-    publicInternet.connect(80, webTier);
+[//]: # (b1)
+```javascript
+    var namespace = createDeployment({
+        adminACL: ["local"],
+    });
 
-    // Allow the webTier to connect to the database on port 1433
-    webTier.connect(1433, database);
+    // An AWS VM with 1-2 CPUs and 1-2 GiB RAM.
+    // The Github user `ejj` can ssh into the VMs.
+    var baseMachine = new Machine({
+        provider: "Amazon",
+        cpu: new Range(2),
+        ram: new Range(2),
+        sshKeys: githubKeys("ejj"),
+    });
 
-    // Allow the batch processor to connect to the database and webTier via SSH
-    batch.connect(22, webTier)
-    batch.connect(22, database);
+    // Boot VMs with the properties of `baseMachine`.
+    namespace.deploy(baseMachine.asMaster());
+    namespace.deploy(baseMachine.asWorker().replicate(3));
+```
+All that is left is to deploy the application on the specified infrastructure:
 
-    // Allow all containers in the webTier to connect to each other on any port
-    webTier.connect(new PortRange(0, 65535), webTier);
-
-    // Deploy our containers.
-    deployment.deploy([webTier, batch, database]);
+[//]: # (b1)
+```javascript
+    namespace.deploy(app);
+    namespace.deploy(mongo);
+    namespace.deploy(haproxy);
 ```
 
-After the above commands, our application looks a lot more interesting:
+This spec can be found in [`specs/mean/example.js`](./specs/mean/example.js) and used to deploy your app. Check out [this guide](./docs/DeployMEANapp.md) for step by step instructions on how to deploy your own application using Quilt.
 
-<img src="./docs/images/quiltAbstractWebTierConnect.png">
+As shown in the very beginning, running the simple command `quilt run specs/mean/example.js` is enough to deploy a mean app.
 
-With this stitch, Quilt can now boot the system. Furthermore, if the stitch is
-modified, Quilt will automatically adapt by adding or removing containers as
-necessary. You can learn the specifics of the Stitch language by reading
-[Stitch.md](docs/Stitch.md).
+## Features
+Quilt offers a lot of great features. These are some of them:
 
-## Contributing
-If you are interested in contributing to Quilt, check out
-[Contributing.md](Contributing.md) and [Dev.md](docs/Dev.md) for development
-instructions, details about the code structure, and more.
+* Build infrastructure in JavaScript
+* Simple deployment and management of applications
+* Easy cross-cloud deployment
+* Low cost
+* Sharable and composable infrastructure code
+* Intuitive networking
+* Flexible and scalable infrastructure
 
-## Contact
-Quilt is led by [Ethan J. Jackson](http://ejj.github.io/), a PhD student at
-the UC Berkeley NetSys lab.  Feel free to direct questions, comments, and
-inquiries to his email at
-[ejj@eecs.berkeley.edu](mailto:ejj@eecs.berkeley.edu). Additionally, numerous
-other contact methods may be found [here](http://ejj.github.io/contact.html).
+There are more to come in the near future!
+
+## Install
+#### Install and Set Up Go
+Install Go with your package manager or by following the directions on [Go's webiste](https://golang.org/doc/install).
+
+Setup your `GOPATH` and `PATH` environment variables in your `~/.bashrc` file. E.g.:
+
+    export GOPATH=’~/gowork’
+    export PATH=’$PATH:$GOPATH/bin’
+
+#### Download Quilt
+Download and install Quilt and its dependencies using `go get`
+
+    go get github.com/NetSys/quilt
+
+Quilt is now installed! Check out the [Getting Started](./docs/GettingStarted.md) guide for more detailed instructions on how to get your Quilt deployment up and running.
