@@ -49,28 +49,7 @@ web proxy:
     // Make the proxy accessible from the public internet on port 80.
     haproxy.public();
 ```
-The application is infrastructure agnostic, so it can be deployed on any - and
-possibly many - of the Quilt supported cloud providers. Here, we specify a
-possible multi-node setup on AWS:
 
-[//]: # (b1)
-```javascript
-    // `App` is a Node.js application using Express, AngluarJS, and MongoDB.
-    var App = require("github.com/NetSys/quilt/specs/mean/app");
-    var HaProxy = require("github.com/NetSys/quilt/specs/haproxy/haproxy").Haproxy;
-    var Mongo = require("github.com/NetSys/quilt/specs/mongo/mongo");
-
-    // Create 3 replicated instances of each service.
-    var mongo = new Mongo(3);
-    var app = new App(3, 8080, { MONGO_URI: mongo.uri("mean-example") });
-    var haproxy = new HaProxy(3, app.services(), 8080);
-
-    // Connect the app and database.
-    mongo.connect(27017, app);
-    app.connect(27017, mongo);
-    // Make the proxy accessible from the public internet on port 80.
-    haproxy.public();
-```
 The application is infrastructure agnostic, so it can be deployed on any - and
 possibly many - of the Quilt supported cloud providers. Here, we specify a
 possible multi-node setup on AWS:
@@ -108,8 +87,8 @@ and used to deploy your app. Check out [this guide](./docs/DeployMEANapp.md)
 for step by step instructions on how to deploy your own application using
 Quilt.
 
-As shown in the very beginning, running the simple command `quilt run
-specs/mean/example.js` is enough to deploy a mean app.
+As shown in the very beginning, deploying a MEAN app with Quilt is now as simple
+as running the command `quilt run specs/mean/example.js`.
 
 ## Features
 Quilt offers a lot of great features. These are some of them:
