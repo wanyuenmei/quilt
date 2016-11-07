@@ -3,6 +3,9 @@ package docs
 import (
 	"bufio"
 	"errors"
+	"os"
+	"path/filepath"
+	"regexp"
 	"testing"
 
 	"github.com/NetSys/quilt/stitch"
@@ -10,41 +13,57 @@ import (
 )
 
 const (
-	blockStart = "```javascript\n"
-	blockEnd   = "```\n"
+	blockStart     = "```javascript\n"
+	blockEnd       = "```\n"
+	commentPattern = "^\\[//\\]: # \\((.*)\\)\\W*$"
 )
 
 var errUnbalanced = errors.New("unbalanced code blocks")
 
 type readmeParser struct {
-	codeBlocks []string
+	currentBlock string
+	// Map block ID to code block.
+	codeBlocks map[string]string
 	recording  bool
 }
 
 func (parser *readmeParser) parse(line string) error {
 	isStart := line == blockStart
 	isEnd := line == blockEnd
+	reComment := regexp.MustCompile(commentPattern)
+	match := reComment.FindStringSubmatch(line)
+	isComment := len(match) > 0
 
 	if (isStart && parser.recording) || (isEnd && !parser.recording) {
 		return errUnbalanced
 	}
 
 	switch {
+	case isComment:
+		parser.currentBlock = match[1]
 	case isStart:
 		parser.recording = true
-		parser.codeBlocks = append(parser.codeBlocks, "")
+
+		if parser.currentBlock == "" {
+			return errors.New("missing code block id")
+		}
+
+		if _, ok := parser.codeBlocks[parser.currentBlock]; !ok {
+			parser.codeBlocks[parser.currentBlock] = ""
+		}
 	case isEnd:
 		parser.recording = false
+		parser.currentBlock = ""
 	}
 
 	if parser.recording && !isStart {
-		parser.codeBlocks[len(parser.codeBlocks)-1] += line
+		parser.codeBlocks[parser.currentBlock] += line
 	}
 
 	return nil
 }
 
-func (parser readmeParser) blocks() ([]string, error) {
+func (parser readmeParser) blocks() (map[string]string, error) {
 	if parser.recording {
 		return nil, errUnbalanced
 	}
@@ -62,6 +81,7 @@ func TestReadme(t *testing.T) {
 	scanner := bufio.NewScanner(f)
 
 	parser := readmeParser{}
+	parser.codeBlocks = make(map[string]string)
 
 	for scanner.Scan() {
 		if err := parser.parse(scanner.Text() + "\n"); err != nil {
@@ -81,15 +101,20 @@ func TestReadme(t *testing.T) {
 		return
 	}
 
+	goPath := os.Getenv("GOPATH")
+	quiltPath := filepath.Join(goPath, "src")
+
 	for _, block := range blocks {
-		if err = checkConfig(block); err != nil {
+		if err = checkConfig(block, quiltPath); err != nil {
 			t.Errorf(err.Error())
 		}
 	}
 }
 
-func checkConfig(content string) error {
-	_, err := stitch.New(content, stitch.DefaultImportGetter)
+func checkConfig(content string, quiltPath string) error {
+	_, err := stitch.New(content, stitch.ImportGetter{
+		Path: quiltPath,
+	})
 	if err != nil {
 		return err
 	}
