@@ -6,8 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"time"
-
-	"gopkg.in/mgo.v2"
 )
 
 func main() {
@@ -22,7 +20,6 @@ func main() {
 	}
 
 	resolveHostname(host)
-	waitForMongo(mongoURI)
 
 	if err := runServer(); err != nil {
 		log.Fatalf("Error running server: %s", err.Error())
@@ -45,24 +42,6 @@ func resolveHostname(hostname string) []string {
 		}
 
 		log.Printf("Unable to resolve %s: %s. Retrying...", hostname, err.Error())
-		time.Sleep(time.Second)
-	}
-}
-
-func waitForMongo(mongoURI string) {
-	dialInfo, err := mgo.ParseURL(mongoURI)
-	if err != nil {
-		log.Fatalf("Failed to parse Mongo URI: %s\n", err.Error())
-	}
-
-	for {
-		_, err = mgo.DialWithInfo(dialInfo)
-		if err == nil {
-			log.Print("Connected to Mongo")
-			return
-		}
-
-		log.Printf("Failed to connect: %s\n", err.Error())
 		time.Sleep(time.Second)
 	}
 }
