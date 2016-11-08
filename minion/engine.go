@@ -20,9 +20,6 @@ func updatePolicy(view db.Database, role db.Role, spec string) {
 
 	updateConnections(view, compiled)
 	if role == db.Master {
-		// This must happen after `updateConnections` because we generate
-		// placement rules based on whether there are incoming connections from
-		// public internet.
 		updatePlacements(view, compiled)
 
 		// The container table is aspirational -- it's the set of containers that
