@@ -7,46 +7,6 @@
 	],
 	"Deps": [
 		{
-			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/compute",
-			"Comment": "v3.1.0-beta-18-g87de771",
-			"Rev": "87de771fcdf5ec4341f3842f74b5bb98652b10f7"
-		},
-		{
-			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/network",
-			"Comment": "v3.1.0-beta-18-g87de771",
-			"Rev": "87de771fcdf5ec4341f3842f74b5bb98652b10f7"
-		},
-		{
-			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/resources/resources",
-			"Comment": "v3.1.0-beta-18-g87de771",
-			"Rev": "87de771fcdf5ec4341f3842f74b5bb98652b10f7"
-		},
-		{
-			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/storage",
-			"Comment": "v3.1.0-beta-18-g87de771",
-			"Rev": "87de771fcdf5ec4341f3842f74b5bb98652b10f7"
-		},
-		{
-			"ImportPath": "github.com/Azure/go-autorest/autorest",
-			"Comment": "v7.0.7-4-gd09c6ea",
-			"Rev": "d09c6ea2240178fb3942d698d432dc00ea7e08e6"
-		},
-		{
-			"ImportPath": "github.com/Azure/go-autorest/autorest/azure",
-			"Comment": "v7.0.7-4-gd09c6ea",
-			"Rev": "d09c6ea2240178fb3942d698d432dc00ea7e08e6"
-		},
-		{
-			"ImportPath": "github.com/Azure/go-autorest/autorest/date",
-			"Comment": "v7.0.7-4-gd09c6ea",
-			"Rev": "d09c6ea2240178fb3942d698d432dc00ea7e08e6"
-		},
-		{
-			"ImportPath": "github.com/Azure/go-autorest/autorest/to",
-			"Comment": "v7.0.7-4-gd09c6ea",
-			"Rev": "d09c6ea2240178fb3942d698d432dc00ea7e08e6"
-		},
-		{
 			"ImportPath": "github.com/Sirupsen/logrus",
 			"Comment": "v0.10.0-19-gf3cfb45",
 			"Rev": "f3cfb454f4c209e6668c95216c4744b8fddb2356"
@@ -189,11 +149,6 @@
 			"Rev": "5215b55f46b2b919f50a1df0eaa5886afe4e3b3d"
 		},
 		{
-			"ImportPath": "github.com/dgrijalva/jwt-go",
-			"Comment": "v3.0.0-6-g63734ea",
-			"Rev": "63734eae1ef55eaac06fdc0f312615f2e321e273"
-		},
-		{
 			"ImportPath": "github.com/docker/docker/opts",
 			"Comment": "v1.4.1-12527-gc764234",
 			"Rev": "c764234c3b4490a7b6cd6239607996c502d9ce22"
@@ -275,14 +230,6 @@
 		{
 			"ImportPath": "github.com/golang/protobuf/proto",
 			"Rev": "c3cefd437628a0b7d31b34fe44b3a7a540e98527"
-		},
-		{
-			"ImportPath": "github.com/google/go-github/github",
-			"Rev": "7ec4e45f77474b3a7b7d9b7ef233a0cc8339ddf3"
-		},
-		{
-			"ImportPath": "github.com/google/go-querystring/query",
-			"Rev": "9235644dd9e52eeae6fa48efd539fdc351a0af53"
 		},
 		{
 			"ImportPath": "github.com/hashicorp/go-cleanhttp",
@@ -575,31 +522,6 @@
 			"ImportPath": "google.golang.org/grpc/transport",
 			"Comment": "v1.0.0-151-g35896af",
 			"Rev": "35896af9ad39c1fb1b1cd925fe3621be361e3d81"
-		},
-		{
-			"ImportPath": "gopkg.in/mgo.v2",
-			"Comment": "r2016.08.01-5-g3f83fa5",
-			"Rev": "3f83fa5005286a7fe593b055f0d7771a7dce4655"
-		},
-		{
-			"ImportPath": "gopkg.in/mgo.v2/bson",
-			"Comment": "r2016.08.01-5-g3f83fa5",
-			"Rev": "3f83fa5005286a7fe593b055f0d7771a7dce4655"
-		},
-		{
-			"ImportPath": "gopkg.in/mgo.v2/internal/json",
-			"Comment": "r2016.08.01-5-g3f83fa5",
-			"Rev": "3f83fa5005286a7fe593b055f0d7771a7dce4655"
-		},
-		{
-			"ImportPath": "gopkg.in/mgo.v2/internal/sasl",
-			"Comment": "r2016.08.01-5-g3f83fa5",
-			"Rev": "3f83fa5005286a7fe593b055f0d7771a7dce4655"
-		},
-		{
-			"ImportPath": "gopkg.in/mgo.v2/internal/scram",
-			"Comment": "r2016.08.01-5-g3f83fa5",
-			"Rev": "3f83fa5005286a7fe593b055f0d7771a7dce4655"
 		},
 		{
 			"ImportPath": "gopkg.in/sourcemap.v1",
