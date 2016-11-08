@@ -1,4 +1,5 @@
-function App(cfg) {
+// Specs for Node.js web service
+function Node(cfg) {
   if (typeof cfg.nWorker !== 'number') {
     throw new Error('`nWorker` is required');
   }
@@ -20,22 +21,22 @@ function App(cfg) {
   this._app.connect(this._port, this._app);
 };
 
-App.prototype.deploy = function(deployment) {
+Node.prototype.deploy = function(deployment) {
   deployment.deploy([this._app]);
 };
 
-App.prototype.services = function() {
+Node.prototype.services = function() {
   return [this._app];
 };
 
-App.prototype.port = function() {
+Node.prototype.port = function() {
   return this._port;
 };
 
-App.prototype.connect = function(port, to) {
+Node.prototype.connect = function(port, to) {
   to.services().forEach(function(service) {
     this._app.connect(port, service);
   }.bind(this));
 };
 
-module.exports = App;
+module.exports = Node;

@@ -1,6 +1,6 @@
 var HaProxy = require("github.com/NetSys/quilt/specs/haproxy/haproxy").Haproxy;
 var Mongo = require("github.com/NetSys/quilt/specs/mongo/mongo");
-var App = require("github.com/NetSys/quilt/specs/mean/app");
+var Node = require("github.com/NetSys/quilt/specs/node/node");
 
 // AWS
 var namespace = createDeployment({
@@ -17,7 +17,7 @@ namespace.deploy(baseMachine.asMaster());
 namespace.deploy(baseMachine.asWorker().replicate(3));
 
 var mongo = new Mongo(3);
-var app = new App({
+var app = new Node({
   nWorker: 3,
   image: "quilt/mean-service",
   env: {
