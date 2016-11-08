@@ -1,3 +1,7 @@
+[![Build Status](https://travis-ci.org/NetSys/quilt.svg?branch=master)](https://travis-ci.org/NetSys/quilt)
+[![Go Report Card](https://goreportcard.com/badge/github.com/NetSys/quilt)](https://goreportcard.com/report/github.com/NetSys/quilt)
+[![Coverage Status](https://coveralls.io/repos/github/NetSys/quilt/badge.svg?branch=master)](https://coveralls.io/github/NetSys/quilt?branch=master)
+
 # Quilt
 
 <img src="./docs/images/quilt_mean.gif">
