@@ -46,13 +46,13 @@ web proxy:
     var mongo = new Mongo(3);
     var app = new App({
       nWorker: 3,
-      port: 8080,
       image: "quilt/mean-service",
       env: {
+        PORT: "80",
         MONGO_URI: mongo.uri("mean-example")
       }
     });
-    var haproxy = new HaProxy(3, app.services(), 8080);
+    var haproxy = new HaProxy(3, app.services());
 
     // Connect the app and database.
     mongo.connect(27017, app);
