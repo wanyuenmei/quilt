@@ -1,14 +1,15 @@
-var image = "quilt/mean-service";
-
 function App(cfg) {
   if (typeof cfg.nWorker !== 'number') {
     throw new Error('`nWorker` is required');
+  }
+  if (typeof cfg.image !== 'string') {
+    throw new Error('`image` is required');
   }
 
   this._port = cfg.port || 80;
 
   var env = cfg.env || {};
-  var containers = new Container(image).withEnv(env).replicate(cfg.nWorker);
+  var containers = new Container(cfg.image).withEnv(env).replicate(cfg.nWorker);
   this._app = new Service("app", containers);
 
   var hosts = this._app.children();

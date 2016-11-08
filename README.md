@@ -47,6 +47,7 @@ web proxy:
     var app = new App({
       nWorker: 3,
       port: 8080,
+      image: "quilt/mean-service",
       env: {
         MONGO_URI: mongo.uri("mean-example")
       }
