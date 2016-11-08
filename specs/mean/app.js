@@ -28,6 +28,10 @@ App.prototype.services = function() {
   return [this._app];
 };
 
+App.prototype.port = function() {
+  return this._port;
+};
+
 App.prototype.connect = function(port, to) {
   to.services().forEach(function(service) {
     this._app.connect(port, service);
