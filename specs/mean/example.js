@@ -17,7 +17,13 @@ namespace.deploy(baseMachine.asMaster());
 namespace.deploy(baseMachine.asWorker().replicate(3));
 
 var mongo = new Mongo(3);
-var app = new App(3, 8080, { MONGO_URI: mongo.uri("mean-example") });
+var app = new App({
+  nWorker: 3,
+  port: 8080,
+  env: {
+    MONGO_URI: mongo.uri("mean-example")
+  }
+});
 var haproxy = new HaProxy(3, app.services(), 8080);
 
 // Places all haproxy containers on separate Worker VMs.

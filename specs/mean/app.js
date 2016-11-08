@@ -1,9 +1,14 @@
 var image = "quilt/mean-service";
 
-function App(nWorker, port, env) {
-  this._port = port || 80;
+function App(cfg) {
+  if (typeof cfg.nWorker !== 'number') {
+    throw new Error('`nWorker` is required');
+  }
 
-  var containers = new Container(image).withEnv(env).replicate(nWorker);
+  this._port = cfg.port || 80;
+
+  var env = cfg.env || {};
+  var containers = new Container(image).withEnv(env).replicate(cfg.nWorker);
   this._app = new Service("app", containers);
 
   var hosts = this._app.children();
@@ -12,7 +17,7 @@ function App(nWorker, port, env) {
   }
 
   this._app.connect(this._port, this._app);
-}
+};
 
 App.prototype.deploy = function(deployment) {
   deployment.deploy([this._app]);

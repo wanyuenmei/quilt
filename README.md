@@ -44,7 +44,13 @@ web proxy:
 
     // Create 3 replicated instances of each service.
     var mongo = new Mongo(3);
-    var app = new App(3, 8080, { MONGO_URI: mongo.uri("mean-example") });
+    var app = new App({
+      nWorker: 3,
+      port: 8080,
+      env: {
+        MONGO_URI: mongo.uri("mean-example")
+      }
+    });
     var haproxy = new HaProxy(3, app.services(), 8080);
 
     // Connect the app and database.
