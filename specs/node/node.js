@@ -22,7 +22,7 @@ function Node(cfg) {
 };
 
 Node.prototype.deploy = function(deployment) {
-  deployment.deploy([this._app]);
+  deployment.deploy(this.services());
 };
 
 Node.prototype.services = function() {
