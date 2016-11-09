@@ -37,13 +37,13 @@ web proxy:
 
 [//]: # (b1)
 ```javascript
-    // `App` is a Node.js application using Express, AngluarJS, and MongoDB.
     var Node = require("github.com/NetSys/quilt/specs/node/node");
     var HaProxy = require("github.com/NetSys/quilt/specs/haproxy/haproxy").Haproxy;
     var Mongo = require("github.com/NetSys/quilt/specs/mongo/mongo");
 
     // Create 3 replicated instances of each service.
     var mongo = new Mongo(3);
+    // `app` is a Node.js application using Express, AngluarJS, and MongoDB.
     var app = new Node({
       nWorker: 3,
       image: "quilt/mean-service",
