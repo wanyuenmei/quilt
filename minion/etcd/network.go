@@ -11,6 +11,7 @@ import (
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/join"
 	"github.com/NetSys/quilt/minion/ip"
+	"github.com/NetSys/quilt/minion/network"
 	"github.com/NetSys/quilt/util"
 
 	log "github.com/Sirupsen/logrus"
@@ -304,7 +305,7 @@ func updateEtcdLabel(s Store, etcdData storeData, containers []db.Container) (st
 
 	// No need to sync the SingleHost IPs, since they get their IPs from the dockerIP
 	// map, which was already synced in updateEtcdDocker
-	ip.Sync(newMultiHosts, ip.LabelPrefix, ip.SubMask)
+	syncIPs(newMultiHosts, ip.LabelPrefix, ip.SubMask)
 
 	if util.StrStrMapEqual(newMultiHosts, etcdData.multiHost) {
 		return etcdData, nil
@@ -442,7 +443,7 @@ func updateContainerIP(etcdData storeData, containers []db.Container,
 		newIPMap[sid] = oldIPMap[sid]
 	}
 
-	ip.Sync(newIPMap, subnet, ip.SubMask)
+	syncIPs(newIPMap, subnet, ip.SubMask)
 
 	if util.StrStrMapEqual(oldIPMap, newIPMap) {
 		return oldIPMap, nil
@@ -517,6 +518,36 @@ func updateDBLabels(view db.Database, etcdData storeData, ipMap map[string]strin
 		dbl.ContainerIPs = containerIPs[dbl.Label]
 
 		view.Commit(dbl)
+	}
+}
+
+// syncIPs takes a map of IDs to IPs and creates an IP address for every entry that's
+// missing one.
+func syncIPs(ipMap map[string]string, prefixIP net.IP, mask net.IPMask) {
+	var unassigned []string
+	ipSet := map[string]struct{}{}
+	subnet := net.IPNet{IP: prefixIP, Mask: mask}
+	for k, ipString := range ipMap {
+		ip := net.ParseIP(ipString)
+		if ip != nil && subnet.Contains(ip) {
+			ipSet[ip.String()] = struct{}{}
+		} else {
+			unassigned = append(unassigned, k)
+		}
+	}
+
+	// Don't assign the IP of the default gateway
+	ipSet[network.GatewayIP] = struct{}{}
+	for _, k := range unassigned {
+		addr := ip.Random(ipSet, prefixIP, mask)
+		if addr.Equal(net.IPv4zero) {
+			log.Errorf("Failed to allocate IP for %s.", k)
+			ipMap[k] = ""
+			continue
+		}
+
+		ipMap[k] = addr.String()
+		ipSet[addr.String()] = struct{}{}
 	}
 }
 

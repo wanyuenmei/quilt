@@ -1,77 +1,10 @@
 package ip
 
 import (
-	"math/rand"
 	"net"
 	"reflect"
 	"testing"
-
-	"github.com/davecgh/go-spew/spew"
 )
-
-func TestSyncIPs(t *testing.T) {
-	prefix := net.IPv4(10, 0, 0, 0)
-
-	nextRand := uint32(0)
-	Rand32 = func() uint32 {
-		ret := nextRand
-		nextRand++
-		return ret
-	}
-
-	defer func() {
-		Rand32 = rand.Uint32
-	}()
-
-	ipMap := map[string]string{
-		"a": "",
-		"b": "",
-		"c": "",
-	}
-
-	mask := net.CIDRMask(20, 32)
-	Sync(ipMap, prefix, mask)
-
-	// 10.0.0.1 is reserved for the default gateway
-	exp := sliceToSet([]string{"10.0.0.0", "10.0.0.2", "10.0.0.3"})
-	ipSet := map[string]struct{}{}
-	for _, ip := range ipMap {
-		ipSet[ip] = struct{}{}
-	}
-
-	if !eq(ipSet, exp) {
-		t.Error(spew.Sprintf("Unexpected IP allocations."+
-			"\nFound %s\nExpected %s\nMap %s",
-			ipSet, exp, ipMap))
-	}
-
-	ipMap["d"] = "junk"
-
-	Sync(ipMap, prefix, mask)
-
-	aIP := ipMap["d"]
-	expected := "10.0.0.4"
-	if aIP != expected {
-		t.Error(spew.Sprintf("Unexpected IP allocations.\nFound %s\nExpected %s",
-			aIP, expected))
-	}
-
-	// Force collisions
-	Rand32 = func() uint32 {
-		return 4
-	}
-
-	ipMap["a"] = "10.0.0.0"
-	ipMap["b"] = "10.0.0.2"
-	ipMap["c"] = "10.0.0.3"
-	ipMap["d"] = "junk"
-
-	Sync(ipMap, prefix, net.CIDRMask(30, 32)) // only 3 viable address in this mask
-
-	if ip, _ := ipMap["d"]; ip != "" {
-		t.Error(spew.Sprintf("Expected IP deletion, found %s", ip))
-	}
-}
 
 func TestMaskToInt(t *testing.T) {
 	mask := net.CIDRMask(16, 32)
@@ -119,14 +52,6 @@ func TestRandomIP(t *testing.T) {
 		// Probably a bug.
 		t.Errorf("Too few conflicts: %d", len(conflicts))
 	}
-}
-
-func sliceToSet(slice []string) map[string]struct{} {
-	res := map[string]struct{}{}
-	for _, s := range slice {
-		res[s] = struct{}{}
-	}
-	return res
 }
 
 func eq(a, b interface{}) bool {

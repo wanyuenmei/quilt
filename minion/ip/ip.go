@@ -6,10 +6,6 @@ import (
 	"math"
 	"math/rand"
 	"net"
-
-	"github.com/NetSys/quilt/minion/network"
-
-	log "github.com/Sirupsen/logrus"
 )
 
 var (
@@ -38,36 +34,6 @@ var (
 	// on the number of available subnets
 	MaxMinionCount = int(math.Pow(2, float64(minionMaskBits-quiltMaskBits))+0.5) - 1
 )
-
-// Sync takes a map of IDs to IPs and creates an IP address for every entry that's
-// missing one.
-func Sync(ipMap map[string]string, prefixIP net.IP, mask net.IPMask) {
-	var unassigned []string
-	ipSet := map[string]struct{}{}
-	subnet := net.IPNet{IP: prefixIP, Mask: mask}
-	for k, ipString := range ipMap {
-		ip := net.ParseIP(ipString)
-		if ip != nil && subnet.Contains(ip) {
-			ipSet[ip.String()] = struct{}{}
-		} else {
-			unassigned = append(unassigned, k)
-		}
-	}
-
-	// Don't assign the IP of the default gateway
-	ipSet[network.GatewayIP] = struct{}{}
-	for _, k := range unassigned {
-		ip := Random(ipSet, prefixIP, mask)
-		if ip.Equal(net.IPv4zero) {
-			log.Errorf("Failed to allocate IP for %s.", k)
-			ipMap[k] = ""
-			continue
-		}
-
-		ipMap[k] = ip.String()
-		ipSet[ip.String()] = struct{}{}
-	}
-}
 
 // MaskToInt takes in a CIDR Mask and return the integer representation of it.
 func MaskToInt(mask net.IPMask) uint32 {

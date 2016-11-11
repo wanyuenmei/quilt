@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"net"
 	"path"
 	"reflect"
 	"strconv"
@@ -469,6 +470,78 @@ func testUpdateDBLabels(t *testing.T, view db.Database) {
 	if !eq(lip, resultLabels) {
 		t.Error(spew.Sprintf("Found: %v\nExpected: %v\n", lip, labelStruct))
 	}
+}
+
+func TestSyncIPs(t *testing.T) {
+	prefix := net.IPv4(10, 0, 0, 0)
+
+	nextRand := uint32(0)
+	ip.Rand32 = func() uint32 {
+		ret := nextRand
+		nextRand++
+		return ret
+	}
+
+	defer func() {
+		ip.Rand32 = rand.Uint32
+	}()
+
+	ipMap := map[string]string{
+		"a": "",
+		"b": "",
+		"c": "",
+	}
+
+	mask := net.CIDRMask(20, 32)
+	syncIPs(ipMap, prefix, mask)
+
+	// 10.0.0.1 is reserved for the default gateway
+	exp := sliceToSet([]string{"10.0.0.0", "10.0.0.2", "10.0.0.3"})
+	ipSet := map[string]struct{}{}
+	for _, ip := range ipMap {
+		ipSet[ip] = struct{}{}
+	}
+
+	if !eq(ipSet, exp) {
+		t.Error(spew.Sprintf("Unexpected IP allocations."+
+			"\nFound %s\nExpected %s\nMap %s",
+			ipSet, exp, ipMap))
+	}
+
+	ipMap["d"] = "junk"
+
+	syncIPs(ipMap, prefix, mask)
+
+	aIP := ipMap["d"]
+	expected := "10.0.0.4"
+	if aIP != expected {
+		t.Error(spew.Sprintf("Unexpected IP allocations.\nFound %s\nExpected %s",
+			aIP, expected))
+	}
+
+	// Force collisions
+	ip.Rand32 = func() uint32 {
+		return 4
+	}
+
+	ipMap["a"] = "10.0.0.0"
+	ipMap["b"] = "10.0.0.2"
+	ipMap["c"] = "10.0.0.3"
+	ipMap["e"] = "junk"
+
+	syncIPs(ipMap, prefix, net.CIDRMask(30, 32)) // only 3 addresses in this mask
+
+	if ip, _ := ipMap["e"]; ip != "" {
+		t.Error(spew.Sprintf("Expected IP deletion, found %s", ip))
+	}
+}
+
+func sliceToSet(slice []string) map[string]struct{} {
+	res := map[string]struct{}{}
+	for _, s := range slice {
+		res[s] = struct{}{}
+	}
+	return res
 }
 
 func eq(a, b interface{}) bool {
