@@ -132,13 +132,24 @@ Deployment.prototype.vet = function() {
             }
         });
 
+        var hasFloatingIp = false;
         service.placements.forEach(function(plcm) {
+            if (plcm.floatingIp) {
+                hasFloatingIp = true;
+            }
+
             var otherLabel = plcm.otherLabel;
             if (otherLabel !== undefined && !labelMap[otherLabel]) {
                 throw service.name + " has a placement in terms of an " +
                     "undeployed service: " + otherLabel;
             }
         });
+
+        if (hasFloatingIp && service.incomingPublic.length
+            && service.containers.length > 1) {
+            throw service.name + " has a floating IP and multiple containers. " +
+              "This is not yet supported."
+        }
     });
 };
 
@@ -303,7 +314,8 @@ Service.prototype.getQuiltPlacements = function() {
             otherLabel: placement.otherLabel || "",
             provider: placement.provider || "",
             size: placement.size || "",
-            region: placement.region || ""
+            region: placement.region || "",
+            floatingIp: placement.floatingIp || ""
         });
     });
     return placements;
@@ -337,6 +349,7 @@ function Machine(optionalArgs) {
     this.role = optionalArgs.role || "";
     this.region = optionalArgs.region || "";
     this.size = optionalArgs.size || "";
+    this.floatingIp = optionalArgs.floatingIp || "";
     this.diskSize = optionalArgs.diskSize || 0;
     this.sshKeys = optionalArgs.sshKeys || [];
     this.cpu = boxRange(optionalArgs.cpu);
@@ -462,6 +475,9 @@ function MachineRule(exclusive, optionalArgs) {
     }
     if (optionalArgs.region) {
         this.region = optionalArgs.region;
+    }
+    if (optionalArgs.floatingIp) {
+      this.floatingIp = optionalArgs.floatingIp;
     }
 }
 

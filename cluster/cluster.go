@@ -24,6 +24,8 @@ type provider interface {
 	Stop([]machine.Machine) error
 
 	SetACLs([]acl.ACL) error
+
+	UpdateFloatingIPs([]machine.Machine) error
 }
 
 // Store the providers in a variable so we can change it in the tests
@@ -37,6 +39,15 @@ type cluster struct {
 
 var myIP = util.MyIP
 var sleep = time.Sleep
+
+// action is an enum for provider actions.
+type action int
+
+const (
+	boot action = iota
+	stop
+	updateIPs
+)
 
 // Run continually checks 'conn' for cluster changes and recreates the cluster as
 // needed.
@@ -107,7 +118,9 @@ func (clst cluster) runOnce() {
 			return
 		}
 
-		if len(jr.boot) == 0 && len(jr.terminate) == 0 {
+		if len(jr.boot) == 0 &&
+			len(jr.terminate) == 0 &&
+			len(jr.updateIPs) == 0 {
 			// ACLs must be processed after Quilt learns about what machines
 			// are in the cloud.  If we didn't, inter-machine ACLs could get
 			// removed when the Quilt controller restarts, even if there are
@@ -116,23 +129,19 @@ func (clst cluster) runOnce() {
 			return
 		}
 
-		clst.updateCloud(jr.boot, true)
-		clst.updateCloud(jr.terminate, false)
+		clst.updateCloud(jr.boot, boot)
+		clst.updateCloud(jr.terminate, stop)
+		clst.updateCloud(jr.updateIPs, updateIPs)
 	}
 }
 
-func (clst cluster) updateCloud(machines []machine.Machine, boot bool) {
+func (clst cluster) updateCloud(machines []machine.Machine, act action) {
 	if len(machines) == 0 {
 		return
 	}
 
-	actionString := "halt"
-	if boot {
-		actionString = "boot"
-	}
-
 	log.WithField("count", len(machines)).
-		Infof("Attempt to %s machines.", actionString)
+		Infof("Attempt to %s machines.", act)
 
 	noFailures := true
 	groupedMachines := groupBy(machines)
@@ -144,20 +153,38 @@ func (clst cluster) updateCloud(machines []machine.Machine, boot bool) {
 			continue
 		}
 		var err error
-		if boot {
+
+		switch act {
+		case boot:
 			err = providerInst.Boot(providerMachines)
-		} else {
+		case stop:
 			err = providerInst.Stop(providerMachines)
+		case updateIPs:
+			err = providerInst.UpdateFloatingIPs(providerMachines)
 		}
+
 		if err != nil {
 			noFailures = false
-			log.WithError(err).
-				Warnf("Unable to %s machines on %s.", actionString, p)
+			switch act {
+			case boot:
+				log.Infof("Unable to boot machines on %s.", p)
+			case stop:
+				log.Infof("Successfully stopped machines on %s", p)
+			case updateIPs:
+				log.Infof("Successfully updated floating IPs on %s", p)
+			}
 		}
 	}
 
 	if noFailures {
-		log.Infof("Successfully %sed machines.", actionString)
+		switch act {
+		case boot:
+			log.Info("Successfully booted machines.")
+		case stop:
+			log.Info("Successfully stopped machines")
+		case updateIPs:
+			log.Info("Successfully updated floating IPs")
+		}
 	} else {
 		log.Infof("Due to failures, sleeping for 1 minute")
 		sleep(60 * time.Second)
@@ -170,6 +197,7 @@ type joinResult struct {
 
 	boot      []machine.Machine
 	terminate []machine.Machine
+	updateIPs []machine.Machine
 }
 
 func (clst cluster) join() (joinResult, error) {
@@ -206,6 +234,7 @@ func (clst cluster) join() (joinResult, error) {
 		dbResult := syncDB(cloudMachines, res.machines)
 		res.boot = dbResult.boot
 		res.terminate = dbResult.stop
+		res.updateIPs = dbResult.updateIPs
 
 		for _, pair := range dbResult.pairs {
 			dbm := pair.L.(db.Machine)
@@ -292,9 +321,10 @@ func (clst cluster) syncACLs(adminACLs []string, appACLs []db.PortRange,
 }
 
 type syncDBResult struct {
-	pairs []join.Pair
-	boot  []machine.Machine
-	stop  []machine.Machine
+	pairs     []join.Pair
+	boot      []machine.Machine
+	stop      []machine.Machine
+	updateIPs []machine.Machine
 }
 
 func syncDB(cloudMachines []machine.Machine, dbMachines []db.Machine) syncDBResult {
@@ -319,8 +349,10 @@ func syncDB(cloudMachines []machine.Machine, dbMachines []db.Machine) syncDBResu
 			return 1
 		case dbm.PrivateIP == m.PrivateIP:
 			return 2
-		default:
+		case dbm.FloatingIP == m.FloatingIP:
 			return 3
+		default:
+			return 4
 		}
 	}
 
@@ -340,6 +372,16 @@ func syncDB(cloudMachines []machine.Machine, dbMachines []db.Machine) syncDBResu
 			Region:   m.Region,
 			DiskSize: m.DiskSize,
 			SSHKeys:  m.SSHKeys})
+	}
+
+	for _, pair := range ret.pairs {
+		dbm := pair.L.(db.Machine)
+		m := pair.R.(machine.Machine)
+
+		if dbm.FloatingIP != m.FloatingIP {
+			m.FloatingIP = dbm.FloatingIP
+			ret.updateIPs = append(ret.updateIPs, m)
+		}
 	}
 
 	return ret

@@ -416,6 +416,11 @@ func (clst *Cluster) SetACLs(acls []acl.ACL) error {
 	return nil
 }
 
+// UpdateFloatingIPs is not implemented.
+func (clst *Cluster) UpdateFloatingIPs([]machine.Machine) error {
+	return errors.New("google provider does not currently support floating IPs")
+}
+
 func (clst *Cluster) getFirewall(name string) (*compute.Firewall, error) {
 	list, err := clst.gce.ListFirewalls(clst.projID)
 	if err != nil {

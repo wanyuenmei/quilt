@@ -14,9 +14,10 @@ type Placement struct {
 	OtherLabel string
 
 	// Machine Constraints
-	Provider string
-	Size     string
-	Region   string
+	Provider   string
+	Size       string
+	Region     string
+	FloatingIP string
 }
 
 // PlacementSlice is an alias for []Placement to allow for joins

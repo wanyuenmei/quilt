@@ -12,12 +12,13 @@ type Machine struct {
 	ID int //Database ID
 
 	/* Populated by the policy engine. */
-	Role     Role
-	Provider Provider
-	Region   string
-	Size     string
-	DiskSize int
-	SSHKeys  []string `rowStringer:"omit"`
+	Role       Role
+	Provider   Provider
+	Region     string
+	Size       string
+	DiskSize   int
+	SSHKeys    []string `rowStringer:"omit"`
+	FloatingIP string
 
 	/* Populated by the cloud provider. */
 	CloudID   string //Cloud Provider ID
@@ -80,6 +81,10 @@ func (m Machine) String() string {
 
 	if m.PrivateIP != "" {
 		tags = append(tags, "PrivateIP="+m.PrivateIP)
+	}
+
+	if m.FloatingIP != "" {
+		tags = append(tags, fmt.Sprintf("FloatingIP=%s", m.FloatingIP))
 	}
 
 	if m.DiskSize != 0 {

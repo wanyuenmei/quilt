@@ -1,6 +1,7 @@
 package vagrant
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/NetSys/quilt/cluster/acl"
@@ -115,4 +116,9 @@ func (clst Cluster) Stop(machines []machine.Machine) error {
 // SetACLs is a noop for vagrant.
 func (clst Cluster) SetACLs(acls []acl.ACL) error {
 	return nil
+}
+
+// UpdateFloatingIPs is not supported.
+func (clst *Cluster) UpdateFloatingIPs([]machine.Machine) error {
+	return errors.New("vagrant provider does not support floating IPs")
 }

@@ -175,6 +175,13 @@ func validPlacement(constraints []db.Placement, m minion, peers []*db.Container,
 				return false
 			}
 		}
+
+		if constraint.FloatingIP != "" {
+			on := constraint.FloatingIP == m.FloatingIP
+			if constraint.Exclusive == on {
+				return false
+			}
+		}
 	}
 
 	return true

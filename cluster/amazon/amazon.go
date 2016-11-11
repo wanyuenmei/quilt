@@ -308,6 +308,11 @@ func (clst Cluster) List() ([]machine.Machine, error) {
 	return machines, nil
 }
 
+// UpdateFloatingIPs is not implemented.
+func (clst *Cluster) UpdateFloatingIPs([]machine.Machine) error {
+	return errors.New("amazon provider does not currently support floating IPs")
+}
+
 func (clst Cluster) getClient(region string) client {
 	if _, ok := clst.clients[region]; !ok {
 		clst.clients[region] = clst.newClient(region)

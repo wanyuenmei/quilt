@@ -42,7 +42,7 @@ func TestRunSpec(t *testing.T) {
 	exJSON := `{"Containers":[],"Labels":[],"Connections":[],"Placements":[],` +
 		`"Machines":[{"Provider":"","Role":"","Size":"",` +
 		`"CPU":{"Min":0,"Max":0},"RAM":{"Min":0,"Max":0},"DiskSize":0,` +
-		`"Region":"","SSHKeys":[]}],"AdminACL":[],"MaxPrice":0,` +
+		`"Region":"","SSHKeys":[],"FloatingIP":""}],"AdminACL":[],"MaxPrice":0,` +
 		`"Namespace":"default-namespace","Invariants":[]}`
 	tests := []runTest{
 		{

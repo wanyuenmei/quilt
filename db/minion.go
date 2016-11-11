@@ -13,11 +13,12 @@ type Minion struct {
 	SupervisorInit bool   `json:"-"`
 
 	// Below fields are included in the JSON encoding.
-	Role      Role
-	PrivateIP string
-	Provider  string
-	Size      string
-	Region    string
+	Role       Role
+	PrivateIP  string
+	Provider   string
+	Size       string
+	Region     string
+	FloatingIP string
 }
 
 // InsertMinion creates a new Minion and inserts it into 'db'.

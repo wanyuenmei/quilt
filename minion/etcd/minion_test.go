@@ -55,7 +55,8 @@ func TestWriteMinion(t *testing.T) {
     "PrivateIP": "1.2.3.4",
     "Provider": "Amazon",
     "Size": "Big",
-    "Region": "Somewhere"
+    "Region": "Somewhere",
+    "FloatingIP": ""
 }`
 	assert.Equal(t, expVal, val)
 }

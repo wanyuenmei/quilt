@@ -19,14 +19,15 @@ type Description struct {
 
 // Machine represents an instance of a machine booted by a Provider.
 type Machine struct {
-	ID        string
-	PublicIP  string
-	PrivateIP string
-	Size      string
-	DiskSize  int
-	SSHKeys   []string
-	Provider  db.Provider
-	Region    string
+	ID         string
+	PublicIP   string
+	PrivateIP  string
+	FloatingIP string
+	Size       string
+	DiskSize   int
+	SSHKeys    []string
+	Provider   db.Provider
+	Region     string
 }
 
 // ChooseSize returns an acceptable machine size for the given provider that fits the

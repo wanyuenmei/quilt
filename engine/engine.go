@@ -107,6 +107,7 @@ func toDBMachine(machines []stitch.Machine, maxPrice float64) []db.Machine {
 
 		m.SSHKeys = stitchm.SSHKeys
 		m.Region = stitchm.Region
+		m.FloatingIP = stitchm.FloatingIP
 		dbMachines = append(dbMachines, cluster.DefaultRegion(m))
 	}
 
@@ -138,6 +139,9 @@ func machineTxn(view db.Database, stitch stitch.Stitch) {
 		case dbMachine.Region != stitchMachine.Region:
 			return -1
 		case dbMachine.Size != "" && stitchMachine.Size != dbMachine.Size:
+			return -1
+		case dbMachine.FloatingIP != "" &&
+			dbMachine.FloatingIP != stitchMachine.FloatingIP:
 			return -1
 		case dbMachine.Role != db.None && dbMachine.Role != stitchMachine.Role:
 			return -1
@@ -175,6 +179,7 @@ func machineTxn(view db.Database, stitch stitch.Stitch) {
 		dbMachine.Provider = stitchMachine.Provider
 		dbMachine.Region = stitchMachine.Region
 		dbMachine.SSHKeys = stitchMachine.SSHKeys
+		dbMachine.FloatingIP = stitchMachine.FloatingIP
 		view.Commit(dbMachine)
 	}
 }

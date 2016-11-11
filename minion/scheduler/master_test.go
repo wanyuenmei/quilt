@@ -68,6 +68,7 @@ func TestCleanup(t *testing.T) {
 			Exclusive:   true,
 			TargetLabel: "1",
 			Region:      "Region1",
+			FloatingIP:  "xxx.xxx.xxx.xxx",
 		},
 	}
 
@@ -205,9 +206,10 @@ func TestPlaceUnassigned(t *testing.T) {
 
 	minions := []db.Minion{
 		{
-			PrivateIP: "1",
-			Region:    "Region1",
-			Role:      db.Worker,
+			PrivateIP:  "1",
+			Region:     "Region1",
+			Role:       db.Worker,
+			FloatingIP: "xxx.xxx.xxx.xxx",
 		},
 		{
 			PrivateIP: "2",

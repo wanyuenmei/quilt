@@ -70,6 +70,20 @@ func TestMachine(t *testing.T) {
 			},
 		},
 	)
+
+	checkMachines(t, `var baseMachine = new Machine({
+	  provider: "Amazon",
+	  floatingIp: "xxx.xxx.xxx.xxx"
+	});
+	deployment.deploy(baseMachine.asMaster());`,
+		[]Machine{
+			{
+				Role:       "Master",
+				Provider:   "Amazon",
+				FloatingIP: "xxx.xxx.xxx.xxx",
+				SSHKeys:    []string{},
+			},
+		})
 }
 
 func TestContainer(t *testing.T) {
@@ -207,6 +221,16 @@ func TestPlacement(t *testing.T) {
 				Exclusive:   true,
 				Provider:    "Amazon",
 				Size:        "m4.large",
+			},
+		})
+
+	checkPlacements(t, pre+`target.place(new MachineRule(false,
+	{floatingIp: "xxx.xxx.xxx.xxx"}));`+post,
+		[]Placement{
+			{
+				TargetLabel: "target",
+				Exclusive:   false,
+				FloatingIP:  "xxx.xxx.xxx.xxx",
 			},
 		})
 }
@@ -350,6 +374,16 @@ func TestVet(t *testing.T) {
 		}));
 	foo.place(new LabelRule(true, new Service("baz", [])));`,
 		"foo has a placement in terms of an undeployed service: baz")
+
+	checkError(t, `
+		var foo = new Service("foo", new Container("image").replicate(2));
+		foo.place(new MachineRule(false, {
+			floatingIp: "123",
+		}));
+		foo.connectFromPublic(80);
+		deployment.deploy([foo]);
+	`, "foo has a floating IP and multiple containers. This is "+
+		"not yet supported.")
 }
 
 func TestCustomDeploy(t *testing.T) {

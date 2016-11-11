@@ -42,9 +42,10 @@ type Placement struct {
 	OtherLabel string
 
 	// Machine Constraints
-	Provider string
-	Size     string
-	Region   string
+	Provider   string
+	Size       string
+	Region     string
+	FloatingIP string
 }
 
 // A Container may be instantiated in the stitch and queried by users.
@@ -76,14 +77,15 @@ type ConnectionSlice []Connection
 
 // A Machine specifies the type of VM that should be booted.
 type Machine struct {
-	Provider string
-	Role     string
-	Size     string
-	CPU      Range
-	RAM      Range
-	DiskSize int
-	Region   string
-	SSHKeys  []string
+	Provider   string
+	Role       string
+	Size       string
+	CPU        Range
+	RAM        Range
+	DiskSize   int
+	Region     string
+	SSHKeys    []string
+	FloatingIP string
 }
 
 // A Range defines a range of acceptable values for a Machine attribute

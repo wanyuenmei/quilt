@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -27,6 +28,12 @@ type bootRequest struct {
 	cloudConfig string
 }
 
+type ipRequest struct {
+	size        string
+	cloudConfig string
+	ip          string
+}
+
 type fakeProvider struct {
 	namespace   string
 	machines    map[string]machine.Machine
@@ -35,6 +42,7 @@ type fakeProvider struct {
 
 	bootRequests []bootRequest
 	stopRequests []string
+	updateIPs    []ipRequest
 	aclRequests  []acl.ACL
 }
 
@@ -60,6 +68,7 @@ func (p *fakeProvider) clearLogs() {
 	p.bootRequests = []bootRequest{}
 	p.stopRequests = []string{}
 	p.aclRequests = []acl.ACL{}
+	p.updateIPs = []ipRequest{}
 }
 
 func (p *fakeProvider) List() ([]machine.Machine, error) {
@@ -95,6 +104,20 @@ func (p *fakeProvider) SetACLs(acls []acl.ACL) error {
 	return nil
 }
 
+func (p *fakeProvider) UpdateFloatingIPs(machines []machine.Machine) error {
+	for _, m := range machines {
+		p.updateIPs = append(p.updateIPs, ipRequest{
+			size:        m.Size,
+			cloudConfig: p.cloudConfig,
+			ip:          m.FloatingIP,
+		})
+
+		p.machines[m.ID] = m
+	}
+
+	return nil
+}
+
 func (p *fakeProvider) Connect(namespace string) error { return nil }
 
 func (p *fakeProvider) ChooseSize(ram stitch.Range, cpu stitch.Range,
@@ -124,8 +147,10 @@ func TestSyncDB(t *testing.T) {
 	checkSyncDB := func(cloudMachines []machine.Machine,
 		databaseMachines []db.Machine, expected syncDBResult) {
 		dbRes := syncDB(cloudMachines, databaseMachines)
-		assert.Equal(t, expected.boot, dbRes.boot)
-		assert.Equal(t, expected.stop, dbRes.stop)
+		assert.Equal(t, expected.boot, dbRes.boot, "boot")
+		assert.Equal(t, expected.stop, dbRes.stop, "stop")
+		assert.Equal(t, expected.updateIPs, dbRes.updateIPs,
+			"updateIPs")
 	}
 
 	var noMachines []machine.Machine
@@ -133,6 +158,11 @@ func TestSyncDB(t *testing.T) {
 	cmNoSize := machine.Machine{Provider: FakeAmazon}
 	dbLarge := db.Machine{Provider: FakeAmazon, Size: "m4.large"}
 	cmLarge := machine.Machine{Provider: FakeAmazon, Size: "m4.large"}
+
+	cmNoIP := machine.Machine{Provider: FakeAmazon}
+	cmWithIP := machine.Machine{Provider: FakeAmazon, FloatingIP: "ip"}
+	dbNoIP := db.Machine{Provider: FakeAmazon}
+	dbWithIP := db.Machine{Provider: FakeAmazon, FloatingIP: "ip"}
 
 	// Test boot with no size
 	checkSyncDB(noMachines, []db.Machine{dbNoSize}, syncDBResult{
@@ -152,7 +182,9 @@ func TestSyncDB(t *testing.T) {
 	// Test partial boot
 	checkSyncDB([]machine.Machine{cmNoSize}, []db.Machine{dbNoSize, dbLarge},
 		syncDBResult{
-			boot: []machine.Machine{cmLarge}})
+			boot: []machine.Machine{cmLarge},
+		},
+	)
 
 	// Test stop
 	checkSyncDB([]machine.Machine{cmNoSize}, []db.Machine{}, syncDBResult{
@@ -163,22 +195,52 @@ func TestSyncDB(t *testing.T) {
 	checkSyncDB([]machine.Machine{cmNoSize, cmLarge}, []db.Machine{}, syncDBResult{
 		stop: []machine.Machine{cmNoSize, cmLarge},
 	})
+
+	// Test assign Floating IP
+	checkSyncDB([]machine.Machine{cmNoIP}, []db.Machine{dbWithIP}, syncDBResult{
+		updateIPs: []machine.Machine{cmWithIP},
+	})
+
+	// Test remove Floating IP
+	checkSyncDB([]machine.Machine{cmWithIP}, []db.Machine{dbNoIP}, syncDBResult{
+		updateIPs: []machine.Machine{cmNoIP},
+	})
+
+	// Test replace Floating IP
+	cNewIP := machine.Machine{Provider: FakeAmazon, FloatingIP: "ip^"}
+	checkSyncDB([]machine.Machine{cNewIP}, []db.Machine{dbWithIP}, syncDBResult{
+		updateIPs: []machine.Machine{cmWithIP},
+	})
 }
 
 func TestSync(t *testing.T) {
-	checkSync := func(clst *cluster, provider db.Provider,
-		expectedBoot []bootRequest, expectedStop []string) {
+	type assertion struct {
+		boot      []bootRequest
+		stop      []string
+		updateIPs []ipRequest
+	}
+
+	checkSync := func(clst *cluster, provider db.Provider, expected assertion) {
 		clst.runOnce()
 		providerInst := clst.providers[provider].(*fakeProvider)
 
-		assert.Equal(t, expectedBoot, providerInst.bootRequests)
-		assert.Equal(t, expectedStop, providerInst.stopRequests)
+		if !emptySlices(expected.boot, providerInst.bootRequests) {
+			assert.Equal(t, expected.boot, providerInst.bootRequests,
+				"bootRequests")
+		}
+
+		if !emptySlices(expected.stop, providerInst.stopRequests) {
+			assert.Equal(t, expected.stop, providerInst.stopRequests,
+				"stopRequests")
+		}
+
+		if !emptySlices(expected.updateIPs, providerInst.updateIPs) {
+			assert.Equal(t, expected.updateIPs, providerInst.updateIPs,
+				"updateIPs")
+		}
 
 		providerInst.clearLogs()
 	}
-
-	noBoots := []bootRequest{}
-	noStops := []string{}
 
 	amazonLargeBoot := bootRequest{size: "m4.large", cloudConfig: amazonCloudConfig}
 	amazonXLargeBoot := bootRequest{size: "m4.xlarge",
@@ -198,7 +260,7 @@ func TestSync(t *testing.T) {
 
 		return nil
 	})
-	checkSync(clst, FakeAmazon, []bootRequest{amazonLargeBoot}, noStops)
+	checkSync(clst, FakeAmazon, assertion{boot: []bootRequest{amazonLargeBoot}})
 
 	// Test adding a machine with the same provider
 	clst.conn.Txn(db.AllTables...).Run(func(view db.Database) error {
@@ -210,7 +272,7 @@ func TestSync(t *testing.T) {
 
 		return nil
 	})
-	checkSync(clst, FakeAmazon, []bootRequest{amazonXLargeBoot}, noStops)
+	checkSync(clst, FakeAmazon, assertion{boot: []bootRequest{amazonXLargeBoot}})
 
 	// Test adding a machine with a different provider
 	clst.conn.Txn(db.AllTables...).Run(func(view db.Database) error {
@@ -222,7 +284,7 @@ func TestSync(t *testing.T) {
 
 		return nil
 	})
-	checkSync(clst, FakeVagrant, []bootRequest{vagrantLargeBoot}, noStops)
+	checkSync(clst, FakeVagrant, assertion{boot: []bootRequest{vagrantLargeBoot}})
 
 	// Test removing a machine
 	var toRemove db.Machine
@@ -231,9 +293,70 @@ func TestSync(t *testing.T) {
 			return m.Provider == FakeAmazon && m.Size == "m4.xlarge"
 		})[0]
 		view.Remove(toRemove)
+
 		return nil
 	})
-	checkSync(clst, FakeAmazon, noBoots, []string{toRemove.CloudID})
+	checkSync(clst, FakeAmazon, assertion{stop: []string{toRemove.CloudID}})
+
+	// Test booting a machine with floating IP
+	clst.conn.Txn(db.AllTables...).Run(func(view db.Database) error {
+		m := view.InsertMachine()
+		m.Role = db.Master
+		m.Provider = FakeAmazon
+		m.Size = "m4.large"
+		m.FloatingIP = "ip"
+		view.Commit(m)
+
+		return nil
+	})
+	checkSync(clst, FakeAmazon, assertion{
+		boot: []bootRequest{amazonLargeBoot},
+		updateIPs: []ipRequest{{
+			size:        "m4.large",
+			cloudConfig: amazonCloudConfig,
+			ip:          "ip",
+		}},
+	})
+
+	// Test assigning a floating IP to an existing machine
+	clst.conn.Txn(db.AllTables...).Run(func(view db.Database) error {
+		toAssign := view.SelectFromMachine(func(m db.Machine) bool {
+			return m.Provider == FakeAmazon &&
+				m.Size == "m4.large" &&
+				m.FloatingIP == ""
+		})[0]
+		toAssign.FloatingIP = "another.ip"
+		view.Commit(toAssign)
+
+		return nil
+	})
+	checkSync(clst, FakeAmazon, assertion{
+		updateIPs: []ipRequest{{
+			size:        "m4.large",
+			cloudConfig: amazonCloudConfig,
+			ip:          "another.ip",
+		}},
+	})
+
+	// Test removing a floating IP
+	clst.conn.Txn(db.AllTables...).Run(func(view db.Database) error {
+		toUpdate := view.SelectFromMachine(func(m db.Machine) bool {
+			return m.Provider == FakeAmazon &&
+				m.Size == "m4.large" &&
+				m.FloatingIP == "ip"
+		})[0]
+		toUpdate.FloatingIP = ""
+		view.Commit(toUpdate)
+
+		return nil
+	})
+	checkSync(clst, FakeAmazon, assertion{
+		updateIPs: []ipRequest{{
+			size:        "m4.large",
+			cloudConfig: amazonCloudConfig,
+			ip:          "",
+		}},
+	})
 
 	// Test removing and adding a machine
 	clst.conn.Txn(db.AllTables...).Run(func(view db.Database) error {
@@ -250,8 +373,10 @@ func TestSync(t *testing.T) {
 
 		return nil
 	})
-	checkSync(clst, FakeAmazon, []bootRequest{amazonXLargeBoot},
-		[]string{toRemove.CloudID})
+	checkSync(clst, FakeAmazon, assertion{
+		boot: []bootRequest{amazonXLargeBoot},
+		stop: []string{toRemove.CloudID},
+	})
 }
 
 func TestACLs(t *testing.T) {
@@ -391,4 +516,8 @@ func setNamespace(conn db.Conn, ns string) {
 func mock() {
 	newProvider = newFakeProvider
 	allProviders = []db.Provider{FakeAmazon, FakeVagrant}
+}
+
+func emptySlices(slice1 interface{}, slice2 interface{}) bool {
+	return reflect.ValueOf(slice1).Len() == 0 && reflect.ValueOf(slice2).Len() == 0
 }
