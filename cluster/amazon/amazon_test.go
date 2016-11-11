@@ -17,6 +17,7 @@ import (
 	"github.com/NetSys/quilt/cluster/cloudcfg"
 	"github.com/NetSys/quilt/cluster/machine"
 	"github.com/NetSys/quilt/db"
+	"github.com/NetSys/quilt/util"
 )
 
 const testNamespace = "namespace"
@@ -104,6 +105,16 @@ func TestList(t *testing.T) {
 			},
 		}, nil,
 	)
+	mc.On("DescribeAddresses", mock.Anything).Return(
+		&ec2.DescribeAddressesOutput{
+			Addresses: []*ec2.Address{
+				{
+					InstanceId: aws.String("inst2"),
+					PublicIp:   aws.String("xx.xxx.xxx.xxx"),
+				},
+			},
+		}, nil,
+	)
 
 	emptyClient := new(mockClient)
 	emptyClient.On("DescribeInstances", mock.Anything).Return(
@@ -111,6 +122,9 @@ func TestList(t *testing.T) {
 	)
 	emptyClient.On("DescribeSpotInstanceRequests", mock.Anything).Return(
 		&ec2.DescribeSpotInstanceRequestsOutput{}, nil,
+	)
+	emptyClient.On("DescribeAddresses", mock.Anything).Return(
+		&ec2.DescribeAddressesOutput{}, nil,
 	)
 
 	amazonCluster := newAmazon(testNamespace)
@@ -134,10 +148,11 @@ func TestList(t *testing.T) {
 			Region:    "us-west-1",
 		},
 		{
-			ID:       "spot2",
-			Provider: db.Amazon,
-			Region:   "us-west-1",
-			Size:     "size2",
+			ID:         "spot2",
+			Provider:   db.Amazon,
+			Region:     "us-west-1",
+			Size:       "size2",
+			FloatingIP: "xx.xxx.xxx.xxx",
 		},
 		{
 			ID:       "spot3",
@@ -364,6 +379,9 @@ func TestBoot(t *testing.T) {
 			},
 		}, nil,
 	)
+	mc.On("DescribeAddresses", mock.Anything).Return(
+		&ec2.DescribeAddressesOutput{}, nil,
+	)
 	mc.On("DescribeSpotInstanceRequests", mock.Anything).Return(
 		&ec2.DescribeSpotInstanceRequestsOutput{
 			SpotInstanceRequests: []*ec2.SpotInstanceRequest{
@@ -480,6 +498,9 @@ func TestStop(t *testing.T) {
 	mc.On("DescribeInstances", mock.Anything).Return(
 		&ec2.DescribeInstancesOutput{}, nil,
 	)
+	mc.On("DescribeAddresses", mock.Anything).Return(
+		&ec2.DescribeAddressesOutput{}, nil,
+	)
 
 	amazonCluster := newAmazon(testNamespace)
 	amazonCluster.newClient = func(region string) client {
@@ -513,8 +534,9 @@ func TestStop(t *testing.T) {
 
 func TestWaitBoot(t *testing.T) {
 	t.Parallel()
+	util.Sleep = func(time.Duration) {}
+	timeout = 10 * time.Second
 
-	sleep = func(t time.Duration) {}
 	instances := []*ec2.Instance{
 		{
 			InstanceId:            aws.String("inst1"),
@@ -534,6 +556,8 @@ func TestWaitBoot(t *testing.T) {
 		},
 	}
 	mc := new(mockClient)
+	mc.On("DescribeAddresses", mock.Anything).Return(
+		&ec2.DescribeAddressesOutput{}, nil)
 	mc.On("DescribeSecurityGroups", mock.Anything).Return(
 		&ec2.DescribeSecurityGroupsOutput{
 			SecurityGroups: []*ec2.SecurityGroup{
@@ -618,6 +642,7 @@ func TestWaitStop(t *testing.T) {
 	t.Parallel()
 
 	sleep = func(t time.Duration) {}
+	timeout = 10 * time.Second
 	instances := []*ec2.Instance{
 		{
 			InstanceId:            aws.String("inst1"),
@@ -669,6 +694,9 @@ func TestWaitStop(t *testing.T) {
 			},
 		}, nil,
 	)
+
+	mc.On("DescribeAddresses", mock.Anything).Return(&ec2.DescribeAddressesOutput{},
+		nil)
 
 	describeRequests := mc.On("DescribeSpotInstanceRequests", mock.Anything)
 	describeRequests.Return(
@@ -726,4 +754,118 @@ func TestWaitStop(t *testing.T) {
 
 	err = amazonCluster.wait(exp, false)
 	assert.NoError(t, err)
+}
+
+func TestUpdateFloatingIPs(t *testing.T) {
+	t.Parallel()
+
+	mockClient := new(mockClient)
+	amazonCluster := newAmazon("")
+	amazonCluster.newClient = func(region string) client {
+		return mockClient
+	}
+
+	mockMachines := []machine.Machine{
+		// Quilt should assign "x.x.x.x" to sir-1.
+		{
+			ID:         "sir-1",
+			FloatingIP: "x.x.x.x",
+		},
+		// Quilt should disassociate all floating IPs from spot instance sir-2.
+		{
+			ID:         "sir-2",
+			FloatingIP: "",
+		},
+		// Quilt is asked to disassociate floating IPs from sir-3. sir-3 no longer
+		// has IP associations, but Quilt should not error.
+		{
+			ID:         "sir-3",
+			FloatingIP: "",
+		},
+	}
+
+	mockClient.On("DescribeAddresses", mock.Anything).Return(
+		&ec2.DescribeAddressesOutput{
+			Addresses: []*ec2.Address{
+				// Quilt should assign x.x.x.x to sir-1.
+				{
+					AllocationId: aws.String("alloc-1"),
+					PublicIp:     aws.String("x.x.x.x"),
+				},
+				// Quilt should disassociate y.y.y.y from sir-2.
+				{
+					AllocationId:  aws.String("alloc-2"),
+					PublicIp:      aws.String("y.y.y.y"),
+					AssociationId: aws.String("assoc-2"),
+					InstanceId:    aws.String("i-2"),
+				},
+				// Quilt should ignore z.z.z.z.
+				{
+					PublicIp:   aws.String("z.z.z.z"),
+					InstanceId: aws.String("i-4"),
+				},
+			},
+		}, nil)
+
+	mockClient.On("DescribeSpotInstanceRequests",
+		mock.Anything).Return(&ec2.DescribeSpotInstanceRequestsOutput{
+		SpotInstanceRequests: []*ec2.SpotInstanceRequest{
+			{
+				SpotInstanceRequestId: aws.String("sir-1"),
+				InstanceId:            aws.String("i-1"),
+			},
+			{
+				SpotInstanceRequestId: aws.String("sir-2"),
+				InstanceId:            aws.String("i-2"),
+			},
+			{
+				SpotInstanceRequestId: aws.String("sir-3"),
+				InstanceId:            aws.String("i-3"),
+			},
+		},
+	}, nil)
+	instancesOut := []*ec2.Instance{
+		{
+			InstanceId:            aws.String("i-1"),
+			SpotInstanceRequestId: aws.String("sir-1"),
+			State: &ec2.InstanceState{
+				Name: aws.String(ec2.InstanceStateNameRunning),
+			},
+		},
+		{
+			InstanceId:            aws.String("i-2"),
+			SpotInstanceRequestId: aws.String("sir-2"),
+			State: &ec2.InstanceState{
+				Name: aws.String(ec2.InstanceStateNameRunning),
+			},
+		},
+		{
+			InstanceId:            aws.String("i-3"),
+			SpotInstanceRequestId: aws.String("sir-3"),
+			State: &ec2.InstanceState{
+				Name: aws.String(ec2.InstanceStateNameRunning),
+			},
+		},
+	}
+	describeInstancesOut := ec2.DescribeInstancesOutput{
+		Reservations: []*ec2.Reservation{
+			{
+				Instances: instancesOut,
+			},
+		},
+	}
+	mockClient.On("DescribeInstances", mock.Anything).Return(
+		&describeInstancesOut, nil)
+
+	mockClient.On("AssociateAddress", &ec2.AssociateAddressInput{
+		InstanceId:   aws.String("i-1"),
+		AllocationId: aws.String("alloc-1"),
+	}).Return(nil, nil)
+
+	mockClient.On("DisassociateAddress", &ec2.DisassociateAddressInput{
+		AssociationId: aws.String("assoc-2"),
+	}).Return(nil, nil)
+
+	err := amazonCluster.UpdateFloatingIPs(mockMachines)
+	assert.Nil(t, err)
 }

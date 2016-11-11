@@ -8,6 +8,29 @@ type mockClient struct {
 	mock.Mock
 }
 
+// AssociateAddress provides a mock function with given fields: _a0
+func (_m *mockClient) AssociateAddress(_a0 *ec2.AssociateAddressInput) (*ec2.AssociateAddressOutput, error) {
+	ret := _m.Called(_a0)
+
+	var r0 *ec2.AssociateAddressOutput
+	if rf, ok := ret.Get(0).(func(*ec2.AssociateAddressInput) *ec2.AssociateAddressOutput); ok {
+		r0 = rf(_a0)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*ec2.AssociateAddressOutput)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(*ec2.AssociateAddressInput) error); ok {
+		r1 = rf(_a0)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // AuthorizeSecurityGroupIngress provides a mock function with given fields: _a0
 func (_m *mockClient) AuthorizeSecurityGroupIngress(_a0 *ec2.AuthorizeSecurityGroupIngressInput) (*ec2.AuthorizeSecurityGroupIngressOutput, error) {
 	ret := _m.Called(_a0)
@@ -100,6 +123,29 @@ func (_m *mockClient) CreateTags(_a0 *ec2.CreateTagsInput) (*ec2.CreateTagsOutpu
 	return r0, r1
 }
 
+// DescribeAddresses provides a mock function with given fields: _a0
+func (_m *mockClient) DescribeAddresses(_a0 *ec2.DescribeAddressesInput) (*ec2.DescribeAddressesOutput, error) {
+	ret := _m.Called(_a0)
+
+	var r0 *ec2.DescribeAddressesOutput
+	if rf, ok := ret.Get(0).(func(*ec2.DescribeAddressesInput) *ec2.DescribeAddressesOutput); ok {
+		r0 = rf(_a0)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*ec2.DescribeAddressesOutput)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(*ec2.DescribeAddressesInput) error); ok {
+		r1 = rf(_a0)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // DescribeInstances provides a mock function with given fields: _a0
 func (_m *mockClient) DescribeInstances(_a0 *ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error) {
 	ret := _m.Called(_a0)
@@ -184,6 +230,29 @@ func (_m *mockClient) DescribeVolumes(_a0 *ec2.DescribeVolumesInput) (*ec2.Descr
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(*ec2.DescribeVolumesInput) error); ok {
+		r1 = rf(_a0)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// DisassociateAddress provides a mock function with given fields: _a0
+func (_m *mockClient) DisassociateAddress(_a0 *ec2.DisassociateAddressInput) (*ec2.DisassociateAddressOutput, error) {
+	ret := _m.Called(_a0)
+
+	var r0 *ec2.DisassociateAddressOutput
+	if rf, ok := ret.Get(0).(func(*ec2.DisassociateAddressInput) *ec2.DisassociateAddressOutput); ok {
+		r0 = rf(_a0)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*ec2.DisassociateAddressOutput)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(*ec2.DisassociateAddressInput) error); ok {
 		r1 = rf(_a0)
 	} else {
 		r1 = ret.Error(1)

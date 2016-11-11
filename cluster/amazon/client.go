@@ -38,6 +38,14 @@ type client interface {
 
 	RequestSpotInstances(*ec2.RequestSpotInstancesInput) (
 		*ec2.RequestSpotInstancesOutput, error)
+
+	AssociateAddress(*ec2.AssociateAddressInput) (*ec2.AssociateAddressOutput, error)
+
+	DescribeAddresses(*ec2.DescribeAddressesInput) (*ec2.DescribeAddressesOutput,
+		error)
+
+	DisassociateAddress(*ec2.DisassociateAddressInput) (
+		*ec2.DisassociateAddressOutput, error)
 }
 
 // newClient is a variable so it can be easily replaced while unit testing

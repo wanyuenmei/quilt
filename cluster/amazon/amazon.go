@@ -12,6 +12,7 @@ import (
 	"github.com/NetSys/quilt/cluster/machine"
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/join"
+	"github.com/NetSys/quilt/util"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -46,6 +47,8 @@ var amis = map[string]string{
 }
 
 var sleep = time.Sleep
+
+var timeout = 15 * time.Minute
 
 // New creates a new Amazon EC2 cluster.
 func New(namespace string) (*Cluster, error) {
@@ -212,6 +215,17 @@ func (clst Cluster) List() ([]machine.Machine, error) {
 			}
 		}
 
+		addrResp, err := client.DescribeAddresses(nil)
+		if err != nil {
+			return nil, err
+		}
+		ipMap := map[string]*ec2.Address{}
+		for _, ip := range addrResp.Addresses {
+			if ip.InstanceId != nil {
+				ipMap[*ip.InstanceId] = ip
+			}
+		}
+
 		for _, spot := range spots.SpotInstanceRequests {
 			if *spot.State != ec2.SpotInstanceStateActive &&
 				*spot.State != ec2.SpotInstanceStateOpen {
@@ -299,6 +313,10 @@ func (clst Cluster) List() ([]machine.Machine, error) {
 							*volumeInfo.Volumes[0].Size)
 					}
 				}
+
+				if ip := ipMap[*inst.InstanceId]; ip != nil {
+					machine.FloatingIP = *ip.PublicIp
+				}
 			}
 
 			machines = append(machines, machine)
@@ -308,9 +326,65 @@ func (clst Cluster) List() ([]machine.Machine, error) {
 	return machines, nil
 }
 
-// UpdateFloatingIPs is not implemented.
-func (clst *Cluster) UpdateFloatingIPs([]machine.Machine) error {
-	return errors.New("amazon provider does not currently support floating IPs")
+// UpdateFloatingIPs updates Elastic IPs <> EC2 instance associations.
+func (clst *Cluster) UpdateFloatingIPs(machines []machine.Machine) error {
+	for region, machines := range machine.GroupByRegion(machines) {
+		aws := clst.getClient(region)
+		addressDesc, err := aws.DescribeAddresses(nil)
+		if err != nil {
+			return err
+		}
+
+		// Map IP Address -> Elastic IP.
+		addresses := map[string]*string{}
+		// Map EC2 Instance -> Elastic IP association.
+		associations := map[string]*string{}
+		for _, addr := range addressDesc.Addresses {
+			addresses[*addr.PublicIp] = addr.AllocationId
+			if addr.InstanceId != nil {
+				associations[*addr.InstanceId] = addr.AssociationId
+			}
+		}
+
+		// Map spot request ID to EC2 instance ID.
+		var spotIDs []string
+		for _, machine := range machines {
+			spotIDs = append(spotIDs, machine.ID)
+		}
+		instances, err := clst.getInstances(region, spotIDs)
+		if err != nil {
+			return err
+		}
+
+		for _, machine := range machines {
+			if machine.FloatingIP == "" {
+				instanceID := *instances[machine.ID].InstanceId
+				associationID := associations[instanceID]
+				if associationID == nil {
+					continue
+				}
+
+				input := ec2.DisassociateAddressInput{
+					AssociationId: associationID,
+				}
+				_, err = aws.DisassociateAddress(&input)
+				if err != nil {
+					return err
+				}
+			} else {
+				allocationID := addresses[machine.FloatingIP]
+				input := ec2.AssociateAddressInput{
+					InstanceId:   instances[machine.ID].InstanceId,
+					AllocationId: allocationID,
+				}
+				if _, err := aws.AssociateAddress(&input); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 func (clst Cluster) getClient(region string) client {
@@ -319,6 +393,45 @@ func (clst Cluster) getClient(region string) client {
 	}
 
 	return clst.clients[region]
+}
+
+func (clst Cluster) getInstances(region string, spotIDs []string) (
+	map[string]*ec2.Instance, error) {
+	client := clst.getClient(region)
+	instances := map[string]*ec2.Instance{}
+
+	spotQuery := ec2.DescribeSpotInstanceRequestsInput{
+		SpotInstanceRequestIds: aws.StringSlice(spotIDs),
+	}
+	spotResp, err := client.DescribeSpotInstanceRequests(&spotQuery)
+	if err != nil {
+		return nil, err
+	}
+
+	var instanceIDs []string
+	for _, spot := range spotResp.SpotInstanceRequests {
+		if spot.InstanceId == nil {
+			instances[*spot.SpotInstanceRequestId] = nil
+		} else {
+			instanceIDs = append(instanceIDs, *spot.InstanceId)
+		}
+	}
+
+	instQuery := ec2.DescribeInstancesInput{
+		InstanceIds: aws.StringSlice(instanceIDs),
+	}
+	instResp, err := client.DescribeInstances(&instQuery)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, reservation := range instResp.Reservations {
+		for _, instance := range reservation.Instances {
+			instances[*instance.SpotInstanceRequestId] = instance
+		}
+	}
+
+	return instances, nil
 }
 
 func (clst *Cluster) tagSpotRequests(awsIDs []awsID) error {
@@ -359,13 +472,11 @@ OuterLoop:
 /* Wait for the spot request 'ids' to have booted or terminated depending on the value
  * of 'boot' */
 func (clst *Cluster) wait(awsIDs []awsID, boot bool) error {
-OuterLoop:
-	for i := 0; i < 100; i++ {
+	return util.WaitFor(func() bool {
 		machines, err := clst.List()
 		if err != nil {
 			log.WithError(err).Warn("Failed to get machines.")
-			sleep(10 * time.Second)
-			continue
+			return true
 		}
 
 		exists := make(map[awsID]struct{})
@@ -388,15 +499,44 @@ OuterLoop:
 
 		for _, id := range awsIDs {
 			if _, ok := exists[id]; ok != boot {
-				sleep(10 * time.Second)
-				continue OuterLoop
+				return false
 			}
 		}
 
-		return nil
+		return true
+	}, 10*time.Second, timeout)
+}
+
+func (clst *Cluster) isDoneWaiting(awsIDs []awsID, boot bool) (bool, error) {
+	machines, err := clst.List()
+	if err != nil {
+		log.WithError(err).Warn("Failed to get machines.")
+		return true, err
 	}
 
-	return errors.New("timed out")
+	exists := make(map[awsID]struct{})
+	for _, inst := range machines {
+		// If the machine wasn't configured completely when the List()
+		// call was made, the cluster will fail to join and boot them
+		// twice.
+		if inst.Size == "" {
+			continue
+		}
+
+		id := awsID{
+			spotID: inst.ID,
+			region: inst.Region,
+		}
+		exists[id] = struct{}{}
+	}
+
+	for _, id := range awsIDs {
+		if _, ok := exists[id]; ok != boot {
+			return false, nil
+		}
+	}
+
+	return true, nil
 }
 
 // SetACLs adds and removes acls in `clst` so that it conforms to `acls`.
