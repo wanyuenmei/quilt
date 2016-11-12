@@ -35,10 +35,10 @@ follow the instructions
 
 ## Configure A Cloud Provider
 
-Below we discuss how to setup Quilt for Amazon EC2.  Other providers are
-supported as well, including [Vagrant](Vagrant.md), and Google Compute Engine.
-Since Quilt deploys systems consistently across providers, the details of the
-rest of this document will apply no matter what provider you choose.
+Below we discuss how to setup Quilt for Amazon EC2. Google Compute Engine is
+also supported. Since Quilt deploys systems consistently across providers, the
+details of the rest of this document will apply no matter what provider you
+choose.
 
 For Amazon EC2, you'll first need to create an account with [Amazon Web
 Services](https://aws.amazon.com/ec2/) and then find your
@@ -52,62 +52,49 @@ aws_secret_access_key = <YOUR_SECRET_KEY>
 ```
 
 ## Your First Quilt-managed Infrastructure
-We suggest you read [specs/example.spec](../specs/example.spec) to understand the
-infrastructure defined by this Stitch.
+We suggest you read [specs/example.js](../specs/example.js) to understand the
+infrastructure defined by this Quilt.js spec.
 
-### Configure [specs/example.spec](../specs/example.spec)
+
+### Configure [specs/example.js](../specs/example.js)
 #### Set Up Your SSH Authentication
-Quilt-managed Machines use public key authentication to control SSH access. Stitch
-defines two Machine attributes for configuring SSH authentication, `githubKey`
-and `sshkey`.
+Quilt-managed Machines use public key authentication to control SSH access.
+SSH authentication is configured with the `sshKeys` Machine attribute.
+Currently,  the easiest way to set up your SSH access, is by using the
+`githubKeys()` function. Given your GitHub username, the function grabs your
+public keys from GitHub, so they can be used to configure SSH authentication.
+If you can access GitHub repositories through SSH, then you can also SSH into a
+`githubKey`-configured Machine.
 
-##### githubKey
-A Machine with the `githubKey` attribute uses your public keys from GitHub
-to configure SSH authentication. If you can access GitHub repositories through
-SSH, then you can also SSH into a `githubKey`-configured Machine.
+If you would like to use `githubKey` authentication, open `specs/example.js`
+and an set the `sshKeys` appropriately.
+```javascript
+var baseMachine = new Machine({
+    ...
+    sshKeys: githubKeys("ejj"),
+    ...
+});
+```
 
-If you would like to use `githubKey` authentication, open `secs/example.spec`
-and fill in `(define githubKey "<YOUR_GITHUB_USERNAME>")` appropriately.
-
-##### sshkey
-Machines with the `sshkey` attribute use a user-supplied public key to configure
-SSH authentication. This attribute is useful for users who want to use an ssh key
-that isn't stored on GitHub.
-
-To use `sshkey` authentication, open
-[specs/example.spec](../specs/example.spec) for editing.
-
-Replace `(define githubKey
-"<YOUR_GITHUB_USERNAME>")` with `(define sshkey <YOUR_PUBLIC_KEY>)`.
-
-`<YOUR_PUBLIC_KEY>` should be a string with the contents of your
-`~/.ssh/id_rsa.pub`, e.g.: `(define sshkey "ssh-rsa
-AAAAB3NzaC1yc2EAAAADAQABAAABAQ shwang@deepmuse.space")`
-
-#### Choose Namespace
-Running two Quilt instances with the same Namespace is not supported.
-If you are sharing a computing cluster with others, it would be a good idea to
-change `(define Namespace "CHANGE_ME")` to a different name.
-
-### Deploying [specs/example.spec](../specs/example.spec)
+### Deploying [specs/example.js](../specs/example.js)
 While in the `$GOPATH/src/github.com/NetSys/quilt/` directory, execute `quilt
-run specs/example.spec`. Quilt will set up several Ubuntu VMs on your cloud
+run specs/example.js`. Quilt will set up several Ubuntu VMs on your cloud
 provider as Workers, and these Workers will host Nginx Docker containers.
 
 
 ### Accessing the Worker VM
 It will take a while for the VMs to boot up, for Quilt to configure the network,
-and for Docker containers to be initialized. "New connection" message in the console
-output indicates that new VM is fully booted and has began communicating with
-Quilt.
+and for Docker containers to be initialized. When a machine is marked
+`Connected` in the console output, the corresponding VM is fully booted and has
+begun communicating with Quilt.
 
 The public IP of the Worker VM can be deduced from the console output. The
-following output shows the Worker VM's public IP to be 52.39.213.45:
+following output shows the Worker VM's public IP to be 52.53.177.110:
 ```
-INFO [Jun  7 17:24:43.660] New connection.
-machine=Machine-3{Role=Worker, Provider=Amazon, Region=us-west-2, Size=m3.medium, DiskSize=32, CloudID=sir-03hg1gw1, PublicIP=52.39.213.45, PrivateIP=172.31.6.254}
-INFO [Jun  7 17:24:43.660] New connection.
-machine=Machine-2{Role=Master, Provider=Amazon, Region=us-west-2, Size=m3.medium, DiskSize=32, CloudID=sir-03hdcezk, PublicIP=52.25.237.134, PrivateIP=172.31.1.198}
+INFO [Nov 11 13:23:10.266] db.Machine:
+	Machine-2{Master, Amazon us-west-1 m4.large, sir-3sngfxdh, PublicIP=54.183.169.245, PrivateIP=172.31.2.178, Disk=32GB, Connected}
+	Machine-4{Worker, Amazon us-west-1 m4.large, sir-19bid86g, PublicIP=52.53.177.110, PrivateIP=172.31.0.87, Disk=32GB, Connected}
+...
 ```
 
 Run `ssh quilt@<WORKER_PUBLIC_IP>` to access a privileged shell on the Worker VM.
@@ -116,12 +103,12 @@ Run `ssh quilt@<WORKER_PUBLIC_IP>` to access a privileged shell on the Worker VM
 You can run `docker ps` to list the containers running on your Worker VM.
 
 ```
-quilt@ip-172-31-1-198:~$ docker ps
+quilt@ip-172-31-0-87:~$ docker ps
 CONTAINER ID        IMAGE                        COMMAND                  CREATED             STATUS              PORTS               NAMES
-4ec5926bfbab        quilt/ovs                    "run ovn-northd"         2 hours ago         Up 2 hours                              ovn-northd
-855e6ff38345        quilt/ovs                    "run ovsdb-server"       2 hours ago         Up 2 hours                              ovsdb-server
-fb0f44812f30        quay.io/coreos/etcd:v2.3.6   "/etcd --name=master-"   2 hours ago         Up 2 hours                              etcd
-79ca96065912        quilt/quilt:latest           "/minion"                2 hours ago         Up 2 hours                              minion
+a2ac27cfd313        quay.io/coreos/etcd:v3.0.2   "/usr/local/bin/etcd "   11 minutes ago      Up 11 minutes                           etcd
+0f407bd0d5c4        quilt/ovs                    "run ovs-vswitchd"       11 minutes ago      Up 11 minutes                           ovs-vswitchd
+7b65a447fe54        quilt/ovs                    "run ovsdb-server"       11 minutes ago      Up 11 minutes                           ovsdb-server
+deb4f98db8eb        quilt/quilt:latest           "quilt minion"           11 minutes ago      Up 11 minutes                           minion
 ```
 
 Any docker containers defined in a Stitch specification are placed on one of
@@ -132,9 +119,13 @@ other and your local computer.
 
 ### Loading the Nginx Webpage
 By default, Quilt-managed containers are disconnected from the public internet
-and isolated from one another.  The final line of
-[specs/example.spec](../specs/example.spec) opens port 80 on the Nginx
-container to the outside world.
+and isolated from one another. In order to make the Nginx container accessible
+from the public internet, [specs/example.js](../specs/example.js) explicitly
+opens port 80 on the Nginx container to the outside world:
+
+```javascript
+publicInternet.connect(80, webTier);
+```
 
 From your browser via `http://<WORKER_PUBLIC_IP>`, or on the command-line via
 `curl <WORKER_PUBLIC_IP>`, you can load the Nginx welcome page served by your
@@ -143,11 +134,9 @@ Quilt cluster.
 ### Cleaning up
 
 If you'd like to destroy the infrastructure you just deployed, you can either
-modify the specification to remove all of the Machines, or use a helper utility
-built into the `quilt` binary:  Invoking it with the `stop` command and the
-Namespace you specified earlier, will cause Quilt to destroy all of the
-Machines in the namespace.  For example, `quilt stop Example`, will destroy all
-of the Machines in the Example namespace.
+modify the specification to remove all of the Machines, or use the command,
+`quilt stop`. Both options will cause Quilt to destroy all of the
+Machines in the deployment.
 
 ## Next Steps: Starting Spark
 A starter Spark example to explore is [SparkPI](../specs/spark/).
@@ -161,6 +150,6 @@ into your `QUILT_PATH`. You can read more about its functionality
 
 Try starting the Quilt daemon with `quilt daemon`. Then, in a separate shell, try
 `quilt get github.com/NetSys/quilt` and running
-`quilt run github.com/NetSys/quilt/specs/example.spec` (remember to
+`quilt run github.com/NetSys/quilt/specs/example.js` (remember to
 configure the file that was just downloaded by following the instructions
 above).
