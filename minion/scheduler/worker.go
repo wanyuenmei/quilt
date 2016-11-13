@@ -13,7 +13,7 @@ import (
 const labelKey = "quilt"
 const labelValue = "scheduler"
 const labelPair = labelKey + "=" + labelValue
-const concurrencyLimit = 32
+const concurrencyLimit = 1
 
 func runWorker(conn db.Conn, dk docker.Client, myIP string) {
 	if myIP == "" {
