@@ -102,7 +102,7 @@ func (sCmd *SSH) Run() int {
 // Stored in a variable so we can mock it out for unit tests.
 var runSSHCommand = func(host string, args []string) *exec.Cmd {
 	baseArgs := []string{fmt.Sprintf("quilt@%s", host),
-		"-o", "StrictHostKeyChecking=no"}
+		"-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null"}
 
 	cmd := exec.Command("ssh", append(baseArgs, args...)...)
 	cmd.Stdin = os.Stdin

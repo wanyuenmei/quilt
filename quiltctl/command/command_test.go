@@ -373,7 +373,7 @@ func TestNoLeader(t *testing.T) {
 
 func TestSSHCommandCreation(t *testing.T) {
 	exp := []string{"ssh", "quilt@host", "-o", "StrictHostKeyChecking=no",
-		"-i", "~/.ssh/quilt"}
+		"-o", "UserKnownHostsFile=/dev/null", "-i", "~/.ssh/quilt"}
 	res := runSSHCommand("host", []string{"-i", "~/.ssh/quilt"})
 	if !reflect.DeepEqual(res.Args, exp) {
 		t.Errorf("Bad SSH command creation: expected %v, got %v.", exp, res.Args)
