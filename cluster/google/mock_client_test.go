@@ -8,6 +8,52 @@ type mockClient struct {
 	mock.Mock
 }
 
+// AddAccessConfig provides a mock function with given fields: project, zone, instance, networkInterface, accessConfig
+func (_m *mockClient) AddAccessConfig(project string, zone string, instance string, networkInterface string, accessConfig *compute.AccessConfig) (*compute.Operation, error) {
+	ret := _m.Called(project, zone, instance, networkInterface, accessConfig)
+
+	var r0 *compute.Operation
+	if rf, ok := ret.Get(0).(func(string, string, string, string, *compute.AccessConfig) *compute.Operation); ok {
+		r0 = rf(project, zone, instance, networkInterface, accessConfig)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*compute.Operation)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, string, string, string, *compute.AccessConfig) error); ok {
+		r1 = rf(project, zone, instance, networkInterface, accessConfig)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// DeleteAccessConfig provides a mock function with given fields: project, zone, instance, accessConfig, networkInterface
+func (_m *mockClient) DeleteAccessConfig(project string, zone string, instance string, accessConfig string, networkInterface string) (*compute.Operation, error) {
+	ret := _m.Called(project, zone, instance, accessConfig, networkInterface)
+
+	var r0 *compute.Operation
+	if rf, ok := ret.Get(0).(func(string, string, string, string, string) *compute.Operation); ok {
+		r0 = rf(project, zone, instance, accessConfig, networkInterface)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*compute.Operation)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, string, string, string, string) error); ok {
+		r1 = rf(project, zone, instance, accessConfig, networkInterface)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // DeleteFirewall provides a mock function with given fields: project, firewall
 func (_m *mockClient) DeleteFirewall(project string, firewall string) (*compute.Operation, error) {
 	ret := _m.Called(project, firewall)
@@ -70,6 +116,29 @@ func (_m *mockClient) GetGlobalOperation(project string, operation string) (*com
 	var r1 error
 	if rf, ok := ret.Get(1).(func(string, string) error); ok {
 		r1 = rf(project, operation)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetInstance provides a mock function with given fields: project, zone, id
+func (_m *mockClient) GetInstance(project string, zone string, id string) (*compute.Instance, error) {
+	ret := _m.Called(project, zone, id)
+
+	var r0 *compute.Instance
+	if rf, ok := ret.Get(0).(func(string, string, string) *compute.Instance); ok {
+		r0 = rf(project, zone, id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*compute.Instance)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, string, string) error); ok {
+		r1 = rf(project, zone, id)
 	} else {
 		r1 = ret.Error(1)
 	}

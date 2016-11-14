@@ -10,11 +10,16 @@ import (
 
 //go:generate mockery -inpkg -testonly -name=client
 type client interface {
+	GetInstance(project, zone, id string) (*compute.Instance, error)
 	ListInstances(project, zone string, opts apiOptions) (*compute.InstanceList,
 		error)
 	InsertInstance(project, zone string, instance *compute.Instance) (
 		*compute.Operation, error)
 	DeleteInstance(project, zone, operation string) (*compute.Operation, error)
+	AddAccessConfig(project, zone, instance, networkInterface string,
+		accessConfig *compute.AccessConfig) (*compute.Operation, error)
+	DeleteAccessConfig(project, zone, instance, accessConfig,
+		networkInterface string) (*compute.Operation, error)
 	GetZoneOperation(project, zone, operation string) (*compute.Operation, error)
 	GetGlobalOperation(project, operation string) (*compute.Operation, error)
 	ListFirewalls(project string) (*compute.FirewallList, error)
@@ -51,6 +56,10 @@ func newClient() (*clientImpl, error) {
  * Service: Instances
  */
 
+func (c *clientImpl) GetInstance(project, zone, id string) (*compute.Instance, error) {
+	return c.gce.Instances.Get(project, zone, id).Do()
+}
+
 type apiOptions struct {
 	filter string
 }
@@ -73,6 +82,18 @@ func (c *clientImpl) InsertInstance(project, zone string, instance *compute.Inst
 func (c *clientImpl) DeleteInstance(project, zone, instance string) (*compute.Operation,
 	error) {
 	return c.gce.Instances.Delete(project, zone, instance).Do()
+}
+
+func (c *clientImpl) AddAccessConfig(project, zone, instance, networkInterface string,
+	accessConfig *compute.AccessConfig) (*compute.Operation, error) {
+	return c.gce.Instances.AddAccessConfig(project, zone, instance, networkInterface,
+		accessConfig).Do()
+}
+
+func (c *clientImpl) DeleteAccessConfig(project, zone, instance, accessConfig,
+	networkInterface string) (*compute.Operation, error) {
+	return c.gce.Instances.DeleteAccessConfig(project, zone, instance,
+		accessConfig, networkInterface).Do()
 }
 
 /**

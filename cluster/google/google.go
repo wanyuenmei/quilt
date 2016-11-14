@@ -40,6 +40,12 @@ import (
 // region preference.
 const DefaultRegion = "us-east1-b"
 
+// ephemeralIPName is a constant for what we label NATs with ephemeral IPs in GCE.
+const ephemeralIPName = "External NAT"
+
+// floatingIPName is a constant for what we label NATs with floating IPs in GCE.
+const floatingIPName = "Floating IP"
+
 const computeBaseURL string = "https://www.googleapis.com/compute/v1/projects"
 const (
 	// These are the various types of Operations that the GCE API returns
@@ -114,14 +120,21 @@ func (clst *Cluster) List() ([]machine.Machine, error) {
 			// XXX: This make some iffy assumptions about NetworkInterfaces
 			machineSplitURL := strings.Split(item.MachineType, "/")
 			mtype := machineSplitURL[len(machineSplitURL)-1]
+
+			accessConfig := item.NetworkInterfaces[0].AccessConfigs[0]
+			floatingIP := ""
+			if accessConfig.Name == floatingIPName {
+				floatingIP = accessConfig.NatIP
+			}
+
 			mList = append(mList, machine.Machine{
-				ID: item.Name,
-				PublicIP: item.NetworkInterfaces[0].
-					AccessConfigs[0].NatIP,
-				PrivateIP: item.NetworkInterfaces[0].NetworkIP,
-				Size:      mtype,
-				Region:    zone,
-				Provider:  db.Google,
+				ID:         item.Name,
+				PublicIP:   accessConfig.NatIP,
+				FloatingIP: floatingIP,
+				PrivateIP:  item.NetworkInterfaces[0].NetworkIP,
+				Size:       mtype,
+				Region:     zone,
+				Provider:   db.Google,
 			})
 		}
 	}
@@ -291,7 +304,7 @@ func (clst *Cluster) instanceNew(name string, size string, zone string,
 				AccessConfigs: []*compute.AccessConfig{
 					{
 						Type: "ONE_TO_ONE_NAT",
-						Name: "External NAT",
+						Name: ephemeralIPName,
 					},
 				},
 				Network: fmt.Sprintf("%s/global/networks/%s",
@@ -416,9 +429,40 @@ func (clst *Cluster) SetACLs(acls []acl.ACL) error {
 	return nil
 }
 
-// UpdateFloatingIPs is not implemented.
-func (clst *Cluster) UpdateFloatingIPs([]machine.Machine) error {
-	return errors.New("google provider does not currently support floating IPs")
+// UpdateFloatingIPs updates IPs of machines by recreating their network interfaces.
+func (clst *Cluster) UpdateFloatingIPs(machines []machine.Machine) error {
+	for _, m := range machines {
+		instance, err := clst.gce.GetInstance(clst.projID, m.Region, m.ID)
+		if err != nil {
+			return err
+		}
+
+		// Delete existing network interface. It is only possible to assign
+		// one access config per instance. Thus, updating GCE Floating IPs
+		// is not a seamless, zero-downtime procedure.
+		networkInterface := instance.NetworkInterfaces[0]
+		accessConfig := instance.NetworkInterfaces[0].AccessConfigs[0]
+		_, err = clst.gce.DeleteAccessConfig(clst.projID, m.Region, m.ID,
+			accessConfig.Name, networkInterface.Name)
+		if err != nil {
+			return err
+		}
+
+		// Add new network interface.
+		_, err = clst.gce.AddAccessConfig(clst.projID, m.Region, m.ID,
+			networkInterface.Name, &compute.AccessConfig{
+				Type: "ONE_TO_ONE_NAT",
+				Name: floatingIPName,
+				// Google will automatically assign a dynamic IP
+				// if none is provided (i.e. m.FloatingIP == "").
+				NatIP: m.FloatingIP,
+			})
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (clst *Cluster) getFirewall(name string) (*compute.Firewall, error) {
