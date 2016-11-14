@@ -6,13 +6,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/spf13/afero"
-
 	"github.com/NetSys/quilt/api"
 	"github.com/NetSys/quilt/api/client"
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/quiltctl/testutils"
-	"github.com/NetSys/quilt/util"
 )
 
 func TestMachineFlags(t *testing.T) {
@@ -111,38 +108,6 @@ func TestGetFlags(t *testing.T) {
 	checkGetParsing(t, []string{"-import", expImport}, expImport, nil)
 	checkGetParsing(t, []string{expImport}, expImport, nil)
 	checkGetParsing(t, []string{}, "", errors.New("no import specified"))
-}
-
-func checkRunParsing(t *testing.T, args []string, expStitch string, expErr error) {
-	runCmd := NewRunCommand()
-	err := parseHelper(runCmd, args)
-
-	if expErr != nil {
-		if err.Error() != expErr.Error() {
-			t.Errorf("Expected error %s, but got %s",
-				expErr.Error(), err.Error())
-		}
-		return
-	}
-
-	if err != nil {
-		t.Errorf("Unexpected error when parsing run args: %s", err.Error())
-		return
-	}
-
-	if runCmd.stitch != expStitch {
-		t.Errorf("Expected run command to parse arg %s, but got %s",
-			expStitch, runCmd.stitch)
-	}
-}
-
-func TestRunFlags(t *testing.T) {
-	t.Parallel()
-
-	expStitch := "spec"
-	checkRunParsing(t, []string{"-stitch", expStitch}, expStitch, nil)
-	checkRunParsing(t, []string{expStitch}, expStitch, nil)
-	checkRunParsing(t, []string{}, "", errors.New("no spec specified"))
 }
 
 func checkStopParsing(t *testing.T, args []string, expNamespace string, expErr error) {
@@ -311,27 +276,6 @@ func TestStopNamespace(t *testing.T) {
 	expStitch = ""
 	if c.runStitchArg != expStitch {
 		t.Error("stop command invoked Quilt with the wrong stitch")
-	}
-}
-
-func TestRunSpec(t *testing.T) {
-	c := &mockClient{}
-	getClient = func(host string) (client.Client, error) {
-		return c, nil
-	}
-	util.AppFs = afero.NewMemMapFs()
-
-	stitchPath := "test.spec"
-	testSpec := `new Container("nginx");`
-	util.WriteFile(stitchPath, []byte(testSpec), 0644)
-
-	runCmd := NewRunCommand()
-	runCmd.stitch = stitchPath
-	runCmd.Run()
-
-	expStitch := `importSources = {};` + testSpec
-	if c.runStitchArg != expStitch {
-		t.Error("run command invoked Quilt with the wrong stitch")
 	}
 }
 

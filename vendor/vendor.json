@@ -9,6 +9,12 @@
 			"revision": "f3cfb454f4c209e6668c95216c4744b8fddb2356"
 		},
 		{
+			"checksumSHA1": "Lglgc8iIRhqbqd8fpAZKpo/eqeY=",
+			"path": "github.com/Sirupsen/logrus/hooks/test",
+			"revision": "abc6f20dabf4b10195f233ad21ea6c5ba33acae0",
+			"revisionTime": "2016-11-11T12:09:51Z"
+		},
+		{
 			"checksumSHA1": "zKsZOyaTSC4MmdbKfiM6iUCjvGk=",
 			"comment": "v1.1.32-1-g1608a1f",
 			"path": "github.com/aws/aws-sdk-go/aws",

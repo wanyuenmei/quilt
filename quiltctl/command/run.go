@@ -4,6 +4,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/robertkrimen/otto"
@@ -61,7 +64,17 @@ func (rCmd *Run) Run() int {
 	}
 	defer c.Close()
 
-	compiled, err := stitch.Compile(rCmd.stitch, stitch.DefaultImportGetter)
+	stitchPath := rCmd.stitch
+	compiled, err := stitch.Compile(stitchPath, stitch.DefaultImportGetter)
+	if err != nil && os.IsNotExist(err) && !filepath.IsAbs(stitchPath) {
+		// Automatically add the ".js" file suffix if it's not provided.
+		if !strings.HasSuffix(stitchPath, ".js") {
+			stitchPath += ".js"
+		}
+		compiled, err = stitch.Compile(
+			filepath.Join(stitch.GetQuiltPath(), stitchPath),
+			stitch.DefaultImportGetter)
+	}
 	if err != nil {
 		// Print the stacktrace if it's an Otto error.
 		if ottoError, ok := err.(*otto.Error); ok {
