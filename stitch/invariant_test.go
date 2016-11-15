@@ -5,7 +5,7 @@ import (
 )
 
 func initSpec(src string) (Stitch, error) {
-	return New(src, ImportGetter{
+	return FromJavascript(src, ImportGetter{
 		Path: "../specs",
 	})
 }

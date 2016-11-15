@@ -233,7 +233,7 @@ type mockClient struct {
 	machineReturn   []db.Machine
 	containerReturn []db.Container
 	etcdReturn      []db.Etcd
-	runStitchArg    string
+	deployArg       string
 }
 
 func (c *mockClient) QueryMachines() ([]db.Machine, error) {
@@ -252,8 +252,8 @@ func (c *mockClient) Close() error {
 	return nil
 }
 
-func (c *mockClient) RunStitch(stitch string) error {
-	c.runStitchArg = stitch
+func (c *mockClient) Deploy(deployment string) error {
+	c.deployArg = deployment
 	return nil
 }
 
@@ -266,15 +266,15 @@ func TestStopNamespace(t *testing.T) {
 	stopCmd := NewStopCommand()
 	stopCmd.namespace = "namespace"
 	stopCmd.Run()
-	expStitch := `createDeployment({namespace: "namespace"});`
-	if c.runStitchArg != expStitch {
+	expStitch := `{"namespace": "namespace"}`
+	if c.deployArg != expStitch {
 		t.Error("stop command invoked Quilt with the wrong stitch")
 	}
 
 	stopCmd = NewStopCommand()
 	stopCmd.Run()
-	expStitch = ""
-	if c.runStitchArg != expStitch {
+	expStitch = "{}"
+	if c.deployArg != expStitch {
 		t.Error("stop command invoked Quilt with the wrong stitch")
 	}
 }

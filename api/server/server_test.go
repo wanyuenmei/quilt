@@ -68,41 +68,46 @@ func TestContainerResponse(t *testing.T) {
 	checkQuery(t, server{conn}, db.ContainerTable, exp)
 }
 
-func TestBadStitch(t *testing.T) {
+func TestBadDeployment(t *testing.T) {
 	conn := db.New()
 	s := server{dbConn: conn}
 
-	badStitch := `anUndefinedVariable`
+	badDeployment := `{`
 
-	_, err := s.Run(context.Background(),
-		&pb.RunRequest{Stitch: badStitch})
+	_, err := s.Deploy(context.Background(),
+		&pb.DeployRequest{Deployment: badDeployment})
 
 	if err == nil {
-		t.Error("Expected error from bad stitch.")
+		t.Error("Expected error from bad deployment.")
 		return
 	}
 
-	expErr := "ReferenceError: 'anUndefinedVariable' is not defined"
+	expErr := "unexpected end of JSON input"
 	if err.Error() != expErr {
-		t.Errorf("Expected run error %s, but got %s\n", expErr, err.Error())
+		t.Errorf("Expected deployment error %s, but got %s\n",
+			expErr, err.Error())
 	}
 }
 
-func TestRun(t *testing.T) {
+func TestDeploy(t *testing.T) {
 	conn := db.New()
 	s := server{dbConn: conn}
 
-	createMachineStitch :=
-		`deployment.deploy([
-		new Machine({provider: "Amazon", size: "m4.large", role: "Master"}),
-		new Machine({provider: "Amazon", size: "m4.large", role: "Worker"}),
-		]);`
+	createMachineDeployment := `
+	{"Machines":[
+		{"Provider":"Amazon",
+		"Role":"Master",
+		"Size":"m4.large"
+	}, {"Provider":"Amazon",
+		"Role":"Worker",
+		"Size":"m4.large"
+	}]}`
 
-	_, err := s.Run(context.Background(),
-		&pb.RunRequest{Stitch: createMachineStitch})
+	_, err := s.Deploy(context.Background(),
+		&pb.DeployRequest{Deployment: createMachineDeployment})
 
 	if err != nil {
-		t.Errorf("Unexpected error when running stich: %s\n", err.Error())
+		t.Errorf("Unexpected error when deploying stitch: %s\n", err.Error())
 		return
 	}
 
@@ -113,7 +118,7 @@ func TestRun(t *testing.T) {
 	})
 
 	if len(machines) != 2 {
-		t.Errorf("Two machines should have been created by running the stitch, "+
+		t.Errorf("Two machines should have been created by the deployment, "+
 			"but we found: %v\n", machines)
 	}
 }

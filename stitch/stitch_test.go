@@ -10,6 +10,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/NetSys/quilt/util"
 )
@@ -427,22 +428,6 @@ func TestRequire(t *testing.T) {
 		return square(5);
 	})()`, float64(25))
 
-	testSpec := `var square = require('square');
-	square(5)`
-	util.WriteFile("test.js", []byte(testSpec), 0644)
-	compiled, err := Compile("test.js", ImportGetter{
-		Path: ".",
-	})
-	if err != nil {
-		t.Errorf(`Unexpected error: "%s".`, err.Error())
-	}
-	expCompiled := `importSources = {"square":"module.exports = ` +
-		`function(x) {return x*x }"};` + testSpec
-	if compiled != expCompiled {
-		t.Errorf(`Bad compilation: expected "%s", got "%s".`,
-			expCompiled, compiled)
-	}
-
 	util.WriteFile("A.js", []byte(`require("A");`), 0644)
 	checkError(t, `require("A")`, `StitchError: import cycle: [A A]`)
 
@@ -499,6 +484,27 @@ func TestQuery(t *testing.T) {
 	adminACLChecker(t, ``, []string{})
 }
 
+func TestMarshal(t *testing.T) {
+	t.Parallel()
+
+	exp := Stitch{
+		Machines: []Machine{
+			{
+				Role:     "Master",
+				Provider: "Amazon",
+			},
+			{
+				Role:     "Worker",
+				Provider: "Amazon",
+			},
+		},
+	}
+
+	actual, err := FromJSON(exp.String())
+	assert.Nil(t, err)
+	assert.Equal(t, exp, actual)
+}
+
 func checkJavascript(t *testing.T, code string, exp interface{}) {
 	resultKey := "result"
 
@@ -532,7 +538,7 @@ func checkJavascript(t *testing.T, code string, exp interface{}) {
 }
 
 func checkError(t *testing.T, code string, exp string) {
-	_, err := New(code, ImportGetter{
+	_, err := FromJavascript(code, ImportGetter{
 		Path: ".",
 	})
 	if err == nil {
@@ -548,7 +554,7 @@ func queryChecker(
 	queryFunc func(Stitch) interface{}) func(*testing.T, string, interface{}) {
 
 	return func(t *testing.T, code string, exp interface{}) {
-		handle, err := New(code, DefaultImportGetter)
+		handle, err := FromJavascript(code, DefaultImportGetter)
 		if err != nil {
 			t.Errorf(`Unexpected error: "%s".`, err.Error())
 			return

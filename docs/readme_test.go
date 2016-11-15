@@ -112,7 +112,7 @@ func TestReadme(t *testing.T) {
 }
 
 func checkConfig(content string, quiltPath string) error {
-	_, err := stitch.New(content, stitch.ImportGetter{
+	_, err := stitch.FromJavascript(content, stitch.ImportGetter{
 		Path: quiltPath,
 	})
 	if err != nil {

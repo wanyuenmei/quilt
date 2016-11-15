@@ -20,7 +20,7 @@ func configRunOnce(configPath string, quiltPath string) error {
 		}
 		return &resp, nil
 	}
-	_, err := stitch.Compile(configPath, stitch.ImportGetter{
+	_, err := stitch.FromFile(configPath, stitch.ImportGetter{
 		Path: quiltPath,
 	})
 	return err

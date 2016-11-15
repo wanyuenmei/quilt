@@ -26,7 +26,7 @@ func TestSlug(t *testing.T) {
 }
 
 func initSpec(src string) (stitch.Stitch, error) {
-	return stitch.New(src, stitch.ImportGetter{
+	return stitch.FromJavascript(src, stitch.ImportGetter{
 		Path: "../specs",
 	})
 }

@@ -36,8 +36,8 @@ type Client interface {
 	// QueryEtcd retrieves the etcd information tracked by the Quilt daemon.
 	QueryEtcd() ([]db.Etcd, error)
 
-	// RunStitch makes a request to the Quilt daemon to execute the given stitch.
-	RunStitch(stitch string) error
+	// Deploy makes a request to the Quilt daemon to deploy the given deployment.
+	Deploy(deployment string) error
 }
 
 type clientImpl struct {
@@ -135,9 +135,9 @@ func (c clientImpl) QueryEtcd() ([]db.Etcd, error) {
 	return rows.([]db.Etcd), nil
 }
 
-// RunStitch makes a request to the Quilt daemon to execute the given stitch.
-func (c clientImpl) RunStitch(stitch string) error {
+// Deploy makes a request to the Quilt daemon to deploy the given deployment.
+func (c clientImpl) Deploy(deployment string) error {
 	ctx, _ := context.WithTimeout(context.Background(), requestTimeout)
-	_, err := c.pbClient.Run(ctx, &pb.RunRequest{Stitch: stitch})
+	_, err := c.pbClient.Deploy(ctx, &pb.DeployRequest{Deployment: deployment})
 	return err
 }

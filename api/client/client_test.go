@@ -23,10 +23,10 @@ func (c mockAPIClient) Query(ctx context.Context, in *pb.DBQuery,
 	return &pb.QueryReply{TableContents: c.mockResponse}, c.mockError
 }
 
-func (c mockAPIClient) Run(ctx context.Context, in *pb.RunRequest,
-	opts ...grpc.CallOption) (*pb.RunReply, error) {
+func (c mockAPIClient) Deploy(ctx context.Context, in *pb.DeployRequest,
+	opts ...grpc.CallOption) (*pb.DeployReply, error) {
 
-	return &pb.RunReply{}, nil
+	return &pb.DeployReply{}, nil
 }
 
 func TestUnmarshalMachine(t *testing.T) {

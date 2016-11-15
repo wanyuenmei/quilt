@@ -2,7 +2,7 @@ syntax = "proto3";
 
 service API {
 	rpc Query(DBQuery) returns(QueryReply) {}
-	rpc Run(RunRequest) returns(RunReply) {}
+	rpc Deploy(DeployRequest) returns(DeployReply) {}
 }
 
 message DBQuery {
@@ -13,9 +13,9 @@ message QueryReply {
     string TableContents = 1;
 }
 
-message RunRequest {
-	string Stitch = 1;
+message DeployRequest {
+	string Deployment = 1;
 }
 
-message RunReply {
+message DeployReply {
 }

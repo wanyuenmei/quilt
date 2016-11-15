@@ -90,21 +90,23 @@ func (s server) Query(cts context.Context, query *pb.DBQuery) (*pb.QueryReply, e
 	return &pb.QueryReply{TableContents: string(json)}, nil
 }
 
-func (s server) Run(cts context.Context, runReq *pb.RunRequest) (*pb.RunReply, error) {
-	stitch, err := stitch.New(runReq.Stitch, stitch.DefaultImportGetter)
+func (s server) Deploy(cts context.Context, deployReq *pb.DeployRequest) (
+	*pb.DeployReply, error) {
+
+	stitch, err := stitch.FromJSON(deployReq.Deployment)
 	if err != nil {
-		return &pb.RunReply{}, err
+		return &pb.DeployReply{}, err
 	}
 
 	if len(stitch.Machines) > ip.MaxMinionCount {
-		return &pb.RunReply{}, fmt.Errorf("cannot boot more than %d "+
+		return &pb.DeployReply{}, fmt.Errorf("cannot boot more than %d "+
 			"machines", ip.MaxMinionCount)
 	}
 
 	err = engine.UpdatePolicy(s.dbConn, stitch)
 	if err != nil {
-		return &pb.RunReply{}, err
+		return &pb.DeployReply{}, err
 	}
 
-	return &pb.RunReply{}, nil
+	return &pb.DeployReply{}, nil
 }

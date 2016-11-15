@@ -4,7 +4,6 @@ package stitch
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/robertkrimen/otto"
 
@@ -28,7 +27,6 @@ type Stitch struct {
 	Namespace string
 
 	Invariants []invariant
-	code       string
 }
 
 // A Placement constraint guides where containers may be scheduled, either relative to
@@ -139,47 +137,14 @@ func runSpec(vm *otto.Otto, filename string, spec string) (otto.Value, error) {
 	return run(vm, filename, exec)
 }
 
-// Compile transforms the Stitch at the given filepath into an executable string.
-func Compile(filepath string, getter ImportGetter) (string, error) {
-	specStr, err := util.ReadFile(filepath)
-	if err != nil {
-		return "", err
-	}
-
-	vm, err := newVM(getter)
-	if err != nil {
-		return "", err
-	}
-
-	if _, err = runSpec(vm, filepath, specStr); err != nil {
-		return "", err
-	}
-
-	imports, err := getImports(vm)
-	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("importSources = %s;", imports) + specStr, nil
-}
-
-// FromFile gets a Stitch handle from a file on disk.
-func FromFile(filename string, getter ImportGetter) (Stitch, error) {
-	compiled, err := Compile(filename, getter)
-	if err != nil {
-		return Stitch{}, err
-	}
-	return New(compiled, getter)
-}
-
 // New parses and executes a stitch (in text form), and returns an abstract Dsl handle.
-func New(specStr string, getter ImportGetter) (Stitch, error) {
+func New(filename string, specStr string, getter ImportGetter) (Stitch, error) {
 	vm, err := newVM(getter)
 	if err != nil {
 		return Stitch{}, err
 	}
 
-	if _, err := runSpec(vm, "<raw_string>", specStr); err != nil {
+	if _, err := runSpec(vm, filename, specStr); err != nil {
 		return Stitch{}, err
 	}
 
@@ -188,7 +153,6 @@ func New(specStr string, getter ImportGetter) (Stitch, error) {
 		return Stitch{}, err
 	}
 	spec.createPortRules()
-	spec.code = specStr
 
 	if len(spec.Invariants) == 0 {
 		return spec, nil
@@ -204,6 +168,26 @@ func New(specStr string, getter ImportGetter) (Stitch, error) {
 	}
 
 	return spec, nil
+}
+
+// FromJavascript gets a Stitch handle from a string containing Javascript code.
+func FromJavascript(specStr string, getter ImportGetter) (Stitch, error) {
+	return New("<raw_string>", specStr, getter)
+}
+
+// FromFile gets a Stitch handle from a file on disk.
+func FromFile(filename string, getter ImportGetter) (Stitch, error) {
+	specStr, err := util.ReadFile(filename)
+	if err != nil {
+		return Stitch{}, err
+	}
+	return New(filename, specStr, getter)
+}
+
+// FromJSON gets a Stitch handle from the deployment representation.
+func FromJSON(jsonStr string) (stc Stitch, err error) {
+	err = json.Unmarshal([]byte(jsonStr), &stc)
+	return stc, err
 }
 
 func parseContext(vm *otto.Otto) (stc Stitch, err error) {
@@ -255,9 +239,13 @@ func (stitch *Stitch) createPortRules() {
 	}
 }
 
-// String returns the stitch in its code form.
+// String returns the Stitch in its deployment representation.
 func (stitch Stitch) String() string {
-	return stitch.code
+	jsonBytes, err := json.Marshal(stitch)
+	if err != nil {
+		panic(err)
+	}
+	return string(jsonBytes)
 }
 
 // Get returns the value contained at the given index

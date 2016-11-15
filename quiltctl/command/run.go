@@ -65,13 +65,13 @@ func (rCmd *Run) Run() int {
 	defer c.Close()
 
 	stitchPath := rCmd.stitch
-	compiled, err := stitch.Compile(stitchPath, stitch.DefaultImportGetter)
+	compiled, err := stitch.FromFile(stitchPath, stitch.DefaultImportGetter)
 	if err != nil && os.IsNotExist(err) && !filepath.IsAbs(stitchPath) {
 		// Automatically add the ".js" file suffix if it's not provided.
 		if !strings.HasSuffix(stitchPath, ".js") {
 			stitchPath += ".js"
 		}
-		compiled, err = stitch.Compile(
+		compiled, err = stitch.FromFile(
 			filepath.Join(stitch.GetQuiltPath(), stitchPath),
 			stitch.DefaultImportGetter)
 	}
@@ -85,7 +85,7 @@ func (rCmd *Run) Run() int {
 		return 1
 	}
 
-	err = c.RunStitch(compiled)
+	err = c.Deploy(compiled.String())
 	if err != nil {
 		log.WithError(err).Error("Unable to start run.")
 		return 1

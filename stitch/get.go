@@ -1,7 +1,6 @@
 package stitch
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"golang.org/x/tools/go/vcs"
@@ -130,7 +129,7 @@ func (getter ImportGetter) checkSpec(file string, _ os.FileInfo, _ error) error 
 	if filepath.Ext(file) != ".js" {
 		return nil
 	}
-	_, err := Compile(file, getter.withAutoDownload(true))
+	_, err := FromFile(file, getter.withAutoDownload(true))
 	return err
 }
 
@@ -148,10 +147,6 @@ func (getter ImportGetter) specContents(name string) (string, error) {
 	}
 	return spec, nil
 }
-
-type importSources map[string]string
-
-const importSourcesKey = "importSources"
 
 func (getter *ImportGetter) requireImpl(call otto.FunctionCall) (otto.Value, error) {
 	if len(call.ArgumentList) != 1 {
@@ -178,64 +173,10 @@ func (getter *ImportGetter) requireImpl(call otto.FunctionCall) (otto.Value, err
 		getter.importPath = getter.importPath[:len(getter.importPath)-1]
 	}()
 
-	vm := call.Otto
-	imports, err := getImports(vm)
+	impStr, err := getter.specContents(name)
 	if err != nil {
 		return otto.Value{}, err
 	}
 
-	impStr, ok := imports[name]
-	if !ok {
-		impStr, err = getter.specContents(name)
-		if err != nil {
-			return otto.Value{}, err
-		}
-		if err := setImport(vm, name, impStr); err != nil {
-			return otto.Value{}, err
-		}
-	}
-
-	return runSpec(vm, name, impStr)
-}
-
-func setImport(vm *otto.Otto, moduleName, moduleContents string) error {
-	imports, getImportsErr := getImports(vm)
-	if getImportsErr != nil {
-		// If this is the first import we're setting, the map won't exist yet.
-		imports = make(map[string]string)
-	}
-	imports[moduleName] = moduleContents
-	importSourcesVal, err := vm.ToValue(imports)
-	if err != nil {
-		return err
-	}
-	return vm.Set(importSourcesKey, importSourcesVal)
-}
-
-func getImports(vm *otto.Otto) (importSources, error) {
-	imports := make(map[string]string)
-	importsVal, err := vm.Get(importSourcesKey)
-	if err != nil {
-		return imports, err
-	}
-
-	if importsVal.IsUndefined() {
-		return imports, nil
-	}
-
-	// Export() always returns `nil` as the error (it's only present for
-	// backwards compatibility), so we can safely ignore it.
-	exp, _ := importsVal.Export()
-	importsStr, err := json.Marshal(exp)
-	if err != nil {
-		return imports, err
-	}
-
-	err = json.Unmarshal(importsStr, &imports)
-	return imports, err
-}
-
-func (imports importSources) String() string {
-	importBytes, _ := json.Marshal(imports)
-	return string(importBytes)
+	return runSpec(call.Otto, name, impStr)
 }

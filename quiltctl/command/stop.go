@@ -54,7 +54,9 @@ func (sCmd *Stop) Run() int {
 	namespace := sCmd.namespace
 	var specStr string
 	if namespace != "" {
-		specStr += fmt.Sprintf("createDeployment({namespace: %q});", namespace)
+		specStr = fmt.Sprintf(`{"namespace": %q}`, namespace)
+	} else {
+		specStr = "{}"
 	}
 
 	c, err := getClient(sCmd.common.host)
@@ -64,7 +66,7 @@ func (sCmd *Stop) Run() int {
 	}
 	defer c.Close()
 
-	if err = c.RunStitch(specStr); err != nil {
+	if err = c.Deploy(specStr); err != nil {
 		log.WithError(err).Error("Unable to stop namespace.")
 		return 1
 	}

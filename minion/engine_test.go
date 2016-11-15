@@ -127,17 +127,17 @@ func TestContainerTxn(t *testing.T) {
 }
 
 func testContainerTxn(conn db.Conn, spec string) string {
-	var containers []db.Container
-	conn.Transact(func(view db.Database) error {
-		updatePolicy(view, db.Master, spec)
-		containers = view.SelectFromContainer(nil)
-		return nil
-	})
-
-	compiled, err := stitch.New(spec, stitch.DefaultImportGetter)
+	compiled, err := stitch.FromJavascript(spec, stitch.DefaultImportGetter)
 	if err != nil {
 		return err.Error()
 	}
+
+	var containers []db.Container
+	conn.Transact(func(view db.Database) error {
+		updatePolicy(view, db.Master, compiled.String())
+		containers = view.SelectFromContainer(nil)
+		return nil
+	})
 
 	for _, e := range queryContainers(compiled) {
 		found := false
@@ -242,17 +242,17 @@ func TestConnectionTxn(t *testing.T) {
 }
 
 func testConnectionTxn(conn db.Conn, spec string) string {
-	var connections []db.Connection
-	conn.Transact(func(view db.Database) error {
-		updatePolicy(view, db.Master, spec)
-		connections = view.SelectFromConnection(nil)
-		return nil
-	})
-
-	compiled, err := stitch.New(spec, stitch.DefaultImportGetter)
+	compiled, err := stitch.FromJavascript(spec, stitch.DefaultImportGetter)
 	if err != nil {
 		return err.Error()
 	}
+
+	var connections []db.Connection
+	conn.Transact(func(view db.Database) error {
+		updatePolicy(view, db.Master, compiled.String())
+		connections = view.SelectFromConnection(nil)
+		return nil
+	})
 
 	exp := compiled.Connections
 	for _, e := range exp {
@@ -292,9 +292,15 @@ func fired(c chan struct{}) bool {
 func TestPlacementTxn(t *testing.T) {
 	conn := db.New()
 	checkPlacement := func(spec string, exp ...db.Placement) {
+		compiled, err := stitch.FromJavascript(spec,
+			stitch.DefaultImportGetter)
+		if err != nil {
+			t.Errorf("Unexpected error while compiling: %s", err.Error())
+		}
+
 		placements := map[db.Placement]struct{}{}
 		conn.Transact(func(view db.Database) error {
-			updatePolicy(view, db.Master, spec)
+			updatePolicy(view, db.Master, compiled.String())
 			res := view.SelectFromPlacement(nil)
 
 			// Set the ID to 0 so that we can use reflect.DeepEqual.
