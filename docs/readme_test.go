@@ -2,7 +2,10 @@ package docs
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
+	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -112,6 +115,17 @@ func TestReadme(t *testing.T) {
 }
 
 func checkConfig(content string, quiltPath string) error {
+	oldHTTPGet := stitch.HTTPGet
+	defer func() {
+		stitch.HTTPGet = oldHTTPGet
+	}()
+
+	stitch.HTTPGet = func(url string) (*http.Response, error) {
+		resp := http.Response{
+			Body: ioutil.NopCloser(bytes.NewBufferString("")),
+		}
+		return &resp, nil
+	}
 	_, err := stitch.FromJavascript(content, stitch.ImportGetter{
 		Path: quiltPath,
 	})
