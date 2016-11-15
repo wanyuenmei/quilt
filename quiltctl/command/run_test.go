@@ -105,7 +105,7 @@ func TestRunSpec(t *testing.T) {
 			expEntries: []log.Entry{
 				{
 					Message: "Error: bar\n" +
-						"    at B:2:17\n" +
+						"    at /quilt_path/B.js:2:17\n" +
 						"    at /quilt_path/A.js:1:67\n",
 					Level: log.ErrorLevel,
 				},

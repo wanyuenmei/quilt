@@ -133,7 +133,7 @@ func (getter ImportGetter) checkSpec(file string, _ os.FileInfo, _ error) error 
 	return err
 }
 
-func (getter ImportGetter) specContents(name string) (string, error) {
+func (getter ImportGetter) specContents(name string) (string, string, error) {
 	modulePath := filepath.Join(getter.Path, name+".js")
 	if _, err := util.AppFs.Stat(modulePath); os.IsNotExist(err) &&
 		getter.AutoDownload {
@@ -142,10 +142,10 @@ func (getter ImportGetter) specContents(name string) (string, error) {
 
 	spec, err := util.ReadFile(modulePath)
 	if err != nil {
-		return "", fmt.Errorf("unable to open import %s (path=%s)",
+		return "", "", fmt.Errorf("unable to open import %s (path=%s)",
 			name, modulePath)
 	}
-	return spec, nil
+	return modulePath, spec, nil
 }
 
 func (getter *ImportGetter) requireImpl(call otto.FunctionCall) (otto.Value, error) {
@@ -173,10 +173,10 @@ func (getter *ImportGetter) requireImpl(call otto.FunctionCall) (otto.Value, err
 		getter.importPath = getter.importPath[:len(getter.importPath)-1]
 	}()
 
-	impStr, err := getter.specContents(name)
+	modulePath, impStr, err := getter.specContents(name)
 	if err != nil {
 		return otto.Value{}, err
 	}
 
-	return runSpec(call.Otto, name, impStr)
+	return runSpec(call.Otto, modulePath, impStr)
 }
