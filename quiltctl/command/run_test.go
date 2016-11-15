@@ -17,6 +17,7 @@ import (
 	clientMock "github.com/NetSys/quilt/api/client/mocks"
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/quiltctl/testutils"
+	"github.com/NetSys/quilt/stitch"
 	"github.com/NetSys/quilt/util"
 )
 
@@ -25,7 +26,7 @@ type file struct {
 }
 
 type runTest struct {
-	file         file
+	files        []file
 	path         string
 	expExitCode  int
 	expDeployArg string
@@ -34,6 +35,7 @@ type runTest struct {
 
 func TestRunSpec(t *testing.T) {
 	os.Setenv("QUILT_PATH", "/quilt_path")
+	stitch.DefaultImportGetter.Path = "/quilt_path"
 
 	exJavascript := `deployment.deploy(new Machine({}));`
 	exJSON := `{"Containers":[],"Labels":[],"Connections":[],"Placements":[],` +
@@ -43,9 +45,11 @@ func TestRunSpec(t *testing.T) {
 		`"Namespace":"default-namespace","Invariants":[]}`
 	tests := []runTest{
 		{
-			file: file{
-				path:     "test.js",
-				contents: exJavascript,
+			files: []file{
+				{
+					path:     "test.js",
+					contents: exJavascript,
+				},
 			},
 			path:         "test.js",
 			expExitCode:  0,
@@ -73,12 +77,39 @@ func TestRunSpec(t *testing.T) {
 			},
 		},
 		{
-			file: file{
-				path:     "/quilt_path/in_quilt_path.js",
-				contents: exJavascript,
+			files: []file{
+				{
+					path:     "/quilt_path/in_quilt_path.js",
+					contents: exJavascript,
+				},
 			},
 			path:         "in_quilt_path",
 			expDeployArg: exJSON,
+		},
+		// Ensure we print a stacktrace when available.
+		{
+			files: []file{
+				{
+					path:     "/quilt_path/A.js",
+					contents: `require("B").foo();`,
+				},
+				{
+					path: "/quilt_path/B.js",
+					contents: `module.exports.foo = function() {
+						throw new Error("bar");
+					}`,
+				},
+			},
+			path:        "/quilt_path/A.js",
+			expExitCode: 1,
+			expEntries: []log.Entry{
+				{
+					Message: "Error: bar\n" +
+						"    at B:2:17\n" +
+						"    at /quilt_path/A.js:1:67\n",
+					Level: log.ErrorLevel,
+				},
+			},
 		},
 	}
 	for _, test := range tests {
@@ -90,7 +121,9 @@ func TestRunSpec(t *testing.T) {
 
 		logHook := logrusTestHook.NewGlobal()
 
-		util.WriteFile(test.file.path, []byte(test.file.contents), 0644)
+		for _, f := range test.files {
+			util.WriteFile(f.path, []byte(f.contents), 0644)
+		}
 		runCmd := NewRunCommand()
 		runCmd.clientGetter = mockGetter
 		runCmd.stitch = test.path
