@@ -322,9 +322,10 @@
 			"revision": "72ba3e6b9e6b87e0c74c9a7a4dc86e8dd8ba4355"
 		},
 		{
-			"checksumSHA1": "5MVpi9U1WCrzZ1VMMn61Fc+trE0=",
+			"checksumSHA1": "oJGkod8y/3GTbKfazzQM+nQOPR0=",
 			"path": "github.com/golang/protobuf/proto",
-			"revision": "c3cefd437628a0b7d31b34fe44b3a7a540e98527"
+			"revision": "da116c3771bf4a398a43f44e069195ef1c9688ef",
+			"revisionTime": "2016-11-04T18:21:45Z"
 		},
 		{
 			"checksumSHA1": "5CLH5JkO7pTla/+vPq8axMEjzD4=",
@@ -340,6 +341,12 @@
 			"checksumSHA1": "juNiTc9bfhQYo4BkWc83sW4Z5gw=",
 			"path": "github.com/golang/protobuf/protoc-gen-go/descriptor",
 			"revision": "c3cefd437628a0b7d31b34fe44b3a7a540e98527"
+		},
+		{
+			"checksumSHA1": "lZFWy27Qo6+m/keDjNFYTxSmvZw=",
+			"path": "github.com/golang/protobuf/ptypes/any",
+			"revision": "da116c3771bf4a398a43f44e069195ef1c9688ef",
+			"revisionTime": "2016-11-04T18:21:45Z"
 		},
 		{
 			"checksumSHA1": "Uzyon2091lmwacNsl1hCytjhHtg=",
