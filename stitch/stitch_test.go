@@ -9,10 +9,7 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/NetSys/quilt/util"
 )
 
 func TestMachine(t *testing.T) {
@@ -380,67 +377,6 @@ func TestCustomDeploy(t *testing.T) {
 
 	checkError(t, `deployment.deploy({})`,
 		`only objects that implement "deploy(deployment)" can be deployed`)
-}
-
-func TestRequire(t *testing.T) {
-	util.AppFs = afero.NewMemMapFs()
-
-	// Import returning a primitive.
-	util.WriteFile("math.js", []byte(`
-	exports.square = function(x) {
-		return x*x;
-	};`), 0644)
-	checkJavascript(t, `(function() {
-		math = require('math');
-		return math.square(5);
-	})()`, float64(25))
-
-	// Import returning a type.
-	util.WriteFile("testImport.js", []byte(`
-	exports.getService = function() {
-		return new Service("foo", []);
-	};`), 0644)
-	checkJavascript(t, `(function() {
-		var testImport = require('testImport');
-		return testImport.getService().hostname();
-	})()`, "foo.q")
-
-	// Import with an import
-	util.WriteFile("square.js", []byte(`
-	exports.square = function(x) {
-		return x*x;
-	};`), 0644)
-	util.WriteFile("cube.js", []byte(`
-	var square = require("square");
-	exports.cube = function(x) {
-		return x * square.square(x);
-	};`), 0644)
-	checkJavascript(t, `(function() {
-		cube = require('cube');
-		return cube.cube(5)
-	})()`, float64(125))
-
-	// Directly assigned exports
-	util.WriteFile("square.js", []byte("module.exports = function(x) {"+
-		"return x*x }"), 0644)
-	checkJavascript(t, `(function() {
-		var square = require('square');
-		return square(5);
-	})()`, float64(25))
-
-	util.WriteFile("A.js", []byte(`require("A");`), 0644)
-	checkError(t, `require("A")`, `StitchError: import cycle: [A A]`)
-
-	util.WriteFile("A.js", []byte(`require("B");`), 0644)
-	util.WriteFile("B.js", []byte(`require("A");`), 0644)
-	checkError(t, `require("A")`, `StitchError: import cycle: [A B A]`)
-
-	util.WriteFile("A.js", []byte(`require("B");`), 0644)
-	util.WriteFile("B.js", []byte(``), 0644)
-	checkJavascript(t, `(function() {
-		require("B");
-		require("A");
-	})()`, nil)
 }
 
 func TestRunModule(t *testing.T) {

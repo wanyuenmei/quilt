@@ -1,11 +1,13 @@
 package stitch
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"golang.org/x/tools/go/vcs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/NetSys/quilt/util"
 
@@ -133,19 +135,97 @@ func (getter ImportGetter) checkSpec(file string, _ os.FileInfo, _ error) error 
 	return err
 }
 
-func (getter ImportGetter) specContents(name string) (string, string, error) {
-	modulePath := filepath.Join(getter.Path, name+".js")
-	if _, err := util.AppFs.Stat(modulePath); os.IsNotExist(err) &&
-		getter.AutoDownload {
-		getter.Get(name)
+// Error thrown when there are no files module files that can be read from disk.
+var errNoLoadableFile = errors.New("no loadable file")
+
+// loadAsFile searches for and evaluates `imp`, `imp`.js`, and finally `imp`.json.
+// Once a loadable import file is found, it stops searching.
+func loadAsFile(vm *otto.Otto, imp string) (otto.Value, error) {
+	for _, suffix := range []string{"", ".js"} {
+		if path := imp + suffix; isFile(path) {
+			spec, err := util.ReadFile(path)
+			if err != nil {
+				return otto.Value{}, err
+			}
+			return runSpec(vm, path, spec)
+		}
 	}
 
-	spec, err := util.ReadFile(modulePath)
-	if err != nil {
-		return "", "", fmt.Errorf("unable to open import %s (path=%s)",
-			name, modulePath)
+	if path := imp + ".json"; isFile(path) {
+		unmarshalled, err := unmarshalFile(path)
+		if err != nil {
+			return otto.Value{}, err
+		}
+		return vm.ToValue(unmarshalled)
 	}
-	return modulePath, spec, nil
+
+	return otto.Value{}, errNoLoadableFile
+}
+
+// loadAsDir searches for and evaluates `dir`/package.json. If `package.json`
+// doesn't exist, it tries to load the import `dir`/index by following the file
+// loading rules.
+// Once a loadable import file is found, it stops searching.
+func loadAsDir(vm *otto.Otto, dir string) (otto.Value, error) {
+	if path := filepath.Join(dir, "package.json"); isFile(path) {
+		intf, err := unmarshalFile(path)
+		if err != nil {
+			return otto.Value{}, err
+		}
+
+		pkg, ok := intf.(map[string]interface{})
+		mainIntf, ok2 := pkg["main"]
+		main, ok3 := mainIntf.(string)
+		if !ok || !ok2 || !ok3 {
+			return otto.Value{}, errors.New("bad package.json format")
+		}
+		return loadAsFile(vm, filepath.Join(dir, main))
+	}
+
+	return loadAsFile(vm, filepath.Join(dir, "index"))
+}
+
+func tryImport(vm *otto.Otto, path string) (otto.Value, error) {
+	if imp, err := loadAsFile(vm, path); err != errNoLoadableFile {
+		return imp, err
+	}
+	return loadAsDir(vm, path)
+}
+
+func (getter ImportGetter) resolveImportHelper(vm *otto.Otto, callerDir, name string) (
+	imp otto.Value, err error) {
+
+	switch {
+	case isRelative(name):
+		imp, err = tryImport(vm, filepath.Join(callerDir, name))
+	case filepath.IsAbs(name):
+		imp, err = tryImport(vm, name)
+	default:
+		imp, err = tryImport(vm, filepath.Join(getter.Path, name))
+	}
+	return imp, err
+}
+
+func (getter ImportGetter) resolveImport(vm *otto.Otto, callerDir, name string) (
+	imp otto.Value, err error) {
+
+	imp, err = getter.resolveImportHelper(vm, callerDir, name)
+	// Autodownload if the import doesn't exist, and it's not a filesystem import.
+	if err == errNoLoadableFile && !isRelative(name) && !filepath.IsAbs(name) &&
+		getter.AutoDownload {
+		getter.Get(name)
+		imp, err = getter.resolveImportHelper(vm, callerDir, name)
+	}
+	switch err.(type) {
+	case nil:
+		return imp, nil
+	// Don't munge the error if it's an evaluation error, and not a loading error.
+	case *otto.Error:
+		return otto.Value{}, err
+	default:
+		return otto.Value{}, fmt.Errorf("unable to open import %s: %s",
+			name, err.Error())
+	}
 }
 
 func (getter *ImportGetter) requireImpl(call otto.FunctionCall) (otto.Value, error) {
@@ -173,10 +253,25 @@ func (getter *ImportGetter) requireImpl(call otto.FunctionCall) (otto.Value, err
 		getter.importPath = getter.importPath[:len(getter.importPath)-1]
 	}()
 
-	modulePath, impStr, err := getter.specContents(name)
+	callerDir := filepath.Dir(call.Otto.Context().Filename)
+	return getter.resolveImport(call.Otto, callerDir, name)
+}
+
+func isFile(path string) bool {
+	info, err := util.AppFs.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
+func isRelative(path string) bool {
+	return strings.HasPrefix(path, ".") || strings.HasPrefix(path, "..")
+}
+
+func unmarshalFile(path string) (parsed interface{}, err error) {
+	contents, err := util.ReadFile(path)
 	if err != nil {
-		return otto.Value{}, err
+		return nil, err
 	}
 
-	return runSpec(call.Otto, modulePath, impStr)
+	err = json.Unmarshal([]byte(contents), &parsed)
+	return parsed, err
 }
