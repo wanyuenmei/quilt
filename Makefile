@@ -1,5 +1,5 @@
 export GO15VENDOREXPERIMENT=1
-PACKAGES=$(shell GO15VENDOREXPERIMENT=1 go list ./... | grep -v vendor)
+PACKAGES=$(shell govendor list -no-status +local)
 NOVENDOR=$(shell find . -path ./specs/**/*/vendor -prune -o -path ./vendor -prune -o -name '*.go' -print)
 LINE_LENGTH_EXCLUDE=./constants/awsConstants.go \
 		    ./constants/gceConstants.go \
@@ -21,10 +21,10 @@ install:
 	cd -P . && go install .
 
 check: format-check
-	go test $(PACKAGES)
+	govendor test +local
 
 clean:
-	go clean -x $(PACKAGES)
+	govendor clean -x +local
 	rm -f *.cov.coverprofile cluster/*.cov.coverprofile minion/*.cov.coverprofile specs/*.cov.coverprofile
 	rm -f *.cov.html cluster/*.cov.html minion/*.cov.html specs/*.cov.html
 
@@ -57,7 +57,7 @@ format-check:
 	fi
 
 lint: format
-	cd -P . && go vet $(PACKAGES)
+	cd -P . && govendor vet +local
 	for package in $(PACKAGES) ; do \
 		if [[ $$package != *minion/pb* && $$package != *api/pb* ]] ; then \
 			golint -min_confidence .25 -set_exit_status $$package || exit 1 ; \
@@ -66,7 +66,7 @@ lint: format
 	ineffassign .
 
 generate:
-	go generate $(PACKAGES)
+	govendor generate +local
 
 providers:
 	python3 scripts/gce-descriptions > provider/gceConstants.go
@@ -79,7 +79,7 @@ go-get:
 	    github.com/golang/lint/golint \
 	    github.com/mattn/goveralls \
 	    github.com/modocache/gover \
-	    github.com/tools/godep \
+	    github.com/kardianos/govendor \
 	    github.com/vektra/mockery
 
 tests:
