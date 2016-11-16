@@ -477,7 +477,7 @@ func TestQuery(t *testing.T) {
 
 	namespaceChecker(t, `createDeployment({namespace: "myNamespace"});`,
 		"myNamespace")
-	namespaceChecker(t, ``, "")
+	namespaceChecker(t, ``, "default-namespace")
 	maxPriceChecker(t, `createDeployment({maxPrice: 5});`, 5.0)
 	maxPriceChecker(t, ``, 0.0)
 	adminACLChecker(t, `createDeployment({adminACL: ["local"]});`, []string{"local"})

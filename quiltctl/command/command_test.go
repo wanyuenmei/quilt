@@ -139,6 +139,7 @@ func TestStopFlags(t *testing.T) {
 	expNamespace := "namespace"
 	checkStopParsing(t, []string{"-namespace", expNamespace}, expNamespace, nil)
 	checkStopParsing(t, []string{expNamespace}, expNamespace, nil)
+	checkStopParsing(t, []string{}, defaultNamespace, nil)
 }
 
 func checkSSHParsing(t *testing.T, args []string, expMachine int,
@@ -267,13 +268,6 @@ func TestStopNamespace(t *testing.T) {
 	stopCmd.namespace = "namespace"
 	stopCmd.Run()
 	expStitch := `{"namespace": "namespace"}`
-	if c.deployArg != expStitch {
-		t.Error("stop command invoked Quilt with the wrong stitch")
-	}
-
-	stopCmd = NewStopCommand()
-	stopCmd.Run()
-	expStitch = "{}"
 	if c.deployArg != expStitch {
 		t.Error("stop command invoked Quilt with the wrong stitch")
 	}

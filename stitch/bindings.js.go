@@ -19,7 +19,7 @@ function createDeployment(deploymentOpts) {
 
 function Deployment(deploymentOpts) {
     this.maxPrice = deploymentOpts.maxPrice || 0;
-    this.namespace = deploymentOpts.namespace || "";
+    this.namespace = deploymentOpts.namespace || "default-namespace";
     this.adminACL = deploymentOpts.adminACL || [];
 
     this.machines = [];

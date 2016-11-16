@@ -44,17 +44,12 @@ func updateTxn(view db.Database, stitch stitch.Stitch) error {
 }
 
 func clusterTxn(view db.Database, stitch stitch.Stitch) error {
-	namespace := stitch.Namespace
-	if namespace == "" {
-		namespace = "default-namespace"
-	}
-
 	cluster, err := view.GetCluster()
 	if err != nil {
 		cluster = view.InsertCluster()
 	}
 
-	cluster.Namespace = namespace
+	cluster.Namespace = stitch.Namespace
 	cluster.Spec = stitch.String()
 	view.Commit(cluster)
 	return nil

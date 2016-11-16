@@ -7,6 +7,10 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
+// The default namespace to use when stopping. This should match the default
+// namespace used in `stitch/bindings.js`.
+const defaultNamespace = "default-namespace"
+
 // Stop contains the options for stopping namespaces.
 type Stop struct {
 	namespace string
@@ -25,7 +29,8 @@ func NewStopCommand() *Stop {
 func (sCmd *Stop) InstallFlags(flags *flag.FlagSet) {
 	sCmd.common.InstallFlags(flags)
 
-	flags.StringVar(&sCmd.namespace, "namespace", "", "the namespace to stop")
+	flags.StringVar(&sCmd.namespace, "namespace", defaultNamespace,
+		"the namespace to stop")
 
 	flags.Usage = func() {
 		fmt.Println("usage: quilt stop [-H=<daemon_host>] " +
@@ -40,10 +45,8 @@ func (sCmd *Stop) InstallFlags(flags *flag.FlagSet) {
 
 // Parse parses the command line arguments for the stop command.
 func (sCmd *Stop) Parse(args []string) error {
-	if sCmd.namespace == "" {
-		if len(args) > 0 {
-			sCmd.namespace = args[0]
-		}
+	if len(args) > 0 {
+		sCmd.namespace = args[0]
 	}
 
 	return nil
@@ -51,14 +54,6 @@ func (sCmd *Stop) Parse(args []string) error {
 
 // Run stops the given namespace.
 func (sCmd *Stop) Run() int {
-	namespace := sCmd.namespace
-	var specStr string
-	if namespace != "" {
-		specStr = fmt.Sprintf(`{"namespace": %q}`, namespace)
-	} else {
-		specStr = "{}"
-	}
-
 	c, err := getClient(sCmd.common.host)
 	if err != nil {
 		log.Error(err)
@@ -66,12 +61,13 @@ func (sCmd *Stop) Run() int {
 	}
 	defer c.Close()
 
+	specStr := fmt.Sprintf(`{"namespace": %q}`, sCmd.namespace)
 	if err = c.Deploy(specStr); err != nil {
 		log.WithError(err).Error("Unable to stop namespace.")
 		return 1
 	}
 
-	fmt.Printf("Successfully began stopping namespace `%s`.\n", namespace)
+	fmt.Printf("Successfully began stopping namespace `%s`.\n", sCmd.namespace)
 
 	return 0
 }
