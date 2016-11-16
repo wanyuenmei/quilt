@@ -3,6 +3,7 @@ package server
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 
 	"github.com/NetSys/quilt/api/pb"
@@ -121,4 +122,23 @@ func TestDeploy(t *testing.T) {
 		t.Errorf("Two machines should have been created by the deployment, "+
 			"but we found: %v\n", machines)
 	}
+}
+
+func TestSwitchNamespace(t *testing.T) {
+	conn := db.New()
+	s := server{dbConn: conn}
+
+	conn.Transact(func(view db.Database) error {
+		clst := view.InsertCluster()
+		clst.Namespace = "old-namespace"
+		view.Commit(clst)
+		return nil
+	})
+
+	newNamespaceStitch := `deployment.namespace = "new-namespace";`
+
+	_, err := s.Run(context.Background(),
+		&pb.RunRequest{Stitch: newNamespaceStitch})
+
+	assert.NotNil(t, err)
 }
