@@ -43,6 +43,9 @@ type Client interface {
 	// QueryLabels retrieves the label information tracked by the Quilt daemon.
 	QueryLabels() ([]db.Label, error)
 
+	// QueryClusters retrieves cluster information tracked by the Quilt daemon.
+	QueryClusters() ([]db.Cluster, error)
+
 	// Deploy makes a request to the Quilt daemon to deploy the given deployment.
 	Deploy(deployment string) error
 
@@ -133,6 +136,12 @@ func query(pbClient pb.APIClient, table db.TableType) (interface{}, error) {
 			return nil, err
 		}
 		return connections, nil
+	case db.ClusterTable:
+		var clusters []db.Cluster
+		if err := json.Unmarshal(replyBytes, &clusters); err != nil {
+			return nil, err
+		}
+		return clusters, nil
 	default:
 		panic(fmt.Sprintf("unsupported table type: %s", table))
 	}
@@ -191,6 +200,16 @@ func (c clientImpl) QueryLabels() ([]db.Label, error) {
 	}
 
 	return rows.([]db.Label), nil
+}
+
+// QueryClusters retrieves the cluster information tracked by the Quilt daemon.
+func (c clientImpl) QueryClusters() ([]db.Cluster, error) {
+	rows, err := query(c.pbClient, db.ClusterTable)
+	if err != nil {
+		return nil, err
+	}
+
+	return rows.([]db.Cluster), nil
 }
 
 // Deploy makes a request to the Quilt daemon to deploy the given deployment.

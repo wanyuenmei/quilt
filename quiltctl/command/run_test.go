@@ -1,8 +1,11 @@
 package command
 
 import (
+	"bytes"
 	"errors"
+	"io"
 	"os"
+	"strings"
 	"testing"
 
 	log "github.com/Sirupsen/logrus"
@@ -12,6 +15,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	clientMock "github.com/NetSys/quilt/api/client/mocks"
+	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/quiltctl/testutils"
 	"github.com/NetSys/quilt/util"
 )
@@ -103,16 +107,168 @@ func TestRunSpec(t *testing.T) {
 	}
 }
 
+type diffTest struct {
+	curr, new, exp string
+}
+
+func TestDeploymentDiff(t *testing.T) {
+	t.Parallel()
+
+	tests := []diffTest{
+		{
+			curr: "{}",
+			new:  "{}",
+			exp:  "",
+		},
+		{
+			curr: `{"Machines":[{"Provider":"Amazon"}]}`,
+			new:  `{"Machines":[]}`,
+			exp: `--- Current
++++ Proposed
+@@ -1,7 +1,3 @@
+ {
+-	"Machines": [
+-		{
+-			"Provider": "Amazon"
+-		}
+-	]
++	"Machines": []
+ }
+`,
+		},
+		{
+			curr: `{"Machines":[{"Provider":"Amazon"},` +
+				`{"Provider":"Google"}]}`,
+			new: `{"Machines":[{"Provider":"Google"}]}`,
+			exp: `--- Current
++++ Proposed
+@@ -1,8 +1,5 @@
+ {
+ 	"Machines": [
+-		{
+-			"Provider": "Amazon"
+-		},
+ 		{
+ 			"Provider": "Google"
+ 		}
+`,
+		},
+		{
+			curr: `{"Machines":[{"Provider":"Amazon"},` +
+				`{"Provider":"Google"}]}`,
+			new: `{"Machines":[{"Provider":"Vagrant"}]}`,
+			exp: `--- Current
++++ Proposed
+@@ -1,10 +1,7 @@
+ {
+ 	"Machines": [
+ 		{
+-			"Provider": "Amazon"
+-		},
+-		{
+-			"Provider": "Google"
++			"Provider": "Vagrant"
+ 		}
+ 	]
+ }
+`,
+		},
+	}
+
+	for _, test := range tests {
+		diff, err := diffDeployment(test.curr, test.new)
+		assert.Nil(t, err)
+		assert.Equal(t, test.exp, diff)
+	}
+}
+
+type confirmTest struct {
+	inputs []string
+	exp    bool
+}
+
+func TestConfirm(t *testing.T) {
+	tests := []confirmTest{
+		{
+			inputs: []string{"y"},
+			exp:    true,
+		},
+		{
+			inputs: []string{"yes"},
+			exp:    true,
+		},
+		{
+			inputs: []string{"YES"},
+			exp:    true,
+		},
+		{
+			inputs: []string{"n"},
+			exp:    false,
+		},
+		{
+			inputs: []string{"no"},
+			exp:    false,
+		},
+		{
+			inputs: []string{"foo", "no"},
+			exp:    false,
+		},
+		{
+			inputs: []string{"foo", "no", "yes"},
+			exp:    false,
+		},
+	}
+	for _, test := range tests {
+		in := bytes.NewBufferString(strings.Join(test.inputs, "\n"))
+		res, err := confirm(in, "")
+		assert.Nil(t, err)
+		assert.Equal(t, test.exp, res)
+	}
+}
+
+func TestPromptsUser(t *testing.T) {
+	oldConfirm := confirm
+	defer func() {
+		confirm = oldConfirm
+	}()
+
+	util.AppFs = afero.NewMemMapFs()
+	for _, confirmResp := range []bool{true, false} {
+		confirm = func(in io.Reader, prompt string) (bool, error) {
+			return confirmResp, nil
+		}
+
+		mockGetter := new(testutils.Getter)
+		c := &clientMock.Client{
+			ClusterReturn: []db.Cluster{
+				{
+					Spec: `{"old":"spec"}`,
+				},
+			},
+		}
+		mockGetter.On("Client", mock.Anything).Return(c, nil)
+
+		util.WriteFile("test.js", []byte(""), 0644)
+		runCmd := NewRunCommand()
+		runCmd.clientGetter = mockGetter
+		runCmd.stitch = "test.js"
+		runCmd.Run()
+		assert.Equal(t, confirmResp, c.DeployArg != "")
+	}
+}
+
 func TestRunFlags(t *testing.T) {
 	t.Parallel()
 
 	expStitch := "spec"
-	checkRunParsing(t, []string{"-stitch", expStitch}, expStitch, nil)
-	checkRunParsing(t, []string{expStitch}, expStitch, nil)
-	checkRunParsing(t, []string{}, "", errors.New("no spec specified"))
+	checkRunParsing(t, []string{"-stitch", expStitch}, Run{stitch: expStitch}, nil)
+	checkRunParsing(t, []string{expStitch}, Run{stitch: expStitch}, nil)
+	checkRunParsing(t, []string{"-f", expStitch},
+		Run{force: true, stitch: expStitch}, nil)
+	checkRunParsing(t, []string{}, Run{}, errors.New("no spec specified"))
 }
 
-func checkRunParsing(t *testing.T, args []string, expStitch string, expErr error) {
+func checkRunParsing(t *testing.T, args []string, expFlags Run, expErr error) {
 	runCmd := NewRunCommand()
 	err := parseHelper(runCmd, args)
 
@@ -124,13 +280,7 @@ func checkRunParsing(t *testing.T, args []string, expStitch string, expErr error
 		return
 	}
 
-	if err != nil {
-		t.Errorf("Unexpected error when parsing run args: %s", err.Error())
-		return
-	}
-
-	if runCmd.stitch != expStitch {
-		t.Errorf("Expected run command to parse arg %s, but got %s",
-			expStitch, runCmd.stitch)
-	}
+	assert.Nil(t, err)
+	assert.Equal(t, expFlags.stitch, runCmd.stitch)
+	assert.Equal(t, expFlags.force, runCmd.force)
 }

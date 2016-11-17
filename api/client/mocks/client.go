@@ -9,6 +9,7 @@ type Client struct {
 	MachineReturn   []db.Machine
 	ContainerReturn []db.Container
 	EtcdReturn      []db.Etcd
+	ClusterReturn   []db.Cluster
 	HostReturn      string
 	DeployArg       string
 }
@@ -37,6 +38,11 @@ func (c *Client) QueryConnections() ([]db.Connection, error) {
 // QueryLabels retrieves the label information tracked by the Quilt daemon.
 func (c *Client) QueryLabels() ([]db.Label, error) {
 	return nil, nil
+}
+
+// QueryClusters retrieves cluster information tracked by the Quilt daemon.
+func (c *Client) QueryClusters() ([]db.Cluster, error) {
+	return c.ClusterReturn, nil
 }
 
 // Close the grpc connection.

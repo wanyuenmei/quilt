@@ -76,6 +76,8 @@ func (s server) Query(cts context.Context, query *pb.DBQuery) (*pb.QueryReply, e
 			rows = view.SelectFromConnection(nil)
 		case db.LabelTable:
 			rows = view.SelectFromLabel(nil)
+		case db.ClusterTable:
+			rows = view.SelectFromCluster(nil)
 		default:
 			return fmt.Errorf("unrecognized table: %s", query.Table)
 		}
