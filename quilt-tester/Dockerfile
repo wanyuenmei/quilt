@@ -4,10 +4,9 @@ Maintainer Ethan J. Jackson
 RUN VER=1.6.2 \
 && export GOROOT=/tmp/build/go GOPATH=/tmp/build/gowork \
 && export PATH=$PATH:$GOROOT/bin \
-&& apk update \
-&& apk add --no-cache bash git python curl openssh-client \
-# Alpine uses musl instead of glibc which confuses go.
-# They're compatible, so just symlink
+&& apt-get update \
+&& apt-get install -y --no-install-recommends \
+    wget bash git python curl openssh-client \
 && mkdir /tmp/build && cd /tmp/build \
 && wget https://storage.googleapis.com/golang/go$VER.linux-amd64.tar.gz \
 && gunzip -c go$VER.linux-amd64.tar.gz | tar x \
@@ -18,7 +17,7 @@ RUN VER=1.6.2 \
 && for suite in tests/* ; do \
 	for f in $suite/* ; do \
 		extension=$(echo "$f" | awk -F'.' '{print $NF}') ; \
-		if [ $extension == "go" ] ; then \
+		if [ $extension = "go" ] ; then \
 			go build -v -o ${f%???} $f ; \
 		fi; \
 	done; \

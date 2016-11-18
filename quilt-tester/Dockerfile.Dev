@@ -1,7 +1,8 @@
 From quilt/quilt
 Maintainer Ethan J. Jackson
 
-RUN apk add --no-cache bash git python curl openssh-client
+RUN apt-get install -y --no-install-recommends \
+    bash git python curl openssh-client
 Copy bin/* /bin/
 Copy tests /tests
 Copy config/id_rsa /root/.ssh/id_rsa
