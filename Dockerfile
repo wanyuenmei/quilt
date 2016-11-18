@@ -26,3 +26,5 @@ RUN VER=1.7 \
 && apt-get remove --purge -y ${build_deps} \
 && apt-get autoremove -y --purge \
 && rm -rf /var/lib/apt/lists/*
+
+ENTRYPOINT []
