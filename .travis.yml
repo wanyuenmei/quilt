@@ -7,7 +7,6 @@ services:
 
 go:
 - 1.7
-- 1.6
 
 install:
     - make go-get
