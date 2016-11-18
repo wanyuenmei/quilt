@@ -12,7 +12,8 @@ go:
 install:
     - make go-get
 
-script: ./scripts/build-push.sh
+script:
+    - make all check lint format-check coverage docker-build-prod
 
 after_success:
     - goveralls -coverprofile=./gover.coverprofile
