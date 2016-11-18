@@ -223,6 +223,24 @@
 			"revision": "c47689d98fd2b58e06c749871c54118371c78778"
 		},
 		{
+			"checksumSHA1": "RBwpnMpfQt7Jo7YWrRph0Vwe+f0=",
+			"path": "github.com/coreos/go-systemd/activation",
+			"revision": "64d5cd7cb947834ef93874e82745c42ad6de4d0e",
+			"revisionTime": "2016-11-02T17:07:22Z"
+		},
+		{
+			"checksumSHA1": "e8qgBHxXbij3RVspqrkeBzMZ564=",
+			"path": "github.com/coreos/go-systemd/util",
+			"revision": "64d5cd7cb947834ef93874e82745c42ad6de4d0e",
+			"revisionTime": "2016-11-02T17:07:22Z"
+		},
+		{
+			"checksumSHA1": "O8c/VKtW34XPJNNlyeb/im8vWSI=",
+			"path": "github.com/coreos/pkg/dlopen",
+			"revision": "447b7ec906e523386d9c53be15b55a8ae86ea944",
+			"revisionTime": "2016-10-26T22:29:26Z"
+		},
+		{
 			"checksumSHA1": "5rPfda8jFccr3A6heL+JAmi9K9g=",
 			"path": "github.com/davecgh/go-spew/spew",
 			"revision": "5215b55f46b2b919f50a1df0eaa5886afe4e3b3d"
@@ -309,6 +327,24 @@
 			"comment": "v0.4.0-66-g4290f40",
 			"path": "github.com/docker/engine-api/types/swarm",
 			"revision": "4290f40c056686fcaa5c9caf02eac1dde9315adf"
+		},
+		{
+			"checksumSHA1": "AeoH23qpdto4UR0eb04eLUH6JL4=",
+			"path": "github.com/docker/go-connections/sockets",
+			"revision": "f512407a188ecb16f31a33dbc9c4e4814afc1b03",
+			"revisionTime": "2016-10-31T18:22:14Z"
+		},
+		{
+			"checksumSHA1": "O8CWhk39rLpO38BIrEa7TKPSIGE=",
+			"path": "github.com/docker/go-plugins-helpers/network",
+			"revision": "60d242cfd0fb30e5002fbf76bf6872e81e85adba",
+			"revisionTime": "2016-10-31T11:46:40Z"
+		},
+		{
+			"checksumSHA1": "SK1epV582t6zeBtowO7cidLFgRE=",
+			"path": "github.com/docker/go-plugins-helpers/sdk",
+			"revision": "60d242cfd0fb30e5002fbf76bf6872e81e85adba",
+			"revisionTime": "2016-10-31T11:46:40Z"
 		},
 		{
 			"checksumSHA1": "HbqQOZa0qqtYp9AHhQCjOiFLdFc=",
@@ -555,6 +591,12 @@
 			"checksumSHA1": "yhndhWXMs/VSEDLks4dNyFMQStA=",
 			"path": "golang.org/x/net/lex/httplex",
 			"revision": "c4c3ea71919de159c9e246d7be66deb7f0a39a58"
+		},
+		{
+			"checksumSHA1": "LvdVRE0FqdR68SvVpRkHs1rxhcA=",
+			"path": "golang.org/x/net/proxy",
+			"revision": "c4c3ea71919de159c9e246d7be66deb7f0a39a58",
+			"revisionTime": "2016-05-27T23:48:58Z"
 		},
 		{
 			"checksumSHA1": "WpST9lFOHvWrjDVy0GJNqHe+R3E=",
