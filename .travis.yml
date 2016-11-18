@@ -12,10 +12,15 @@ install:
     - make go-get
 
 script:
-    - make all check lint format-check coverage docker-build-prod
+    - make all check lint format-check coverage docker-build-quilt docker-build-tester
 
 after_success:
     - goveralls -coverprofile=./gover.coverprofile
+    - if [ "$TRAVIS_BRANCH" == "master" ] && [ "$TRAVIS_PULL_REQUEST" == "false" ]; then
+          docker login -e="$DOCKER_EMAIL" -u="$DOCKER_USERNAME" -p="$DOCKER_PASSWORD";
+          docker push quilt/quilt;
+          docker push quilt/tester;
+      fi
 
 notifications:
   slack:

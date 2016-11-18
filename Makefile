@@ -92,28 +92,18 @@ tests:
 		done \
 	done
 
-docker-build-prod:
-	${DOCKER} build -t ${REPO}/quilt .
-
-docker-build-dev:
+docker-build-quilt:
 	cd -P . && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build . \
-	    && ${DOCKER} build -t ${REPO}/quilt -f Dockerfile.Dev .
+	    && ${DOCKER} build -t ${REPO}/quilt .
 
-docker-build-tester-dev: tests
-	cd -P quilt-tester && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/quilt-tester . \
-	&& ${DOCKER} build -t ${REPO}/tester -f Dockerfile.Dev .
+docker-build-tester: tests
+	cd -P quilt-tester \
+	    && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+	       go build -o bin/quilt-tester . \
+	    && ${DOCKER} build -t ${REPO}/tester .
 
 docker-build-ovs:
 	cd -P ovs && docker build -t ${REPO}/ovs .
-
-docker-push-dev:
-	${DOCKER} push ${REPO}/quilt
-
-docker-push-tester:
-	${DOCKER} push ${REPO}/tester
-
-docker-push-ovs:
-	${DOCKER} push ${REPO}/ovs
 
 # Include all .mk files so you can have your own local configurations
 include $(wildcard *.mk)
