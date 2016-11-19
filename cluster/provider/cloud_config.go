@@ -18,8 +18,12 @@ initialize_ovs() {
 	Description=OVS
 
 	[Service]
-	ExecStart=/sbin/modprobe openvswitch
-	ExecStartPost=/sbin/modprobe vport_geneve
+	ExecStartPre=/sbin/modprobe gre
+	ExecStartPre=/sbin/modprobe nf_nat_ipv6
+	ExecStart=/usr/bin/docker run --privileged {{.QuiltImage}} \
+	bash -c "insmod /modules/openvswitch.ko \
+	         && insmod /modules/vport-geneve.ko \
+	         && insmod /modules/vport-stt.ko"
 
 	[Install]
 	WantedBy=multi-user.target
@@ -111,10 +115,10 @@ sudo usermod -aG docker quilt
 systemctl daemon-reload
 
 # Enable our services to run on boot
-systemctl enable {ovs,docker,minion}.service
+systemctl enable {docker,ovs,minion}.service
 
 # Start our services
-systemctl restart {ovs,docker,minion}.service
+systemctl restart {docker,ovs,minion}.service
 
 echo -n "Completed Boot Script: " >> /var/log/bootscript.log
 date >> /var/log/bootscript.log
