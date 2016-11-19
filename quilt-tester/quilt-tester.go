@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -92,6 +93,7 @@ func (t *tester) generateTestSuites(testRoot string) error {
 		return err
 	}
 
+	sort.Sort(byPriorityPrefix(testSuiteFolders))
 	for _, testSuiteFolder := range testSuiteFolders {
 		files, err := ioutil.ReadDir(testSuiteFolder)
 		if err != nil {

@@ -3,10 +3,12 @@ package main
 import (
 	"fmt"
 	"os/exec"
+	"sort"
 	"testing"
 	"time"
 
 	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCmdExec(t *testing.T) {
@@ -100,4 +102,22 @@ deployment.deploy(new Machine({}));; deployment.namespace = "test-namespace";`
 		t.Errorf("Namespace didn't properly update, expected %s, got %s",
 			exp, res)
 	}
+}
+
+func checkSort(t *testing.T, toSort, exp []string) {
+	sort.Sort(byPriorityPrefix(toSort))
+	assert.Equal(t, exp, toSort)
+}
+
+func TestPriorityPrefix(t *testing.T) {
+	// Order based on priority.
+	checkSort(t, []string{"100-foo", "50-bar"}, []string{"50-bar", "100-foo"})
+	checkSort(t, []string{"50-bar", "100-foo"}, []string{"50-bar", "100-foo"})
+
+	// Order based on name.
+	checkSort(t, []string{"50-foo", "50-bar"}, []string{"50-bar", "50-foo"})
+
+	// Default priority.
+	checkSort(t, []string{"foo", "20-bar"}, []string{"20-bar", "foo"})
+	checkSort(t, []string{"foo", "100-bar"}, []string{"foo", "100-bar"})
 }
