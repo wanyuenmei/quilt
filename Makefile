@@ -29,8 +29,8 @@ clean:
 	rm -f *.cov.html cluster/*.cov.html minion/*.cov.html specs/*.cov.html
 
 COV_SKIP= /minion/pb /minion/pprofile /api/pb /constants /scripts /quilt-tester \
-		  /quilt-tester/tests/basic /quilt-tester/tests/basic/check_docker.go \
-		  /quilt-tester/tests/basic/check_logs.go \
+		  /quilt-tester/tests/100-basic /quilt-tester/tests/100-basic/check_docker.go \
+		  /quilt-tester/tests/100-basic/check_logs.go \
 		  /quilt-tester/tests/spark /quilt-tester/tests/spark/check_spark.go \
 		  /quiltctl/testutils /cluster/provider/mocks
 

@@ -1,5 +1,5 @@
 bin/quilt-tester
-tests/basic/check_docker
-tests/basic/check_logs
+tests/100-basic/check_docker
+tests/100-basic/check_logs
 tests/spark/check_spark
 vagrant/.vagrant/
