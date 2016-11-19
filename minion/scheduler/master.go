@@ -45,15 +45,17 @@ func placeContainers(view db.Database) {
 // Unassign all containers that are placed incorrectly.
 func cleanupPlacements(ctx *context) {
 	for _, m := range ctx.minions {
-		for i, dbc := range m.containers {
-			if validPlacement(ctx.constraints, *m, dbc) {
+		var valid []*db.Container
+		for _, dbc := range m.containers {
+			if validPlacement(ctx.constraints, *m, valid, dbc) {
+				valid = append(valid, dbc)
 				continue
 			}
 			dbc.Minion = ""
-			m.containers = append(m.containers[:i], m.containers[i+1:]...)
 			ctx.unassigned = append(ctx.unassigned, dbc)
 			ctx.changed = append(ctx.changed, dbc)
 		}
+		m.containers = valid
 	}
 }
 
@@ -63,11 +65,11 @@ func placeUnassigned(ctx *context) {
 
 Outer:
 	for _, dbc := range ctx.unassigned {
-		for i, minion := range minions {
-			if validPlacement(ctx.constraints, *minion, dbc) {
-				dbc.Minion = minion.PrivateIP
+		for i, m := range minions {
+			if validPlacement(ctx.constraints, *m, m.containers, dbc) {
+				dbc.Minion = m.PrivateIP
 				ctx.changed = append(ctx.changed, dbc)
-				minion.containers = append(minion.containers, dbc)
+				m.containers = append(m.containers, dbc)
 				heap.Fix(&minions, i)
 				log.WithField("container", dbc).Info("Placed container.")
 				continue Outer
@@ -79,7 +81,7 @@ Outer:
 }
 
 // Compute the peer labels map if it is nil, otherwise just return it
-func computePeerLabels(peerLabels map[string]struct{}, m minion,
+func computePeerLabels(peerLabels map[string]struct{}, peers []*db.Container,
 	dbcID int) map[string]struct{} {
 
 	if peerLabels != nil {
@@ -87,7 +89,7 @@ func computePeerLabels(peerLabels map[string]struct{}, m minion,
 	}
 
 	peerLabels = map[string]struct{}{}
-	for _, peer := range m.containers {
+	for _, peer := range peers {
 		if peer.ID == dbcID {
 			continue
 		}
@@ -129,7 +131,9 @@ func checkExclusionConstraint(constraint db.Placement, cLabels,
 		cLabels, pLabels)
 }
 
-func validPlacement(constraints []db.Placement, m minion, dbc *db.Container) bool {
+func validPlacement(constraints []db.Placement, m minion, peers []*db.Container,
+	dbc *db.Container) bool {
+
 	cLabels := map[string]struct{}{}
 	for _, label := range dbc.Labels {
 		cLabels[label] = struct{}{}
@@ -138,7 +142,7 @@ func validPlacement(constraints []db.Placement, m minion, dbc *db.Container) boo
 	var peerLabels map[string]struct{}
 	for _, constraint := range constraints {
 		if constraint.OtherLabel != "" {
-			peerLabels = computePeerLabels(peerLabels, m, dbc.ID)
+			peerLabels = computePeerLabels(peerLabels, peers, dbc.ID)
 			ok := checkExclusionConstraint(constraint, cLabels, peerLabels)
 			if !ok {
 				return false

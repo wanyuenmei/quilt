@@ -116,6 +116,119 @@ func TestCleanup(t *testing.T) {
 	}
 }
 
+func TestCleanupLabelRule(t *testing.T) {
+	t.Parallel()
+
+	containers := []db.Container{
+		{
+			ID:     1,
+			Labels: []string{"1"},
+			Minion: "1",
+		},
+		{
+			ID:     2,
+			Labels: []string{"1"},
+			Minion: "1",
+		},
+		{
+			ID:     3,
+			Labels: []string{"1"},
+			Minion: "1",
+		},
+		{
+			ID:     4,
+			Labels: []string{"1"},
+			Minion: "1",
+		},
+		{
+			ID:     5,
+			Labels: []string{"2"},
+			Minion: "1",
+		},
+		{
+			ID:     6,
+			Labels: []string{"3"},
+			Minion: "2",
+		},
+		{
+			ID:     7,
+			Labels: []string{"1"},
+			Minion: "2",
+		},
+	}
+
+	minions := []db.Minion{
+		{
+			PrivateIP: "1",
+			Role:      db.Worker,
+		},
+		{
+			PrivateIP: "2",
+			Role:      db.Worker,
+		},
+	}
+
+	placements := []db.Placement{
+		{
+			Exclusive:   true,
+			TargetLabel: "1",
+			OtherLabel:  "2",
+		},
+		{
+			Exclusive:   true,
+			TargetLabel: "1",
+			OtherLabel:  "3",
+		},
+	}
+
+	ctx := makeContext(minions, placements, containers)
+	cleanupPlacements(ctx)
+
+	expMinions := []*minion{
+		{
+			Minion: minions[0],
+			containers: []*db.Container{
+				&containers[0],
+				&containers[1],
+				&containers[2],
+				&containers[3],
+			},
+		},
+		{
+			Minion: minions[1],
+			containers: []*db.Container{
+				&containers[5],
+			},
+		},
+	}
+
+	if !eq(ctx.minions, expMinions) {
+		t.Error(spew.Sprintf("\nMinions:  %v\nExpected: %v",
+			ctx.minions, expMinions))
+	}
+
+	if !eq(ctx.constraints, placements) {
+		t.Error(spew.Sprintf("\nConstraints: %v\nExpected:    %v",
+			ctx.constraints, placements))
+	}
+
+	expUnassigned := []*db.Container{
+		&containers[4],
+		&containers[6],
+	}
+
+	if !eq(expUnassigned, ctx.unassigned) {
+		t.Error(spew.Sprintf("\nUnassigned: %v\nExpected:   %v",
+			ctx.unassigned, expUnassigned))
+	}
+
+	expChanged := expUnassigned
+	if !eq(expChanged, ctx.changed) {
+		t.Error(spew.Sprintf("\nChanged:  %v\nExpected: %v",
+			ctx.changed, expChanged))
+	}
+}
+
 func TestPlaceUnassigned(t *testing.T) {
 	t.Parallel()
 
@@ -323,7 +436,8 @@ func TestValidPlacementTwoWay(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		res := validPlacement(constraints, testCase.m, testCase.dbc)
+		res := validPlacement(constraints, testCase.m, testCase.m.containers,
+			testCase.dbc)
 		if res {
 			t.Fatalf("Succeeded with bad placement: %s on %s",
 				testCase.dbc.Labels[0],
@@ -364,7 +478,7 @@ func TestValidPlacementLabel(t *testing.T) {
 			OtherLabel:  "orange",
 		},
 	}
-	res := validPlacement(constraints, m, dbc)
+	res := validPlacement(constraints, m, m.containers, dbc)
 	if !res {
 		t.Error(spew.Sprintf(
 			"Unexpected %v\nMinion %v\nContainer %v\nConstraints %v",
@@ -378,8 +492,16 @@ func TestValidPlacementLabel(t *testing.T) {
 			OtherLabel:  "blue",
 		},
 	}
-	res = validPlacement(constraints, m, dbc)
+	res = validPlacement(constraints, m, m.containers, dbc)
 	if res {
+		t.Error(spew.Sprintf(
+			"Unexpected %v\nMinion %v\nContainer %v\nConstraints %v",
+			res, m, dbc, constraints))
+	}
+
+	var empty []*db.Container
+	res = validPlacement(constraints, m, empty, dbc)
+	if !res {
 		t.Error(spew.Sprintf(
 			"Unexpected %v\nMinion %v\nContainer %v\nConstraints %v",
 			res, m, dbc, constraints))
@@ -392,7 +514,7 @@ func TestValidPlacementLabel(t *testing.T) {
 			OtherLabel:  "yellow",
 		},
 	}
-	res = validPlacement(constraints, m, dbc)
+	res = validPlacement(constraints, m, m.containers, dbc)
 	if res {
 		t.Error(spew.Sprintf(
 			"Unexpected %v\nMinion %v\nContainer %v\nConstraints %v",
@@ -406,7 +528,7 @@ func TestValidPlacementLabel(t *testing.T) {
 			OtherLabel:  "magenta",
 		},
 	}
-	res = validPlacement(constraints, m, dbc)
+	res = validPlacement(constraints, m, m.containers, dbc)
 	if !res {
 		t.Error(spew.Sprintf(
 			"Unexpected %v\nMinion %v\nContainer %v\nConstraints %v",
@@ -420,7 +542,7 @@ func TestValidPlacementLabel(t *testing.T) {
 			OtherLabel:  "yellow",
 		},
 	}
-	res = validPlacement(constraints, m, dbc)
+	res = validPlacement(constraints, m, m.containers, dbc)
 	if !res {
 		t.Error(spew.Sprintf(
 			"Unexpected %v\nMinion %v\nContainer %v\nConstraints %v",
@@ -442,7 +564,7 @@ func TestValidPlacementMachine(t *testing.T) {
 	m.Size = "Size"
 	m.Region = "Region"
 
-	res := validPlacement(constraints, m, dbc)
+	res := validPlacement(constraints, m, m.containers, dbc)
 	if !res {
 		t.Error(spew.Sprintf(
 			"Unexpected %v. Minion %v, Container %v, Constraints %v",
@@ -456,7 +578,7 @@ func TestValidPlacementMachine(t *testing.T) {
 			Provider:    "Provider",
 		},
 	}
-	res = validPlacement(constraints, m, dbc)
+	res = validPlacement(constraints, m, m.containers, dbc)
 	if !res {
 		t.Error(spew.Sprintf(
 			"Unexpected %v. Minion %v, Container %v, Constraints %v",
@@ -470,7 +592,7 @@ func TestValidPlacementMachine(t *testing.T) {
 			Provider:    "Provider",
 		},
 	}
-	res = validPlacement(constraints, m, dbc)
+	res = validPlacement(constraints, m, m.containers, dbc)
 	if res {
 		t.Error(spew.Sprintf(
 			"Unexpected %v. Minion %v, Container %v, Constraints %v",
@@ -484,7 +606,7 @@ func TestValidPlacementMachine(t *testing.T) {
 			Provider:    "NotProvider",
 		},
 	}
-	res = validPlacement(constraints, m, dbc)
+	res = validPlacement(constraints, m, m.containers, dbc)
 	if res {
 		t.Error(spew.Sprintf(
 			"Unexpected %v. Minion %v, Container %v, Constraints %v",
@@ -499,7 +621,7 @@ func TestValidPlacementMachine(t *testing.T) {
 			Region:      "Region",
 		},
 	}
-	res = validPlacement(constraints, m, dbc)
+	res = validPlacement(constraints, m, m.containers, dbc)
 	if !res {
 		t.Error(spew.Sprintf(
 			"Unexpected %v. Minion %v, Container %v, Constraints %v",
@@ -513,7 +635,7 @@ func TestValidPlacementMachine(t *testing.T) {
 			Region:      "Region",
 		},
 	}
-	res = validPlacement(constraints, m, dbc)
+	res = validPlacement(constraints, m, m.containers, dbc)
 	if res {
 		t.Error(spew.Sprintf(
 			"Unexpected %v. Minion %v, Container %v, Constraints %v",
@@ -527,7 +649,7 @@ func TestValidPlacementMachine(t *testing.T) {
 			Region:      "NoRegion",
 		},
 	}
-	res = validPlacement(constraints, m, dbc)
+	res = validPlacement(constraints, m, m.containers, dbc)
 	if res {
 		t.Error(spew.Sprintf(
 			"Unexpected %v. Minion %v, Container %v, Constraints %v",
@@ -542,7 +664,7 @@ func TestValidPlacementMachine(t *testing.T) {
 			Size:        "Size",
 		},
 	}
-	res = validPlacement(constraints, m, dbc)
+	res = validPlacement(constraints, m, m.containers, dbc)
 	if !res {
 		t.Error(spew.Sprintf(
 			"Unexpected %v. Minion %v, Container %v, Constraints %v",
@@ -556,7 +678,7 @@ func TestValidPlacementMachine(t *testing.T) {
 			Size:        "Size",
 		},
 	}
-	res = validPlacement(constraints, m, dbc)
+	res = validPlacement(constraints, m, m.containers, dbc)
 	if res {
 		t.Error(spew.Sprintf(
 			"Unexpected %v. Minion %v, Container %v, Constraints %v",
@@ -570,7 +692,7 @@ func TestValidPlacementMachine(t *testing.T) {
 			Size:        "NoSize",
 		},
 	}
-	res = validPlacement(constraints, m, dbc)
+	res = validPlacement(constraints, m, m.containers, dbc)
 	if res {
 		t.Error(spew.Sprintf(
 			"Unexpected %v. Minion %v, Container %v, Constraints %v",
@@ -595,7 +717,7 @@ func TestValidPlacementMachine(t *testing.T) {
 			Provider:    "Provider",
 		},
 	}
-	res = validPlacement(constraints, m, dbc)
+	res = validPlacement(constraints, m, m.containers, dbc)
 	if !res {
 		t.Error(spew.Sprintf(
 			"Unexpected %v. Minion %v, Container %v, Constraints %v",
@@ -619,7 +741,7 @@ func TestValidPlacementMachine(t *testing.T) {
 			Provider:    "Provider",
 		},
 	}
-	res = validPlacement(constraints, m, dbc)
+	res = validPlacement(constraints, m, m.containers, dbc)
 	if res {
 		t.Error(spew.Sprintf(
 			"Unexpected %v. Minion %v, Container %v, Constraints %v",
