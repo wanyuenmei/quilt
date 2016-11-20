@@ -966,7 +966,8 @@ func generateTargetOpenFlow(odb ovsdb.Client, containers []db.Container,
 			5000, ofVeth) +
 			"%s,%s," + fmt.Sprintf("dl_dst=%s actions=LOCAL", dflGatewayMAC)
 		ingressRule := fmt.Sprintf("table=0 priority=%d,in_port=LOCAL,", 5000) +
-			"%s,%s," + fmt.Sprintf("dl_dst=%s actions=%d", dbcMac, ofVeth)
+			"%s,%s," + fmt.Sprintf("dl_dst=%s actions=output:%d",
+			dbcMac, ofVeth)
 
 		for port := range portsFromWeb {
 			for _, protocol := range protocols {
