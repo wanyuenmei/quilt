@@ -10,6 +10,7 @@ import (
 	"github.com/NetSys/quilt/api"
 	clientMock "github.com/NetSys/quilt/api/client/mocks"
 	"github.com/NetSys/quilt/db"
+	"github.com/NetSys/quilt/quiltctl/ssh"
 	"github.com/NetSys/quilt/quiltctl/testutils"
 )
 
@@ -34,22 +35,25 @@ func TestExecPTY(t *testing.T) {
 		}, nil)
 
 	mockSSHClient := new(testutils.MockSSHClient)
+	sshGetter := func(host, key string) (ssh.Client, error) {
+		assert.Equal(t, workerHost, host)
+		assert.Equal(t, "key", key)
+		return mockSSHClient, nil
+	}
 	execCmd := Exec{
 		privateKey:      "key",
 		command:         "cat /etc/hosts",
 		allocatePTY:     true,
 		targetContainer: targetContainer,
-		SSHClient:       mockSSHClient,
+		sshGetter:       sshGetter,
 		clientGetter:    mockGetter,
 		common: &commonFlags{
 			host: api.DefaultSocket,
 		},
 	}
 
-	mockSSHClient.On("Connect", workerHost, "key").Return(nil)
-	mockSSHClient.On("RequestPTY").Return(nil)
-	mockSSHClient.On("Run", "docker exec -it foo cat /etc/hosts").Return(nil)
-	mockSSHClient.On("Disconnect").Return(nil)
+	mockSSHClient.On("Run", true, "docker exec -it foo cat /etc/hosts").Return(nil)
+	mockSSHClient.On("Close").Return(nil)
 
 	execCmd.Run()
 
@@ -78,19 +82,22 @@ func TestExecNoPTY(t *testing.T) {
 		}, nil)
 
 	mockSSHClient := new(testutils.MockSSHClient)
+	sshGetter := func(host, key string) (ssh.Client, error) {
+		assert.Equal(t, workerHost, host)
+		return mockSSHClient, nil
+	}
 	execCmd := Exec{
 		command:         "cat /etc/hosts",
 		targetContainer: targetContainer,
-		SSHClient:       mockSSHClient,
+		sshGetter:       sshGetter,
 		clientGetter:    mockGetter,
 		common: &commonFlags{
 			host: api.DefaultSocket,
 		},
 	}
 
-	mockSSHClient.On("Connect", workerHost, "").Return(nil)
-	mockSSHClient.On("Run", "docker exec  foo cat /etc/hosts").Return(nil)
-	mockSSHClient.On("Disconnect").Return(nil)
+	mockSSHClient.On("Run", false, "docker exec  foo cat /etc/hosts").Return(nil)
+	mockSSHClient.On("Close").Return(nil)
 
 	execCmd.Run()
 
@@ -139,7 +146,7 @@ func TestExecFlags(t *testing.T) {
 
 func checkExecParsing(t *testing.T, args []string, expArgs Exec, expErr error) {
 
-	execCmd := NewExecCommand(nil)
+	execCmd := NewExecCommand()
 	err := parseHelper(execCmd, args)
 
 	assert.Equal(t, expErr, err)

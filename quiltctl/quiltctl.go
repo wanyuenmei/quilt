@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/NetSys/quilt/quiltctl/command"
-	"github.com/NetSys/quilt/quiltctl/ssh"
 
 	log "github.com/Sirupsen/logrus"
 )
@@ -13,10 +12,10 @@ import (
 var commands = map[string]command.SubCommand{
 	"containers": command.NewContainerCommand(),
 	"daemon":     command.NewDaemonCommand(),
-	"exec":       command.NewExecCommand(ssh.NewNativeClient()),
+	"exec":       command.NewExecCommand(),
 	"get":        &command.Get{},
 	"inspect":    &command.Inspect{},
-	"logs":       command.NewLogCommand(ssh.NewNativeClient()),
+	"logs":       command.NewLogCommand(),
 	"machines":   command.NewMachineCommand(),
 	"minion":     &command.Minion{},
 	"ps":         command.NewPsCommand(),

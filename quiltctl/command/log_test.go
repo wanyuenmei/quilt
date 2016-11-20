@@ -10,6 +10,7 @@ import (
 	"github.com/NetSys/quilt/api"
 	clientMock "github.com/NetSys/quilt/api/client/mocks"
 	"github.com/NetSys/quilt/db"
+	"github.com/NetSys/quilt/quiltctl/ssh"
 	"github.com/NetSys/quilt/quiltctl/testutils"
 )
 
@@ -59,23 +60,27 @@ func TestLog(t *testing.T) {
 			HostReturn: workerHost,
 		}, nil)
 	mockSSHClient := new(testutils.MockSSHClient)
+	sshGetter := func(host, key string) (ssh.Client, error) {
+		assert.Equal(t, workerHost, host)
+		assert.Equal(t, "key", key)
+		return mockSSHClient, nil
+	}
 	logsCmd := Log{
 		privateKey:      "key",
 		targetContainer: targetContainer,
 		shouldTail:      true,
 		showTimestamps:  true,
 		sinceTimestamp:  "2006-01-02T15:04:05",
-		SSHClient:       mockSSHClient,
+		sshGetter:       sshGetter,
 		clientGetter:    mockGetter,
 		common: &commonFlags{
 			host: api.DefaultSocket,
 		},
 	}
 
-	mockSSHClient.On("Connect", workerHost, "key").Return(nil)
-	mockSSHClient.On("Run", "docker logs --since=2006-01-02T15:04:05 --timestamps "+
-		"--follow foo").Return(nil)
-	mockSSHClient.On("Disconnect").Return(nil)
+	mockSSHClient.On("Run", false, "docker logs --since=2006-01-02T15:04:05 "+
+		"--timestamps --follow foo").Return(nil)
+	mockSSHClient.On("Close").Return(nil)
 
 	logsCmd.Run()
 
@@ -83,7 +88,7 @@ func TestLog(t *testing.T) {
 }
 
 func checkLogParsing(t *testing.T, args []string, exp Log, expErr error) {
-	logsCmd := NewLogCommand(nil)
+	logsCmd := NewLogCommand()
 	err := parseHelper(logsCmd, args)
 
 	assert.Equal(t, expErr, err)

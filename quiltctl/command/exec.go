@@ -26,15 +26,15 @@ type Exec struct {
 
 	common *commonFlags
 
-	SSHClient    ssh.Client
+	sshGetter    ssh.Getter
 	clientGetter client.Getter
 }
 
 // NewExecCommand creates a new Exec command instance.
-func NewExecCommand(c ssh.Client) *Exec {
+func NewExecCommand() *Exec {
 	return &Exec{
 		common:       &commonFlags{},
-		SSHClient:    c,
+		sshGetter:    ssh.New,
 		clientGetter: getter.New(),
 	}
 }
@@ -103,19 +103,12 @@ func (eCmd *Exec) Run() int {
 		return 1
 	}
 
-	err = eCmd.SSHClient.Connect(containerClient.Host(), eCmd.privateKey)
+	sshClient, err := eCmd.sshGetter(containerClient.Host(), eCmd.privateKey)
 	if err != nil {
 		log.WithError(err).Info("Error opening SSH connection")
 		return 1
 	}
-	defer eCmd.SSHClient.Disconnect()
-
-	if eCmd.allocatePTY {
-		if err = eCmd.SSHClient.RequestPTY(); err != nil {
-			log.WithError(err).Info("Error requesting pseudo-terminal")
-			return 1
-		}
-	}
+	defer sshClient.Close()
 
 	var flags string
 	if eCmd.allocatePTY {
@@ -123,7 +116,7 @@ func (eCmd *Exec) Run() int {
 	}
 	command := strings.Join(
 		[]string{"docker exec", flags, container.DockerID, eCmd.command}, " ")
-	if err = eCmd.SSHClient.Run(command); err != nil {
+	if err = sshClient.Run(eCmd.allocatePTY, command); err != nil {
 		log.WithError(err).Info("Error running command over SSH")
 		return 1
 	}

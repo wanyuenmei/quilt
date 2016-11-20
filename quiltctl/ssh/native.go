@@ -20,22 +20,16 @@ import (
 
 // NativeClient is wrapper over Go's SSH client.
 type NativeClient struct {
-	session *ssh.Session
-	pty     *pty
+	*ssh.Client
 }
 
-// NewNativeClient creates a new NativeClient.
-func NewNativeClient() *NativeClient {
-	return &NativeClient{}
-}
-
-// Connect establishes an SSH session with reasonable, quilt-specific defaults.
-func (c *NativeClient) Connect(host string, keyPath string) error {
+// New returns an SSH Client connected to the given host.
+func New(host string, keyPath string) (Client, error) {
 	var auth ssh.AuthMethod
 	if keyPath != "" {
 		signer, err := signerFromFile(keyPath)
 		if err != nil {
-			return err
+			return NativeClient{}, err
 		}
 		auth = ssh.PublicKeys(signer)
 	} else {
@@ -46,16 +40,8 @@ func (c *NativeClient) Connect(host string, keyPath string) error {
 		Auth: []ssh.AuthMethod{auth},
 	}
 
-	conn, err := ssh.Dial("tcp", fmt.Sprintf("%s:22", host), sshConfig)
-	if err != nil {
-		return err
-	}
-
-	c.session, err = conn.NewSession()
-	if err != nil {
-		return err
-	}
-	return nil
+	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:22", host), sshConfig)
+	return NativeClient{client}, err
 }
 
 var defaultKeys = []string{"id_rsa", "id_dsa", "id_ecdsa", "id_ed25519"}
@@ -92,41 +78,26 @@ func defaultSigners() []ssh.Signer {
 	return signers
 }
 
-// RequestPTY requests a pseudo-terminal on the remote server.
-func (c *NativeClient) RequestPTY() error {
-	if c.session == nil {
-		return errors.New("no open SSH session")
+// Run runs an SSH command.
+func (c NativeClient) Run(requestPTY bool, command string) error {
+	session, err := c.NewSession()
+	if err != nil {
+		return err
 	}
+	defer session.Close()
+	session.Stdout = os.Stdout
+	session.Stdin = os.Stdin
+	session.Stderr = os.Stderr
 
-	c.pty = newPty(c.session)
-	return c.pty.Request()
-}
-
-// Run runs an SSH command, erroring if no connection is open.
-func (c *NativeClient) Run(command string) error {
-	if c.session == nil {
-		return errors.New("no open SSH session")
-	}
-	c.session.Stdout = os.Stdout
-	c.session.Stdin = os.Stdin
-	c.session.Stderr = os.Stderr
-
-	return c.session.Run(command)
-}
-
-// Disconnect closes SSH session, erroring if none open.
-func (c *NativeClient) Disconnect() error {
-	if c.session == nil {
-		return errors.New("no open SSH session")
-	}
-
-	if c.pty != nil {
-		if err := c.pty.Close(); err != nil {
+	if requestPTY {
+		pty := newPty(session)
+		if err := pty.Request(); err != nil {
 			return err
 		}
+		defer pty.Close()
 	}
 
-	return c.session.Close()
+	return session.Run(command)
 }
 
 // pty encapsulates pseudo-terminal operations.

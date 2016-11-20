@@ -22,16 +22,16 @@ type Log struct {
 	shouldTail     bool
 
 	targetContainer int
-	SSHClient       ssh.Client
-	clientGetter    client.Getter
 
-	common *commonFlags
+	sshGetter    ssh.Getter
+	clientGetter client.Getter
+	common       *commonFlags
 }
 
 // NewLogCommand creates a new Log command instance.
-func NewLogCommand(c ssh.Client) *Log {
+func NewLogCommand() *Log {
 	return &Log{
-		SSHClient:    c,
+		sshGetter:    ssh.New,
 		clientGetter: getter.New(),
 		common:       &commonFlags{},
 	}
@@ -108,14 +108,14 @@ func (lCmd *Log) Run() int {
 	}
 	dockerCmd += " " + container.DockerID
 
-	err = lCmd.SSHClient.Connect(containerClient.Host(), lCmd.privateKey)
+	sshClient, err := lCmd.sshGetter(containerClient.Host(), lCmd.privateKey)
 	if err != nil {
 		log.WithError(err).Info("Error opening SSH connection")
 		return 1
 	}
-	defer lCmd.SSHClient.Disconnect()
+	defer sshClient.Close()
 
-	if err = lCmd.SSHClient.Run(dockerCmd); err != nil {
+	if err = sshClient.Run(false, dockerCmd); err != nil {
 		log.WithError(err).Info("Error running command over SSH")
 		return 1
 	}
