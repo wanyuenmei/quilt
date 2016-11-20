@@ -102,5 +102,5 @@ Pi is roughly 3.13918
 
 **Note:** The Spark cluster is now up and usable. You can run the interactive
 spark-shell by exec-ing it in the Master Spark container:
-`quilt exec <MASTER_CONTAINER_ID> spark-shell`. To tear down the deployment,
+`quilt exec -t <MASTER_CONTAINER_ID> spark-shell`. To tear down the deployment,
 just execute `quilt stop`.

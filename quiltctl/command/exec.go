@@ -4,10 +4,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
+	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/NetSys/quilt/api/client"
 	"github.com/NetSys/quilt/api/client/getter"
@@ -20,6 +22,7 @@ type Exec struct {
 	privateKey      string
 	targetContainer int
 	command         string
+	allocatePTY     bool
 
 	common *commonFlags
 
@@ -42,15 +45,17 @@ func (eCmd *Exec) InstallFlags(flags *flag.FlagSet) {
 
 	flags.StringVar(&eCmd.privateKey, "i", "",
 		"the private key to use to connect to the host")
+	flags.BoolVar(&eCmd.allocatePTY, "t", false,
+		"attempt to allocate a pseudo-terminal")
 
 	flags.Usage = func() {
 		fmt.Println("usage: quilt exec [-H=<daemon_host>] [-i=<private_key>] " +
-			"<stitch_id> <command>")
+			"[-t] <stitch_id> <command>")
 		fmt.Println("`exec` runs a command within the specified container. " +
 			"The container is identified by the stitch ID produced by " +
 			"`quilt containers`.")
 		fmt.Println("For example, to get a shell in container 5 with a " +
-			"specific private key: quilt exec -i ~/.ssh/quilt 5 sh")
+			"specific private key: quilt exec -t -i ~/.ssh/quilt 5 sh")
 		flags.PrintDefaults()
 	}
 }
@@ -73,6 +78,11 @@ func (eCmd *Exec) Parse(args []string) error {
 
 // Run finds the target continer, and executes the given command in it.
 func (eCmd *Exec) Run() int {
+	if eCmd.allocatePTY && !isTerminal() {
+		log.Error("Cannot allocate pseudo-terminal without a terminal")
+		return 1
+	}
+
 	localClient, err := eCmd.clientGetter.Client(eCmd.common.host)
 	if err != nil {
 		log.Error(err)
@@ -100,16 +110,27 @@ func (eCmd *Exec) Run() int {
 	}
 	defer eCmd.SSHClient.Disconnect()
 
-	if err = eCmd.SSHClient.RequestPTY(); err != nil {
-		log.WithError(err).Info("Error requesting pseudo-terminal")
-		return 1
+	if eCmd.allocatePTY {
+		if err = eCmd.SSHClient.RequestPTY(); err != nil {
+			log.WithError(err).Info("Error requesting pseudo-terminal")
+			return 1
+		}
 	}
 
-	command := fmt.Sprintf("docker exec -it %s %s", container.DockerID, eCmd.command)
+	var flags string
+	if eCmd.allocatePTY {
+		flags = "-it"
+	}
+	command := strings.Join(
+		[]string{"docker exec", flags, container.DockerID, eCmd.command}, " ")
 	if err = eCmd.SSHClient.Run(command); err != nil {
 		log.WithError(err).Info("Error running command over SSH")
 		return 1
 	}
 
 	return 0
+}
+
+var isTerminal = func() bool {
+	return terminal.IsTerminal(int(os.Stdout.Fd()))
 }

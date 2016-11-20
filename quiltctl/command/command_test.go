@@ -8,7 +8,6 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
-	"github.com/NetSys/quilt/api"
 	clientMock "github.com/NetSys/quilt/api/client/mocks"
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/quiltctl/testutils"
@@ -184,54 +183,6 @@ func TestSSHFlags(t *testing.T) {
 		errors.New("must specify a target machine"))
 }
 
-func checkExecParsing(t *testing.T, args []string, expContainer int,
-	expKey string, expCmd string, expErr error) {
-
-	execCmd := NewExecCommand(nil)
-	err := parseHelper(execCmd, args)
-
-	if expErr != nil {
-		if err.Error() != expErr.Error() {
-			t.Errorf("Expected error %s, but got %s",
-				expErr.Error(), err.Error())
-		}
-		return
-	}
-
-	if err != nil {
-		t.Errorf("Unexpected error when parsing exec args: %s", err.Error())
-		return
-	}
-
-	if execCmd.targetContainer != expContainer {
-		t.Errorf("Expected exec command to parse target container %d, but got %d",
-			expContainer, execCmd.targetContainer)
-	}
-
-	if execCmd.command != expCmd {
-		t.Errorf("Expected exec command to parse command %s, but got %s",
-			expCmd, execCmd.command)
-	}
-
-	if execCmd.privateKey != expKey {
-		t.Errorf("Expected exec command to parse private key %s, but got %s",
-			expKey, execCmd.privateKey)
-	}
-}
-
-func TestExecFlags(t *testing.T) {
-	t.Parallel()
-
-	checkExecParsing(t, []string{"1", "sh"}, 1, "", "sh", nil)
-	checkExecParsing(t, []string{"-i", "key", "1", "sh"}, 1, "key", "sh", nil)
-	checkExecParsing(t, []string{"1", "cat /etc/hosts"}, 1, "",
-		"cat /etc/hosts", nil)
-	checkExecParsing(t, []string{"1"}, 0, "", "",
-		errors.New("must specify a target container and command"))
-	checkExecParsing(t, []string{}, 0, "", "",
-		errors.New("must specify a target container and command"))
-}
-
 func TestStopNamespace(t *testing.T) {
 	t.Parallel()
 
@@ -258,47 +209,6 @@ func TestSSHCommandCreation(t *testing.T) {
 	if !reflect.DeepEqual(res.Args, exp) {
 		t.Errorf("Bad SSH command creation: expected %v, got %v.", exp, res.Args)
 	}
-}
-
-func TestExec(t *testing.T) {
-	t.Parallel()
-
-	workerHost := "worker"
-	targetContainer := 1
-
-	mockGetter := new(testutils.Getter)
-	mockGetter.On("Client", mock.Anything).Return(&clientMock.Client{}, nil)
-	mockGetter.On("ContainerClient", mock.Anything, mock.Anything).Return(
-		&clientMock.Client{
-			ContainerReturn: []db.Container{
-				{
-					StitchID: targetContainer,
-					DockerID: "foo",
-				},
-			},
-			HostReturn: workerHost,
-		}, nil)
-
-	mockSSHClient := new(testutils.MockSSHClient)
-	execCmd := Exec{
-		privateKey:      "key",
-		command:         "cat /etc/hosts",
-		targetContainer: targetContainer,
-		SSHClient:       mockSSHClient,
-		clientGetter:    mockGetter,
-		common: &commonFlags{
-			host: api.DefaultSocket,
-		},
-	}
-
-	mockSSHClient.On("Connect", workerHost, "key").Return(nil)
-	mockSSHClient.On("RequestPTY").Return(nil)
-	mockSSHClient.On("Run", "docker exec -it foo cat /etc/hosts").Return(nil)
-	mockSSHClient.On("Disconnect").Return(nil)
-
-	execCmd.Run()
-
-	mockSSHClient.AssertExpectations(t)
 }
 
 func parseHelper(cmd SubCommand, args []string) error {
