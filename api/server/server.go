@@ -109,8 +109,8 @@ func (s server) Deploy(cts context.Context, deployReq *pb.DeployRequest) (
 		clusters = view.SelectFromCluster(nil)
 		return nil
 	})
-	if len(clusters) != 0 && clusters[0].Namespace != stitch.QueryNamespace() {
-		return &pb.RunReply{}, errors.New(
+	if len(clusters) != 0 && clusters[0].Namespace != stitch.Namespace {
+		return &pb.DeployReply{}, errors.New(
 			"Quilt currently does not support switching namespaces. " +
 				"Kill and restart the daemon if you would like to " +
 				"use a different namespace.")

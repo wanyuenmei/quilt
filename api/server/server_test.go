@@ -135,10 +135,10 @@ func TestSwitchNamespace(t *testing.T) {
 		return nil
 	})
 
-	newNamespaceStitch := `deployment.namespace = "new-namespace";`
+	newNamespaceDeployment := `{"namespace": "new-namespace"}`
 
-	_, err := s.Run(context.Background(),
-		&pb.RunRequest{Stitch: newNamespaceStitch})
+	_, err := s.Deploy(context.Background(),
+		&pb.DeployRequest{Deployment: newNamespaceDeployment})
 
 	assert.NotNil(t, err)
 }
