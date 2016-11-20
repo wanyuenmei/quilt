@@ -1490,8 +1490,11 @@ func addOrDelFlows(flows []interface{}, add bool) error {
 
 	for _, f := range flows {
 		flow := f.(OFRule)
-		stdin.Write([]byte(fmt.Sprintf("%s,%s,actions=%s\n",
-			flow.table, flow.match, flow.actions)))
+		rule := fmt.Sprintf("%s,%s", flow.table, flow.match)
+		if add {
+			rule += fmt.Sprintf(",actions=%s", flow.actions)
+		}
+		stdin.Write([]byte(rule + "\n"))
 	}
 	stdin.Close()
 
