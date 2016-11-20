@@ -1,8 +1,6 @@
 package engine
 
 import (
-	"fmt"
-
 	"github.com/NetSys/quilt/cluster/provider"
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/join"
@@ -49,8 +47,6 @@ func clusterTxn(view db.Database, stitch stitch.Stitch) error {
 	namespace := stitch.Namespace
 	if namespace == "" {
 		namespace = "default-namespace"
-		msg := "policy did not specify 'Namespace', defaulting to '%s'"
-		log.Warn(fmt.Sprintf(msg, namespace))
 	}
 
 	cluster, err := view.GetCluster()
