@@ -41,16 +41,11 @@ func runWorker(conn db.Conn, dk docker.Client, myIP string) {
 				view.Commit(dbc)
 			}
 
-			// XXX: We do the actual booting and destruction in the
-			// transaction so that we can prevent the network from running
-			// while the containers are being created. This can cause the
-			// occasional deadlock.  This should be undone once we have the
-			// network driver in place.
-			doContainers(dk, toBoot, dockerRun)
-			doContainers(dk, toKill, dockerKill)
 			return nil
 		})
 
+		doContainers(dk, toBoot, dockerRun)
+		doContainers(dk, toKill, dockerKill)
 	}
 }
 
