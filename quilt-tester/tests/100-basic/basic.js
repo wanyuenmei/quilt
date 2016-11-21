@@ -10,3 +10,6 @@ var blue = new Service("blue", new Container("google/pause").replicate(3 * nWork
 var ports = new PortRange(1024, 65535);
 red.connect(ports, blue);
 blue.connect(ports, red);
+
+deployment.deploy(red);
+deployment.deploy(blue);
