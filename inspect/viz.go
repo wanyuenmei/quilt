@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/NetSys/quilt/stitch"
+	"github.com/NetSys/quilt/util"
 )
 
 func getSlug(configPath string) (string, error) {
@@ -75,17 +76,16 @@ func subGraph(i int, labels ...string) string {
 // Graphviz generates a specification for the graphviz program that visualizes the
 // communication graph of a stitch.
 func graphviz(outputFormat string, slug string, dot string) {
-	f, err := os.Create(slug + ".dot")
+	f, err := util.AppFs.Create(slug + ".dot")
 	if err != nil {
 		panic(err)
 	}
 	defer f.Close()
-	defer func() {
-		rm := exec.Command("rm", slug+".dot")
-		rm.Run()
-	}()
-
 	f.Write([]byte(dot))
+	if outputFormat == "graphviz" {
+		return
+	}
+	defer exec.Command("rm", slug+".dot").Run()
 
 	// Dependencies:
 	// - easy-graph (install Graph::Easy from cpan)
