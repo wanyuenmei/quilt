@@ -298,9 +298,9 @@ func syncDB(cloudMachines []machine.Machine, dbMachines []db.Machine) (
 		switch {
 		case dbm.Provider != m.Provider:
 			return -1
-		case m.Region != "" && dbm.Region != m.Region:
+		case dbm.Region != m.Region:
 			return -1
-		case m.Size != "" && dbm.Size != m.Size:
+		case dbm.Size != m.Size:
 			return -1
 		case m.DiskSize != 0 && dbm.DiskSize != m.DiskSize:
 			return -1
