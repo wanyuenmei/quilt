@@ -16,6 +16,8 @@ initialize_ovs() {
 	cat <<- EOF > /etc/systemd/system/ovs.service
 	[Unit]
 	Description=OVS
+	After=docker.service
+	Requires=docker.service
 
 	[Service]
 	ExecStartPre=/sbin/modprobe gre
