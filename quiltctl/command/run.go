@@ -73,13 +73,6 @@ const emptyDeployment = "{}"
 
 // Run starts the run for the provided Stitch.
 func (rCmd *Run) Run() int {
-	c, err := rCmd.clientGetter.Client(rCmd.common.host)
-	if err != nil {
-		log.Error(err)
-		return 1
-	}
-	defer c.Close()
-
 	stitchPath := rCmd.stitch
 	compiled, err := stitch.FromFile(stitchPath, stitch.DefaultImportGetter)
 	if err != nil && os.IsNotExist(err) && !filepath.IsAbs(stitchPath) {
@@ -101,6 +94,13 @@ func (rCmd *Run) Run() int {
 		return 1
 	}
 	deployment := compiled.String()
+
+	c, err := rCmd.clientGetter.Client(rCmd.common.host)
+	if err != nil {
+		log.Error(err)
+		return 1
+	}
+	defer c.Close()
 
 	curr, err := getCurrentDeployment(c)
 	if err != nil {
