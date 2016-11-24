@@ -1,16 +1,6 @@
-package provider
+package cloudcfg
 
-import (
-	"bytes"
-	"strings"
-	"text/template"
-)
-
-const (
-	quiltImage = "quilt/quilt:latest"
-)
-
-var cloudConfigTemplate = `#!/bin/bash
+var cfgTemplate = `#!/bin/bash
 
 initialize_ovs() {
 	cat <<- EOF > /etc/systemd/system/ovs.service
@@ -50,9 +40,7 @@ initialize_docker() {
 }
 
 initialize_minion() {
-	cat <<- EOF > /etc/systemd/system/minion.service
-	[Unit]
-	Description=Quilt Minion
+	cat <<- EOF > /etc/systemd/system/minion.service [Unit] Description=Quilt Minion
 	After=docker.service
 	Requires=docker.service
 
@@ -125,23 +113,3 @@ systemctl restart {docker,ovs,minion}.service
 echo -n "Completed Boot Script: " >> /var/log/bootscript.log
 date >> /var/log/bootscript.log
     `
-
-func cloudConfigUbuntu(keys []string, ubuntuVersion string) string {
-	t := template.Must(template.New("cloudConfig").Parse(cloudConfigTemplate))
-
-	var cloudConfigBytes bytes.Buffer
-	err := t.Execute(&cloudConfigBytes, struct {
-		QuiltImage    string
-		UbuntuVersion string
-		SSHKeys       string
-	}{
-		QuiltImage:    quiltImage,
-		UbuntuVersion: ubuntuVersion,
-		SSHKeys:       strings.Join(keys, "\n"),
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	return cloudConfigBytes.String()
-}

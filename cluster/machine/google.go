@@ -1,7 +1,6 @@
-package constants
+package machine
 
-// GoogleDescriptions enumerates Google Compute Engine instance offerings
-var GoogleDescriptions = []Description{
+var googleDescriptions = []Description{
 	{Size: "n1-standard-1", CPU: 1, RAM: 3.75, Price: 0.050},
 	{Size: "n1-standard-2", CPU: 2, RAM: 7.5, Price: 0.100},
 	{Size: "n1-standard-4", CPU: 4, RAM: 15, Price: 0.200},

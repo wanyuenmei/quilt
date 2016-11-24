@@ -3,15 +3,26 @@ package cluster
 import (
 	"time"
 
-	"github.com/NetSys/quilt/cluster/provider"
+	"github.com/NetSys/quilt/cluster/acl"
+	"github.com/NetSys/quilt/cluster/amazon"
+	"github.com/NetSys/quilt/cluster/google"
+	"github.com/NetSys/quilt/cluster/machine"
+	"github.com/NetSys/quilt/cluster/vagrant"
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/join"
 	"github.com/NetSys/quilt/util"
 	log "github.com/Sirupsen/logrus"
 )
 
-var myIP = util.MyIP
-var sleep = time.Sleep
+type provider interface {
+	List() ([]machine.Machine, error)
+
+	Boot([]machine.Machine) error
+
+	Stop([]machine.Machine) error
+
+	SetACLs([]acl.ACL) error
+}
 
 // Store the providers in a variable so we can change it in the tests
 var allProviders = []db.Provider{db.Amazon, db.Google, db.Vagrant}
@@ -22,8 +33,11 @@ type cluster struct {
 	fm      foreman
 
 	namespace string
-	providers map[db.Provider]provider.Provider
+	providers map[db.Provider]provider
 }
+
+var myIP = util.MyIP
+var sleep = time.Sleep
 
 // Run continually checks 'conn' for cluster changes and recreates the cluster as
 // needed.
@@ -57,17 +71,18 @@ func newCluster(conn db.Conn, namespace string) *cluster {
 		conn: conn,
 		trigger: conn.TriggerTick(30, db.ClusterTable, db.MachineTable,
 			db.ACLTable),
+
 		fm:        createForeman(conn),
 		namespace: namespace,
-		providers: make(map[db.Provider]provider.Provider),
+		providers: make(map[db.Provider]provider),
 	}
 
 	for _, p := range allProviders {
-		inst := provider.New(p)
-		if err := inst.Connect(namespace); err == nil {
-			clst.providers[p] = inst
-		} else {
+		prvdr, err := newProvider(p, namespace)
+		if err != nil {
 			log.Debugf("Failed to connect to provider %s: %s", p, err)
+		} else {
+			clst.providers[p] = prvdr
 		}
 	}
 
@@ -85,19 +100,19 @@ func (clst *cluster) listen() {
 	}
 }
 
-func (clst cluster) get() ([]provider.Machine, error) {
-	var cloudMachines []provider.Machine
+func (clst cluster) get() ([]machine.Machine, error) {
+	var cloudMachines []machine.Machine
 	for _, p := range clst.providers {
 		providerMachines, err := p.List()
 		if err != nil {
-			return []provider.Machine{}, err
+			return []machine.Machine{}, err
 		}
 		cloudMachines = append(cloudMachines, providerMachines...)
 	}
 	return cloudMachines, nil
 }
 
-func (clst cluster) updateCloud(machines []provider.Machine, boot bool) {
+func (clst cluster) updateCloud(machines []machine.Machine, boot bool) {
 	if len(machines) == 0 {
 		return
 	}
@@ -111,7 +126,7 @@ func (clst cluster) updateCloud(machines []provider.Machine, boot bool) {
 		Infof("Attempt to %s machines.", actionString)
 
 	noFailures := true
-	groupedMachines := provider.GroupBy(machines)
+	groupedMachines := groupBy(machines)
 	for p, providerMachines := range groupedMachines {
 		providerInst, ok := clst.providers[p]
 		if !ok {
@@ -178,7 +193,7 @@ func (clst cluster) sync() {
 	clst.syncACLs(adminACLs, appACLs, machines)
 }
 
-func (clst cluster) syncMachines() (bootSet, terminateSet []provider.Machine) {
+func (clst cluster) syncMachines() (bootSet, terminateSet []machine.Machine) {
 	cloudMachines, err := clst.get()
 	if err != nil {
 		log.WithError(err).Error("Failed to list machines.")
@@ -192,7 +207,7 @@ func (clst cluster) syncMachines() (bootSet, terminateSet []provider.Machine) {
 		pairs, bootSet, terminateSet = syncDB(cloudMachines, dbMachines)
 		for _, pair := range pairs {
 			dbm := pair.L.(db.Machine)
-			m := pair.R.(provider.Machine)
+			m := pair.R.(machine.Machine)
 
 			dbm.CloudID = m.ID
 			dbm.PublicIP = m.PublicIP
@@ -228,16 +243,16 @@ func (clst cluster) syncACLs(adminACLs []string, appACLs []db.PortRange,
 		log.WithError(err).Error("Couldn't retrieve our IP address.")
 	}
 
-	var acls []provider.ACL
+	var acls []acl.ACL
 	for _, adminACL := range adminACLs {
-		acls = append(acls, provider.ACL{
+		acls = append(acls, acl.ACL{
 			CidrIP:  adminACL,
 			MinPort: 1,
 			MaxPort: 65535,
 		})
 	}
 	for _, appACL := range appACLs {
-		acls = append(acls, provider.ACL{
+		acls = append(acls, acl.ACL{
 			CidrIP:  "0.0.0.0/0",
 			MinPort: appACL.MinPort,
 			MaxPort: appACL.MaxPort,
@@ -249,7 +264,7 @@ func (clst cluster) syncACLs(adminACLs []string, appACLs []db.PortRange,
 	for _, m := range machines {
 		if m.PublicIP != "" {
 			// XXX: Look into the minimal set of necessary ports.
-			acls = append(acls, provider.ACL{
+			acls = append(acls, acl.ACL{
 				CidrIP:  m.PublicIP + "/32",
 				MinPort: 1,
 				MaxPort: 65535,
@@ -261,7 +276,7 @@ func (clst cluster) syncACLs(adminACLs []string, appACLs []db.PortRange,
 	for name, prvdr := range clst.providers {
 		// For this providers with no specified machines, we remove all ACLs.
 		// Otherwise we set acls to what's specified.
-		var setACLs []provider.ACL
+		var setACLs []acl.ACL
 		if _, ok := prvdrSet[name]; ok {
 			setACLs = acls
 		}
@@ -272,11 +287,11 @@ func (clst cluster) syncACLs(adminACLs []string, appACLs []db.PortRange,
 	}
 }
 
-func syncDB(cloudMachines []provider.Machine, dbMachines []db.Machine) (
-	pairs []join.Pair, bootSet []provider.Machine, terminateSet []provider.Machine) {
+func syncDB(cloudMachines []machine.Machine, dbMachines []db.Machine) (
+	pairs []join.Pair, bootSet []machine.Machine, terminateSet []machine.Machine) {
 	scoreFun := func(left, right interface{}) int {
 		dbm := left.(db.Machine)
-		m := right.(provider.Machine)
+		m := right.(machine.Machine)
 
 		switch {
 		case dbm.Provider != m.Provider:
@@ -301,13 +316,13 @@ func syncDB(cloudMachines []provider.Machine, dbMachines []db.Machine) (
 	pairs, dbmIface, cmIface := join.Join(dbMachines, cloudMachines, scoreFun)
 
 	for _, cm := range cmIface {
-		m := cm.(provider.Machine)
+		m := cm.(machine.Machine)
 		terminateSet = append(terminateSet, m)
 	}
 
 	for _, dbm := range dbmIface {
 		m := dbm.(db.Machine)
-		bootSet = append(bootSet, provider.Machine{
+		bootSet = append(bootSet, machine.Machine{
 			Size:     m.Size,
 			Provider: m.Provider,
 			Region:   m.Region,
@@ -316,4 +331,29 @@ func syncDB(cloudMachines []provider.Machine, dbMachines []db.Machine) (
 	}
 
 	return pairs, bootSet, terminateSet
+}
+
+func groupBy(machines []machine.Machine) map[db.Provider][]machine.Machine {
+	machineMap := make(map[db.Provider][]machine.Machine)
+	for _, m := range machines {
+		if _, ok := machineMap[m.Provider]; !ok {
+			machineMap[m.Provider] = []machine.Machine{}
+		}
+		machineMap[m.Provider] = append(machineMap[m.Provider], m)
+	}
+
+	return machineMap
+}
+
+func newProvider(p db.Provider, namespace string) (provider, error) {
+	switch p {
+	case db.Amazon:
+		return amazon.New(namespace)
+	case db.Google:
+		return google.New(namespace)
+	case db.Vagrant:
+		return vagrant.New(namespace)
+	default:
+		panic("Unimplemented")
+	}
 }

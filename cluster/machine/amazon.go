@@ -1,10 +1,10 @@
-package constants
+package machine
 
 // AwsDescriptions enumerates Amazon EC2 instance offerings
 //
 // T2 instances are not supported for Spot requests:
 // https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-spot-limits.html
-var AwsDescriptions = []Description{
+var amazonDescriptions = []Description{
 	{Size: "m4.large", CPU: 2, RAM: 8, Disk: "ebsonly", Region: "us-east-1", Price: 0.12},
 	{Size: "m4.xlarge", CPU: 4, RAM: 16, Disk: "ebsonly", Region: "us-east-1", Price: 0.239},
 	{Size: "m4.2xlarge", CPU: 8, RAM: 32, Disk: "ebsonly", Region: "us-east-1", Price: 0.479},

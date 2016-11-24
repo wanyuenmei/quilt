@@ -1,4 +1,4 @@
-package provider
+package amazon
 
 import (
 	"encoding/base64"
@@ -7,52 +7,34 @@ import (
 	"strings"
 	"time"
 
-	"github.com/NetSys/quilt/constants"
+	"github.com/NetSys/quilt/cluster/acl"
+	"github.com/NetSys/quilt/cluster/cloudcfg"
+	"github.com/NetSys/quilt/cluster/machine"
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/join"
-	"github.com/NetSys/quilt/stitch"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 
 	log "github.com/Sirupsen/logrus"
 )
 
-// EC2Client defines an interface that can be mocked out for interacting with EC2.
-type EC2Client interface {
-	AuthorizeSecurityGroupIngress(*ec2.AuthorizeSecurityGroupIngressInput) (
-		*ec2.AuthorizeSecurityGroupIngressOutput, error)
+// The Cluster object represents a connection to Amazon EC2.
+type Cluster struct {
+	namespace string
 
-	CancelSpotInstanceRequests(*ec2.CancelSpotInstanceRequestsInput) (
-		*ec2.CancelSpotInstanceRequestsOutput, error)
-
-	CreateSecurityGroup(*ec2.CreateSecurityGroupInput) (
-		*ec2.CreateSecurityGroupOutput, error)
-
-	CreateTags(*ec2.CreateTagsInput) (*ec2.CreateTagsOutput, error)
-
-	DescribeSecurityGroups(*ec2.DescribeSecurityGroupsInput) (
-		*ec2.DescribeSecurityGroupsOutput, error)
-
-	DescribeInstances(*ec2.DescribeInstancesInput) (
-		*ec2.DescribeInstancesOutput, error)
-
-	DescribeSpotInstanceRequests(*ec2.DescribeSpotInstanceRequestsInput) (
-		*ec2.DescribeSpotInstanceRequestsOutput, error)
-
-	DescribeVolumes(*ec2.DescribeVolumesInput) (
-		*ec2.DescribeVolumesOutput, error)
-
-	RevokeSecurityGroupIngress(*ec2.RevokeSecurityGroupIngressInput) (
-		*ec2.RevokeSecurityGroupIngressOutput, error)
-
-	TerminateInstances(*ec2.TerminateInstancesInput) (
-		*ec2.TerminateInstancesOutput, error)
-
-	RequestSpotInstances(*ec2.RequestSpotInstancesInput) (
-		*ec2.RequestSpotInstancesOutput, error)
+	clients   map[string]client
+	newClient func(string) client
 }
+
+type awsID struct {
+	spotID string
+	region string
+}
+
+// DefaultRegion is the prefered location for machines which haven't a user specified
+// region preference.
+const DefaultRegion = "us-west-1"
 
 const spotPrice = "0.5"
 
@@ -63,83 +45,25 @@ var amis = map[string]string{
 	"us-west-2":      "ami-e1fe2281",
 }
 
-func newAmazonCluster(sessionGetter func(string) EC2Client) *amazonCluster {
-	return &amazonCluster{
-		sessions:      make(map[string]EC2Client),
-		sessionGetter: sessionGetter,
-	}
-}
-
-func newEC2Session(region string) EC2Client {
-	session := session.New()
-	session.Config.Region = aws.String(region)
-	return ec2.New(session)
-}
-
-// blockDevice returns the block device we use for our AWS machines.
-func blockDevice(diskSize int) *ec2.BlockDeviceMapping {
-	return &ec2.BlockDeviceMapping{
-		DeviceName: aws.String("/dev/sda1"),
-		Ebs: &ec2.EbsBlockDevice{
-			DeleteOnTermination: aws.Bool(true),
-			VolumeSize:          aws.Int64(int64(diskSize)),
-			VolumeType:          aws.String("gp2"),
-		},
-	}
-}
-
-type amazonCluster struct {
-	sessionGetter func(string) EC2Client
-	sessions      map[string]EC2Client
-
-	namespace string
-}
-
-type awsID struct {
-	spotID string
-	region string
-}
-
-func getSpotIDs(ids []awsID) []string {
-	var spotIDs []string
-	for _, id := range ids {
-		spotIDs = append(spotIDs, id.spotID)
-	}
-
-	return spotIDs
-}
-
-func groupByRegion(ids []awsID) map[string][]awsID {
-	grouped := make(map[string][]awsID)
-	for _, id := range ids {
-		region := id.region
-		if _, ok := grouped[region]; !ok {
-			grouped[region] = []awsID{}
-		}
-		grouped[region] = append(grouped[region], id)
-	}
-
-	return grouped
-}
-
-func (clst *amazonCluster) Connect(namespace string) error {
-	clst.namespace = strings.ToLower(namespace)
-
+// New creates a new Amazon EC2 cluster.
+func New(namespace string) (*Cluster, error) {
+	clst := newAmazon(namespace)
 	if _, err := clst.List(); err != nil {
-		return errors.New("AWS failed to connect")
+		return nil, errors.New("AWS failed to connect")
 	}
-	return nil
+	return clst, nil
 }
 
-func (clst amazonCluster) getSession(region string) EC2Client {
-	if _, ok := clst.sessions[region]; !ok {
-		clst.sessions[region] = clst.sessionGetter(region)
+func newAmazon(namespace string) *Cluster {
+	return &Cluster{
+		namespace: strings.ToLower(namespace),
+		clients:   make(map[string]client),
+		newClient: newClient,
 	}
-
-	return clst.sessions[region]
 }
 
-func (clst amazonCluster) Boot(bootSet []Machine) error {
+// Boot creates instances in the `clst` configured according to the `bootSet`.
+func (clst Cluster) Boot(bootSet []machine.Machine) error {
 	if len(bootSet) <= 0 {
 		return nil
 	}
@@ -154,7 +78,7 @@ func (clst amazonCluster) Boot(bootSet []Machine) error {
 	bootReqMap := make(map[bootReq]int64) // From boot request to an instance count.
 	for _, m := range bootSet {
 		br := bootReq{
-			cfg:      cloudConfigUbuntu(m.SSHKeys, "xenial"),
+			cfg:      cloudcfg.Ubuntu(m.SSHKeys, "xenial"),
 			size:     m.Size,
 			region:   m.Region,
 			diskSize: m.DiskSize,
@@ -164,14 +88,14 @@ func (clst amazonCluster) Boot(bootSet []Machine) error {
 
 	var awsIDs []awsID
 	for br, count := range bootReqMap {
-		session := clst.getSession(br.region)
-		groupID, _, err := clst.GetCreateSecurityGroup(session)
+		client := clst.getClient(br.region)
+		groupID, _, err := clst.getCreateSecurityGroup(client)
 		if err != nil {
 			return err
 		}
 
 		cloudConfig64 := base64.StdEncoding.EncodeToString([]byte(br.cfg))
-		resp, err := session.RequestSpotInstances(&ec2.RequestSpotInstancesInput{
+		resp, err := client.RequestSpotInstances(&ec2.RequestSpotInstancesInput{
 			SpotPrice: aws.String(spotPrice),
 			LaunchSpecification: &ec2.RequestSpotLaunchSpecification{
 				ImageId:          aws.String(amis[br.region]),
@@ -203,7 +127,8 @@ func (clst amazonCluster) Boot(bootSet []Machine) error {
 	return clst.wait(awsIDs, true)
 }
 
-func (clst amazonCluster) Stop(machines []Machine) error {
+// Stop shuts down `machines` in `clst.
+func (clst Cluster) Stop(machines []machine.Machine) error {
 	var awsIDs []awsID
 	for _, m := range machines {
 		awsIDs = append(awsIDs, awsID{
@@ -212,10 +137,10 @@ func (clst amazonCluster) Stop(machines []Machine) error {
 		})
 	}
 	for region, ids := range groupByRegion(awsIDs) {
-		session := clst.getSession(region)
+		client := clst.getClient(region)
 		spotIDs := getSpotIDs(ids)
 
-		spots, err := session.DescribeSpotInstanceRequests(
+		spots, err := client.DescribeSpotInstanceRequests(
 			&ec2.DescribeSpotInstanceRequestsInput{
 				SpotInstanceRequestIds: aws.StringSlice(spotIDs),
 			})
@@ -231,7 +156,7 @@ func (clst amazonCluster) Stop(machines []Machine) error {
 		}
 
 		if len(instIds) > 0 {
-			_, err = session.TerminateInstances(&ec2.TerminateInstancesInput{
+			_, err = client.TerminateInstances(&ec2.TerminateInstancesInput{
 				InstanceIds: aws.StringSlice(instIds),
 			})
 			if err != nil {
@@ -239,7 +164,7 @@ func (clst amazonCluster) Stop(machines []Machine) error {
 			}
 		}
 
-		_, err = session.CancelSpotInstanceRequests(
+		_, err = client.CancelSpotInstanceRequests(
 			&ec2.CancelSpotInstanceRequestsInput{
 				SpotInstanceRequestIds: aws.StringSlice(spotIDs),
 			})
@@ -255,17 +180,18 @@ func (clst amazonCluster) Stop(machines []Machine) error {
 	return nil
 }
 
-func (clst amazonCluster) List() ([]Machine, error) {
-	machines := []Machine{}
+// List queries `clst` for the list of booted machines.
+func (clst Cluster) List() ([]machine.Machine, error) {
+	machines := []machine.Machine{}
 	for region := range amis {
-		session := clst.getSession(region)
+		client := clst.getClient(region)
 
-		spots, err := session.DescribeSpotInstanceRequests(nil)
+		spots, err := client.DescribeSpotInstanceRequests(nil)
 		if err != nil {
 			return nil, err
 		}
 
-		insts, err := session.DescribeInstances(&ec2.DescribeInstancesInput{
+		insts, err := client.DescribeInstances(&ec2.DescribeInstancesInput{
 			Filters: []*ec2.Filter{
 				{
 					Name:   aws.String("instance.group-name"),
@@ -323,7 +249,7 @@ func (clst amazonCluster) List() ([]Machine, error) {
 				}
 			}
 
-			machine := Machine{
+			machine := machine.Machine{
 				ID:       *spot.SpotInstanceRequestId,
 				Region:   region,
 				Provider: db.Amazon,
@@ -359,7 +285,7 @@ func (clst amazonCluster) List() ([]Machine, error) {
 						},
 					}
 
-					volumeInfo, err := session.DescribeVolumes(
+					volumeInfo, err := client.DescribeVolumes(
 						&ec2.DescribeVolumesInput{
 							Filters: filters,
 						})
@@ -380,20 +306,23 @@ func (clst amazonCluster) List() ([]Machine, error) {
 	return machines, nil
 }
 
-func (clst *amazonCluster) ChooseSize(ram stitch.Range, cpu stitch.Range,
-	maxPrice float64) string {
-	return pickBestSize(constants.AwsDescriptions, ram, cpu, maxPrice)
+func (clst Cluster) getClient(region string) client {
+	if _, ok := clst.clients[region]; !ok {
+		clst.clients[region] = clst.newClient(region)
+	}
+
+	return clst.clients[region]
 }
 
-func (clst *amazonCluster) tagSpotRequests(awsIDs []awsID) error {
+func (clst *Cluster) tagSpotRequests(awsIDs []awsID) error {
 OuterLoop:
 	for region, ids := range groupByRegion(awsIDs) {
-		session := clst.getSession(region)
+		client := clst.getClient(region)
 		spotIDs := getSpotIDs(ids)
 
 		var err error
 		for i := 0; i < 30; i++ {
-			_, err = session.CreateTags(&ec2.CreateTagsInput{
+			_, err = client.CreateTags(&ec2.CreateTagsInput{
 				Tags: []*ec2.Tag{
 					{
 						Key:   aws.String(clst.namespace),
@@ -409,7 +338,7 @@ OuterLoop:
 		}
 
 		log.Warn("Failed to tag spot requests: ", err)
-		session.CancelSpotInstanceRequests(
+		client.CancelSpotInstanceRequests(
 			&ec2.CancelSpotInstanceRequestsInput{
 				SpotInstanceRequestIds: aws.StringSlice(spotIDs),
 			})
@@ -422,7 +351,7 @@ OuterLoop:
 
 /* Wait for the spot request 'ids' to have booted or terminated depending on the value
  * of 'boot' */
-func (clst *amazonCluster) wait(awsIDs []awsID, boot bool) error {
+func (clst *Cluster) wait(awsIDs []awsID, boot bool) error {
 OuterLoop:
 	for i := 0; i < 100; i++ {
 		machines, err := clst.List()
@@ -455,10 +384,67 @@ OuterLoop:
 	return errors.New("timed out")
 }
 
-func (clst *amazonCluster) GetCreateSecurityGroup(session EC2Client) (
+// SetACLs adds and removes acls in `clst` so that it conforms to `acls`.
+func (clst *Cluster) SetACLs(acls []acl.ACL) error {
+	for region := range amis {
+		client := clst.getClient(region)
+
+		groupID, ingress, err := clst.getCreateSecurityGroup(client)
+		if err != nil {
+			return err
+		}
+
+		rangesToAdd, foundGroup, rulesToRemove := syncACLs(acls, groupID, ingress)
+
+		if len(rangesToAdd) != 0 {
+			logACLs(true, rangesToAdd)
+			_, err = client.AuthorizeSecurityGroupIngress(
+				&ec2.AuthorizeSecurityGroupIngressInput{
+					GroupName:     aws.String(clst.namespace),
+					IpPermissions: rangesToAdd,
+				},
+			)
+			if err != nil {
+				return err
+			}
+		}
+
+		if !foundGroup {
+			log.WithField("Group", clst.namespace).Debug("Amazon: Add group")
+			_, err = client.AuthorizeSecurityGroupIngress(
+				&ec2.AuthorizeSecurityGroupIngressInput{
+					GroupName: aws.String(
+						clst.namespace),
+					SourceSecurityGroupName: aws.String(
+						clst.namespace),
+				},
+			)
+			if err != nil {
+				return err
+			}
+		}
+
+		if len(rulesToRemove) != 0 {
+			logACLs(false, rulesToRemove)
+			_, err = client.RevokeSecurityGroupIngress(
+				&ec2.RevokeSecurityGroupIngressInput{
+					GroupName:     aws.String(clst.namespace),
+					IpPermissions: rulesToRemove,
+				},
+			)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (clst *Cluster) getCreateSecurityGroup(client client) (
 	string, []*ec2.IpPermission, error) {
 
-	resp, err := session.DescribeSecurityGroups(
+	resp, err := client.DescribeSecurityGroups(
 		&ec2.DescribeSecurityGroupsInput{
 			Filters: []*ec2.Filter{
 				{
@@ -485,7 +471,7 @@ func (clst *amazonCluster) GetCreateSecurityGroup(session EC2Client) (
 		return *groups[0].GroupId, groups[0].IpPermissions, nil
 	}
 
-	csgResp, err := session.CreateSecurityGroup(
+	csgResp, err := client.CreateSecurityGroup(
 		&ec2.CreateSecurityGroupInput{
 			Description: aws.String("Quilt Group"),
 			GroupName:   aws.String(clst.namespace),
@@ -497,66 +483,10 @@ func (clst *amazonCluster) GetCreateSecurityGroup(session EC2Client) (
 	return *csgResp.GroupId, nil, nil
 }
 
-func (clst *amazonCluster) SetACLs(acls []ACL) error {
-	for region := range amis {
-		session := clst.getSession(region)
-
-		groupID, ingress, err := clst.GetCreateSecurityGroup(session)
-		if err != nil {
-			return err
-		}
-
-		rangesToAdd, foundGroup, rulesToRemove := syncACLs(acls, groupID, ingress)
-
-		if len(rangesToAdd) != 0 {
-			logACLs(true, rangesToAdd)
-			_, err = session.AuthorizeSecurityGroupIngress(
-				&ec2.AuthorizeSecurityGroupIngressInput{
-					GroupName:     aws.String(clst.namespace),
-					IpPermissions: rangesToAdd,
-				},
-			)
-			if err != nil {
-				return err
-			}
-		}
-
-		if !foundGroup {
-			log.WithField("Group", clst.namespace).Debug("Amazon: Add group")
-			_, err = session.AuthorizeSecurityGroupIngress(
-				&ec2.AuthorizeSecurityGroupIngressInput{
-					GroupName: aws.String(
-						clst.namespace),
-					SourceSecurityGroupName: aws.String(
-						clst.namespace),
-				},
-			)
-			if err != nil {
-				return err
-			}
-		}
-
-		if len(rulesToRemove) != 0 {
-			logACLs(false, rulesToRemove)
-			_, err = session.RevokeSecurityGroupIngress(
-				&ec2.RevokeSecurityGroupIngressInput{
-					GroupName:     aws.String(clst.namespace),
-					IpPermissions: rulesToRemove,
-				},
-			)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
 // syncACLs returns the permissions that need to be removed and added in order
 // for the cloud ACLs to match the policy.
 // rangesToAdd is guaranteed to always have exactly one item in the IpRanges slice.
-func syncACLs(desiredACLs []ACL, desiredGroupID string,
+func syncACLs(desiredACLs []acl.ACL, desiredGroupID string,
 	current []*ec2.IpPermission) (rangesToAdd []*ec2.IpPermission, foundGroup bool,
 	toRemove []*ec2.IpPermission) {
 
@@ -660,6 +590,40 @@ func logACLs(add bool, perms []*ec2.IpPermission) {
 	}
 }
 
+// blockDevice returns the block device we use for our AWS machines.
+func blockDevice(diskSize int) *ec2.BlockDeviceMapping {
+	return &ec2.BlockDeviceMapping{
+		DeviceName: aws.String("/dev/sda1"),
+		Ebs: &ec2.EbsBlockDevice{
+			DeleteOnTermination: aws.Bool(true),
+			VolumeSize:          aws.Int64(int64(diskSize)),
+			VolumeType:          aws.String("gp2"),
+		},
+	}
+}
+
+func getSpotIDs(ids []awsID) []string {
+	var spotIDs []string
+	for _, id := range ids {
+		spotIDs = append(spotIDs, id.spotID)
+	}
+
+	return spotIDs
+}
+
+func groupByRegion(ids []awsID) map[string][]awsID {
+	grouped := make(map[string][]awsID)
+	for _, id := range ids {
+		region := id.region
+		if _, ok := grouped[region]; !ok {
+			grouped[region] = []awsID{}
+		}
+		grouped[region] = append(grouped[region], id)
+	}
+
+	return grouped
+}
+
 type ipPermissionKey struct {
 	protocol string
 	ipRange  string
@@ -670,12 +634,25 @@ type ipPermissionKey struct {
 func permToACLKey(permIntf interface{}) interface{} {
 	perm := permIntf.(*ec2.IpPermission)
 
-	return ipPermissionKey{
-		protocol: resolveString(perm.IpProtocol),
-		ipRange:  resolveString(perm.IpRanges[0].CidrIp),
-		minPort:  int(resolveInt64(perm.FromPort)),
-		maxPort:  int(resolveInt64(perm.ToPort)),
+	key := ipPermissionKey{}
+
+	if perm.FromPort != nil {
+		key.minPort = int(*perm.FromPort)
 	}
+
+	if perm.ToPort != nil {
+		key.maxPort = int(*perm.ToPort)
+	}
+
+	if perm.IpProtocol != nil {
+		key.protocol = *perm.IpProtocol
+	}
+
+	if perm.IpRanges[0].CidrIp != nil {
+		key.ipRange = *perm.IpRanges[0].CidrIp
+	}
+
+	return key
 }
 
 type ipPermSlice []*ec2.IpPermission

@@ -5,7 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/NetSys/quilt/cluster/provider"
+	"github.com/NetSys/quilt/cluster/acl"
+	"github.com/NetSys/quilt/cluster/machine"
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/stitch"
 	"github.com/davecgh/go-spew/spew"
@@ -17,8 +18,8 @@ var amazonCloudConfig = "Amazon Cloud Config"
 var vagrantCloudConfig = "Vagrant Cloud Config"
 
 type providerRequest struct {
-	request  provider.Machine
-	provider provider.Provider
+	request  machine.Machine
+	provider provider
 	boot     bool
 }
 
@@ -28,18 +29,18 @@ type bootRequest struct {
 }
 
 type fakeProvider struct {
-	machines    map[string]provider.Machine
+	machines    map[string]machine.Machine
 	idCounter   int
 	cloudConfig string
 
 	bootRequests []bootRequest
 	stopRequests []string
-	aclRequests  []provider.ACL
+	aclRequests  []acl.ACL
 }
 
 func newFakeProvider(cloudConfig string) *fakeProvider {
 	var ret fakeProvider
-	ret.machines = make(map[string]provider.Machine)
+	ret.machines = make(map[string]machine.Machine)
 	ret.cloudConfig = cloudConfig
 	return &ret
 }
@@ -47,18 +48,18 @@ func newFakeProvider(cloudConfig string) *fakeProvider {
 func (p *fakeProvider) clearLogs() {
 	p.bootRequests = []bootRequest{}
 	p.stopRequests = []string{}
-	p.aclRequests = []provider.ACL{}
+	p.aclRequests = []acl.ACL{}
 }
 
-func (p *fakeProvider) List() ([]provider.Machine, error) {
-	var machines []provider.Machine
+func (p *fakeProvider) List() ([]machine.Machine, error) {
+	var machines []machine.Machine
 	for _, machine := range p.machines {
 		machines = append(machines, machine)
 	}
 	return machines, nil
 }
 
-func (p *fakeProvider) Boot(bootSet []provider.Machine) error {
+func (p *fakeProvider) Boot(bootSet []machine.Machine) error {
 	for _, bootSet := range bootSet {
 		p.idCounter++
 		bootSet.ID = string(p.idCounter)
@@ -70,7 +71,7 @@ func (p *fakeProvider) Boot(bootSet []provider.Machine) error {
 	return nil
 }
 
-func (p *fakeProvider) Stop(machines []provider.Machine) error {
+func (p *fakeProvider) Stop(machines []machine.Machine) error {
 	for _, machine := range machines {
 		delete(p.machines, machine.ID)
 		p.stopRequests = append(p.stopRequests, machine.ID)
@@ -78,7 +79,7 @@ func (p *fakeProvider) Stop(machines []provider.Machine) error {
 	return nil
 }
 
-func (p *fakeProvider) SetACLs(acls []provider.ACL) error {
+func (p *fakeProvider) SetACLs(acls []acl.ACL) error {
 	p.aclRequests = acls
 	return nil
 }
@@ -94,7 +95,7 @@ func newTestCluster() cluster {
 	conn := db.New()
 	clst := cluster{
 		conn:      conn,
-		providers: make(map[db.Provider]provider.Provider),
+		providers: make(map[db.Provider]provider),
 	}
 
 	clst.providers[FakeAmazon] = newFakeProvider(amazonCloudConfig)
@@ -120,9 +121,9 @@ func TestPanicBadProvider(t *testing.T) {
 func TestSyncDB(t *testing.T) {
 	spew := spew.NewDefaultConfig()
 	spew.MaxDepth = 2
-	checkSyncDB := func(cloudMachines []provider.Machine,
+	checkSyncDB := func(cloudMachines []machine.Machine,
 		databaseMachines []db.Machine, expectedBoot,
-		expectedStop []provider.Machine) {
+		expectedStop []machine.Machine) {
 		_, bootResult, stopResult := syncDB(cloudMachines, databaseMachines)
 		if !emptySlices(bootResult, expectedBoot) &&
 			!reflect.DeepEqual(bootResult, expectedBoot) {
@@ -138,35 +139,35 @@ func TestSyncDB(t *testing.T) {
 		}
 	}
 
-	var noMachines []provider.Machine
+	var noMachines []machine.Machine
 	dbNoSize := db.Machine{Provider: FakeAmazon}
-	cmNoSize := provider.Machine{Provider: FakeAmazon}
+	cmNoSize := machine.Machine{Provider: FakeAmazon}
 	dbLarge := db.Machine{Provider: FakeAmazon, Size: "m4.large"}
-	cmLarge := provider.Machine{Provider: FakeAmazon, Size: "m4.large"}
+	cmLarge := machine.Machine{Provider: FakeAmazon, Size: "m4.large"}
 
 	// Test boot with no size
-	checkSyncDB(noMachines, []db.Machine{dbNoSize}, []provider.Machine{cmNoSize},
+	checkSyncDB(noMachines, []db.Machine{dbNoSize}, []machine.Machine{cmNoSize},
 		noMachines)
 
 	// Test boot with size
-	checkSyncDB(noMachines, []db.Machine{dbLarge}, []provider.Machine{cmLarge},
+	checkSyncDB(noMachines, []db.Machine{dbLarge}, []machine.Machine{cmLarge},
 		noMachines)
 
 	// Test mixed boot
-	checkSyncDB(noMachines, []db.Machine{dbNoSize, dbLarge}, []provider.Machine{
+	checkSyncDB(noMachines, []db.Machine{dbNoSize, dbLarge}, []machine.Machine{
 		cmNoSize, cmLarge}, noMachines)
 
 	// Test partial boot
-	checkSyncDB([]provider.Machine{cmNoSize}, []db.Machine{dbNoSize, dbLarge},
-		[]provider.Machine{cmLarge}, noMachines)
+	checkSyncDB([]machine.Machine{cmNoSize}, []db.Machine{dbNoSize, dbLarge},
+		[]machine.Machine{cmLarge}, noMachines)
 
 	// Test stop
-	checkSyncDB([]provider.Machine{cmNoSize}, []db.Machine{}, noMachines,
-		[]provider.Machine{cmNoSize})
+	checkSyncDB([]machine.Machine{cmNoSize}, []db.Machine{}, noMachines,
+		[]machine.Machine{cmNoSize})
 
 	// Test partial stop
-	checkSyncDB([]provider.Machine{cmNoSize, cmLarge}, []db.Machine{}, noMachines,
-		[]provider.Machine{cmNoSize, cmLarge})
+	checkSyncDB([]machine.Machine{cmNoSize, cmLarge}, []db.Machine{}, noMachines,
+		[]machine.Machine{cmNoSize, cmLarge})
 }
 
 func TestSync(t *testing.T) {
@@ -290,7 +291,7 @@ func TestACLs(t *testing.T) {
 		},
 	)
 
-	exp := []provider.ACL{
+	exp := []acl.ACL{
 		{
 			CidrIP:  "admin",
 			MinPort: 1,

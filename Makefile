@@ -1,9 +1,10 @@
 export GO15VENDOREXPERIMENT=1
 PACKAGES=$(shell govendor list -no-status +local)
 NOVENDOR=$(shell find . -path ./specs/**/*/vendor -prune -o -path ./vendor -prune -o -name '*.go' -print)
-LINE_LENGTH_EXCLUDE=./constants/awsConstants.go \
-		    ./constants/gceConstants.go \
-		    ./cluster/provider/cloud_config.go \
+LINE_LENGTH_EXCLUDE=./cluster/machine/amazon.go \
+		    ./cluster/machine/google.go \
+		    ./cluster/cloudcfg/template.go \
+		    ./cluster/amazon/mock_client.go \
 		    ./minion/network/link_test.go \
 		    ./minion/pb/pb.pb.go \
 		    ./api/pb/pb.pb.go \
@@ -69,7 +70,7 @@ generate:
 	govendor generate +local
 
 providers:
-	python3 scripts/gce-descriptions > provider/gceConstants.go
+	python3 scripts/gce-descriptions > cluster/machine/google.go
 
 go-get:
 	go get -v -u \

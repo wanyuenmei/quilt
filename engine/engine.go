@@ -1,7 +1,7 @@
 package engine
 
 import (
-	"github.com/NetSys/quilt/cluster/provider"
+	"github.com/NetSys/quilt/cluster"
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/join"
 	"github.com/NetSys/quilt/stitch"
@@ -108,9 +108,8 @@ func toDBMachine(machines []stitch.Machine, maxPrice float64) []db.Machine {
 		m.Size = stitchm.Size
 
 		if m.Size == "" {
-			providerInst := provider.New(p)
-			m.Size = providerInst.ChooseSize(
-				stitchm.RAM, stitchm.CPU, maxPrice)
+			m.Size = cluster.ChooseSize(p, stitchm.RAM, stitchm.CPU,
+				maxPrice)
 			if m.Size == "" {
 				log.Errorf("No valid size for %v, skipping.", m)
 				continue
@@ -124,7 +123,7 @@ func toDBMachine(machines []stitch.Machine, maxPrice float64) []db.Machine {
 
 		m.SSHKeys = stitchm.SSHKeys
 		m.Region = stitchm.Region
-		dbMachines = append(dbMachines, provider.DefaultRegion(m))
+		dbMachines = append(dbMachines, cluster.DefaultRegion(m))
 	}
 
 	if hasMaster && !hasWorker {

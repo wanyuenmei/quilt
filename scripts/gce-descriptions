@@ -41,8 +41,7 @@ class GCEParser(object):
     # Prints the data to stdout
     def emitData(self, data):
         print("package {}\n".format(self.goPackage))
-        print("// GoogleDescriptions enumerates Google Compute Engine instance offerings")
-        print("var GoogleDescriptions = []Description{")
+        print("var googleDescription = []Description{")
         for row in data:
             print("\t{}".format(self.emitLine(row)))
         print("}")

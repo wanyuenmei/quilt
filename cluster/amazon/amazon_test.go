@@ -1,5 +1,5 @@
-//go:generate mockery -name=EC2Client
-package provider
+//go:generate mockery -inpkg -name=client
+package amazon
 
 import (
 	"encoding/base64"
@@ -12,7 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/NetSys/quilt/cluster/provider/mocks"
+	"github.com/NetSys/quilt/cluster/acl"
+	"github.com/NetSys/quilt/cluster/cloudcfg"
+	"github.com/NetSys/quilt/cluster/machine"
 	"github.com/NetSys/quilt/db"
 )
 
@@ -21,7 +23,7 @@ const testNamespace = "namespace"
 func TestList(t *testing.T) {
 	t.Parallel()
 
-	mockClient := new(mocks.EC2Client)
+	mc := new(mockClient)
 	instances := []*ec2.Instance{
 		// A booted spot instance (with a matching spot tag).
 		{
@@ -44,7 +46,7 @@ func TestList(t *testing.T) {
 			},
 		},
 	}
-	mockClient.On("DescribeInstances", mock.Anything).Return(
+	mc.On("DescribeInstances", mock.Anything).Return(
 		&ec2.DescribeInstancesOutput{
 			Reservations: []*ec2.Reservation{
 				{
@@ -53,7 +55,7 @@ func TestList(t *testing.T) {
 			},
 		}, nil,
 	)
-	mockClient.On("DescribeSpotInstanceRequests", mock.Anything).Return(
+	mc.On("DescribeSpotInstanceRequests", mock.Anything).Return(
 		&ec2.DescribeSpotInstanceRequestsOutput{
 			SpotInstanceRequests: []*ec2.SpotInstanceRequest{
 				// A spot request with tags and a corresponding instance.
@@ -102,7 +104,7 @@ func TestList(t *testing.T) {
 		}, nil,
 	)
 
-	emptyClient := new(mocks.EC2Client)
+	emptyClient := new(mockClient)
 	emptyClient.On("DescribeInstances", mock.Anything).Return(
 		&ec2.DescribeInstancesOutput{}, nil,
 	)
@@ -110,18 +112,18 @@ func TestList(t *testing.T) {
 		&ec2.DescribeSpotInstanceRequestsOutput{}, nil,
 	)
 
-	amazonCluster := newAmazonCluster(func(region string) EC2Client {
+	amazonCluster := newAmazon(testNamespace)
+	amazonCluster.newClient = func(region string) client {
 		if region == "us-west-1" {
-			return mockClient
+			return mc
 		}
 		return emptyClient
-	})
+	}
 
-	amazonCluster.namespace = testNamespace
 	spots, err := amazonCluster.List()
 
 	assert.Nil(t, err)
-	assert.Equal(t, []Machine{
+	assert.Equal(t, []machine.Machine{
 		{
 			ID:        "spot1",
 			Provider:  db.Amazon,
@@ -147,8 +149,8 @@ func TestList(t *testing.T) {
 func TestNewACLs(t *testing.T) {
 	t.Parallel()
 
-	mockClient := new(mocks.EC2Client)
-	mockClient.On("DescribeSecurityGroups", mock.Anything).Return(
+	mc := new(mockClient)
+	mc.On("DescribeSecurityGroups", mock.Anything).Return(
 		&ec2.DescribeSecurityGroupsOutput{
 			SecurityGroups: []*ec2.SecurityGroup{
 				{
@@ -184,19 +186,22 @@ func TestNewACLs(t *testing.T) {
 			},
 		}, nil,
 	)
-	mockClient.On("RevokeSecurityGroupIngress", mock.Anything).Return(
+	mc.On("RevokeSecurityGroupIngress", mock.Anything).Return(
 		&ec2.RevokeSecurityGroupIngressOutput{}, nil,
 	)
-	mockClient.On("AuthorizeSecurityGroupIngress", mock.Anything).Return(
+	mc.On("AuthorizeSecurityGroupIngress", mock.Anything).Return(
 		&ec2.AuthorizeSecurityGroupIngressOutput{}, nil,
 	)
+	mc.On("DescribeInstances", mock.Anything).Return(
+		&ec2.DescribeInstancesOutput{}, nil,
+	)
 
-	cluster := newAmazonCluster(func(region string) EC2Client {
-		return mockClient
-	})
-	cluster.namespace = testNamespace
+	cluster := newAmazon(testNamespace)
+	cluster.newClient = func(region string) client {
+		return mc
+	}
 
-	err := cluster.SetACLs([]ACL{
+	err := cluster.SetACLs([]acl.ACL{
 		{
 			CidrIP:  "foo",
 			MinPort: 1,
@@ -211,7 +216,7 @@ func TestNewACLs(t *testing.T) {
 
 	assert.Nil(t, err)
 
-	mockClient.AssertCalled(t, "RevokeSecurityGroupIngress",
+	mc.AssertCalled(t, "RevokeSecurityGroupIngress",
 		&ec2.RevokeSecurityGroupIngressInput{
 			GroupName: aws.String(testNamespace),
 			IpPermissions: []*ec2.IpPermission{
@@ -227,7 +232,7 @@ func TestNewACLs(t *testing.T) {
 		},
 	)
 
-	mockClient.AssertCalled(t, "AuthorizeSecurityGroupIngress",
+	mc.AssertCalled(t, "AuthorizeSecurityGroupIngress",
 		&ec2.AuthorizeSecurityGroupIngressInput{
 			GroupName:               aws.String(testNamespace),
 			SourceSecurityGroupName: aws.String(testNamespace),
@@ -239,7 +244,7 @@ func TestNewACLs(t *testing.T) {
 	// in a non-deterministic order.
 	var perms []*ec2.IpPermission
 	var foundCall bool
-	for _, call := range mockClient.Calls {
+	for _, call := range mc.Calls {
 		if call.Method == "AuthorizeSecurityGroupIngress" {
 			arg := call.Arguments.Get(0).(*ec2.
 				AuthorizeSecurityGroupIngressInput)
@@ -305,8 +310,8 @@ func TestNewACLs(t *testing.T) {
 func TestBoot(t *testing.T) {
 	t.Parallel()
 
-	mockClient := new(mocks.EC2Client)
-	mockClient.On("DescribeSecurityGroups", mock.Anything).Return(
+	mc := new(mockClient)
+	mc.On("DescribeSecurityGroups", mock.Anything).Return(
 		&ec2.DescribeSecurityGroupsOutput{
 			SecurityGroups: []*ec2.SecurityGroup{
 				{
@@ -315,7 +320,7 @@ func TestBoot(t *testing.T) {
 			},
 		}, nil,
 	)
-	mockClient.On("RequestSpotInstances", mock.Anything).Return(
+	mc.On("RequestSpotInstances", mock.Anything).Return(
 		&ec2.RequestSpotInstancesOutput{
 			SpotInstanceRequests: []*ec2.SpotInstanceRequest{
 				{
@@ -327,13 +332,13 @@ func TestBoot(t *testing.T) {
 			},
 		}, nil,
 	)
-	mockClient.On("CreateTags", mock.Anything).Return(
+	mc.On("CreateTags", mock.Anything).Return(
 		&ec2.CreateTagsOutput{}, nil,
 	)
-	mockClient.On("DescribeInstances", mock.Anything).Return(
+	mc.On("DescribeInstances", mock.Anything).Return(
 		&ec2.DescribeInstancesOutput{}, nil,
 	)
-	mockClient.On("DescribeSpotInstanceRequests", mock.Anything).Return(
+	mc.On("DescribeSpotInstanceRequests", mock.Anything).Return(
 		&ec2.DescribeSpotInstanceRequestsOutput{
 			SpotInstanceRequests: []*ec2.SpotInstanceRequest{
 				{
@@ -360,12 +365,12 @@ func TestBoot(t *testing.T) {
 		}, nil,
 	)
 
-	amazonCluster := newAmazonCluster(func(region string) EC2Client {
-		return mockClient
-	})
-	amazonCluster.namespace = testNamespace
+	amazonCluster := newAmazon(testNamespace)
+	amazonCluster.newClient = func(region string) client {
+		return mc
+	}
 
-	err := amazonCluster.Boot([]Machine{
+	err := amazonCluster.Boot([]machine.Machine{
 		{
 			Region:   "us-west-1",
 			Size:     "m4.large",
@@ -379,8 +384,8 @@ func TestBoot(t *testing.T) {
 	})
 	assert.Nil(t, err)
 
-	cfg := cloudConfigUbuntu(nil, "xenial")
-	mockClient.AssertCalled(t, "RequestSpotInstances",
+	cfg := cloudcfg.Ubuntu(nil, "xenial")
+	mc.AssertCalled(t, "RequestSpotInstances",
 		&ec2.RequestSpotInstancesInput{
 			SpotPrice: aws.String(spotPrice),
 			LaunchSpecification: &ec2.RequestSpotLaunchSpecification{
@@ -395,7 +400,7 @@ func TestBoot(t *testing.T) {
 			InstanceCount: aws.Int64(2),
 		},
 	)
-	mockClient.AssertCalled(t, "CreateTags",
+	mc.AssertCalled(t, "CreateTags",
 		&ec2.CreateTagsInput{
 			Tags: []*ec2.Tag{
 				{
@@ -411,10 +416,10 @@ func TestBoot(t *testing.T) {
 func TestStop(t *testing.T) {
 	t.Parallel()
 
-	mockClient := new(mocks.EC2Client)
+	mc := new(mockClient)
 	toStopIDs := []string{"spot1", "spot2"}
 	// When we're getting information about what machines to stop.
-	mockClient.On("DescribeSpotInstanceRequests",
+	mc.On("DescribeSpotInstanceRequests",
 		&ec2.DescribeSpotInstanceRequestsInput{
 			SpotInstanceRequestIds: aws.StringSlice(toStopIDs),
 		}).Return(
@@ -434,24 +439,25 @@ func TestStop(t *testing.T) {
 		}, nil,
 	)
 	// When we're listing machines to tell if they've stopped.
-	mockClient.On("DescribeSpotInstanceRequests", mock.Anything).Return(
+	mc.On("DescribeSpotInstanceRequests", mock.Anything).Return(
 		&ec2.DescribeSpotInstanceRequestsOutput{}, nil,
 	)
-	mockClient.On("TerminateInstances", mock.Anything).Return(
+	mc.On("TerminateInstances", mock.Anything).Return(
 		&ec2.TerminateInstancesOutput{}, nil,
 	)
-	mockClient.On("CancelSpotInstanceRequests", mock.Anything).Return(
+	mc.On("CancelSpotInstanceRequests", mock.Anything).Return(
 		&ec2.CancelSpotInstanceRequestsOutput{}, nil,
 	)
-	mockClient.On("DescribeInstances", mock.Anything).Return(
+	mc.On("DescribeInstances", mock.Anything).Return(
 		&ec2.DescribeInstancesOutput{}, nil,
 	)
 
-	amazonCluster := newAmazonCluster(func(region string) EC2Client {
-		return mockClient
-	})
+	amazonCluster := newAmazon(testNamespace)
+	amazonCluster.newClient = func(region string) client {
+		return mc
+	}
 
-	err := amazonCluster.Stop([]Machine{
+	err := amazonCluster.Stop([]machine.Machine{
 		{
 			Region: "us-west-1",
 			ID:     toStopIDs[0],
@@ -463,13 +469,13 @@ func TestStop(t *testing.T) {
 	})
 	assert.Nil(t, err)
 
-	mockClient.AssertCalled(t, "TerminateInstances",
+	mc.AssertCalled(t, "TerminateInstances",
 		&ec2.TerminateInstancesInput{
 			InstanceIds: aws.StringSlice([]string{"inst1"}),
 		},
 	)
 
-	mockClient.AssertCalled(t, "CancelSpotInstanceRequests",
+	mc.AssertCalled(t, "CancelSpotInstanceRequests",
 		&ec2.CancelSpotInstanceRequestsInput{
 			SpotInstanceRequestIds: aws.StringSlice(toStopIDs),
 		},
