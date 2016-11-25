@@ -3,8 +3,6 @@ package quiltctl
 import (
 	"flag"
 	"testing"
-
-	"github.com/NetSys/quilt/quiltctl/command"
 )
 
 type testCommand struct {
@@ -43,10 +41,7 @@ func (tCmd *testCommand) Run() int {
 func TestArgumentParsing(t *testing.T) {
 	t.Parallel()
 
-	commands = map[string]command.SubCommand{
-		"testCommand": &testCommand{t: t},
-	}
-	subcommand, err := parseSubcommand("testCommand",
+	subcommand, err := parseSubcommand("test", &testCommand{t: t},
 		[]string{"-arg", expFlagArg, expPosArg})
 	if err != nil {
 		t.Errorf("Unexpected error: %s\n", err.Error())
@@ -54,20 +49,4 @@ func TestArgumentParsing(t *testing.T) {
 	}
 
 	subcommand.Run()
-}
-
-func TestUnknownSubcommand(t *testing.T) {
-	t.Parallel()
-
-	_, err := parseSubcommand("undefinedSubcommand", []string{})
-	expErr := "unrecognized subcommand: undefinedSubcommand"
-	if err == nil {
-		t.Error("No error returned")
-		return
-	}
-
-	if err.Error() != expErr {
-		t.Errorf("Expected error \"%s\", but got \"%s\".", expErr, err.Error())
-		return
-	}
 }

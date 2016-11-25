@@ -2,7 +2,6 @@ package quiltctl
 
 import (
 	"flag"
-	"fmt"
 	"os"
 
 	"github.com/NetSys/quilt/quiltctl/command"
@@ -26,15 +25,11 @@ var commands = map[string]command.SubCommand{
 }
 
 // Run parses and runs the quiltctl subcommand given the command line arguments.
-func Run(args []string) {
-	if len(args) == 0 {
-		usage()
-	}
-
-	cmd, err := parseSubcommand(args[0], args[1:])
+func Run(cmdName string, args []string) {
+	cmd, err := parseSubcommand(cmdName, commands[cmdName], args)
 	if err != nil {
 		log.WithError(err).Error("Unable to parse subcommand.")
-		usage()
+		os.Exit(1)
 	}
 
 	os.Exit(cmd.Run())
@@ -46,12 +41,9 @@ func HasSubcommand(name string) bool {
 	return ok
 }
 
-func parseSubcommand(name string, args []string) (command.SubCommand, error) {
-	if !HasSubcommand(name) {
-		return nil, fmt.Errorf("unrecognized subcommand: %s", name)
-	}
+func parseSubcommand(name string, cmd command.SubCommand, args []string) (
+	command.SubCommand, error) {
 
-	cmd := commands[name]
 	flags := flag.NewFlagSet(name, flag.ExitOnError)
 	cmd.InstallFlags(flags)
 	if err := flags.Parse(args); err != nil {
@@ -65,9 +57,4 @@ func parseSubcommand(name string, args []string) (command.SubCommand, error) {
 	}
 
 	return cmd, nil
-}
-
-func usage() {
-	flag.Usage()
-	os.Exit(1)
 }

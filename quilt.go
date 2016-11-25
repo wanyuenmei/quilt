@@ -72,7 +72,7 @@ func main() {
 
 	subcommand := flag.Arg(0)
 	if quiltctl.HasSubcommand(subcommand) {
-		quiltctl.Run(flag.Args())
+		quiltctl.Run(subcommand, flag.Args()[1:])
 	} else {
 		usage()
 	}
