@@ -16,14 +16,15 @@ func TestSetMinionConfig(t *testing.T) {
 	s := server{db.New()}
 
 	cfg := pb.MinionConfig{
-		Role:      pb.MinionConfig_MASTER,
-		PrivateIP: "priv",
-		Spec:      "spec",
-		Provider:  "provider",
-		Size:      "size",
-		Region:    "region",
+		Role:        pb.MinionConfig_MASTER,
+		PrivateIP:   "priv",
+		Spec:        "spec",
+		Provider:    "provider",
+		Size:        "size",
+		Region:      "region",
+		EtcdMembers: []string{"etcd1", "etcd2"},
 	}
-	exp := db.Minion{
+	expMinion := db.Minion{
 		Self:      true,
 		Spec:      "spec",
 		Role:      db.Master,
@@ -34,14 +35,21 @@ func TestSetMinionConfig(t *testing.T) {
 	}
 	_, err := s.SetMinionConfig(nil, &cfg)
 	assert.NoError(t, err)
-	checkMinionEquals(t, s.Conn, exp)
+	checkMinionEquals(t, s.Conn, expMinion)
+	checkEtcdEquals(t, s.Conn, db.Etcd{
+		EtcdIPs: []string{"etcd1", "etcd2"},
+	})
 
 	// Update a field.
 	cfg.Spec = "new"
-	exp.Spec = "new"
+	expMinion.Spec = "new"
+	cfg.EtcdMembers = []string{"etcd3"}
 	_, err = s.SetMinionConfig(nil, &cfg)
 	assert.NoError(t, err)
-	checkMinionEquals(t, s.Conn, exp)
+	checkMinionEquals(t, s.Conn, expMinion)
+	checkEtcdEquals(t, s.Conn, db.Etcd{
+		EtcdIPs: []string{"etcd3"},
+	})
 }
 
 func checkMinionEquals(t *testing.T, conn db.Conn, exp db.Minion) {
@@ -56,6 +64,28 @@ func checkMinionEquals(t *testing.T, conn db.Conn, exp db.Minion) {
 		select {
 		case <-timeout:
 			t.Errorf("Expected minion to be %v, but got %v\n", exp, actual)
+			return
+		default:
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+}
+
+func checkEtcdEquals(t *testing.T, conn db.Conn, exp db.Etcd) {
+	timeout := time.After(1 * time.Second)
+	var actual db.Etcd
+	for {
+		conn.Transact(func(view db.Database) error {
+			actual, _ = view.GetEtcd()
+			return nil
+		})
+		actual.ID = 0
+		if reflect.DeepEqual(exp, actual) {
+			return
+		}
+		select {
+		case <-timeout:
+			t.Errorf("Expected etcd row to be %v, but got %v\n", exp, actual)
 			return
 		default:
 			time.Sleep(100 * time.Millisecond)
@@ -94,16 +124,21 @@ func TestGetMinionConfig(t *testing.T) {
 		m := view.SelectFromMinion(nil)[0]
 		m.Self = true
 		view.Commit(m)
+
+		etcd := view.InsertEtcd()
+		etcd.EtcdIPs = []string{"etcd1", "etcd2"}
+		view.Commit(etcd)
 		return nil
 	})
 	cfg, err = s.GetMinionConfig(nil, &pb.Request{})
 	assert.NoError(t, err)
 	assert.Equal(t, pb.MinionConfig{
-		Role:      pb.MinionConfig_MASTER,
-		PrivateIP: "priv",
-		Spec:      "spec",
-		Provider:  "provider",
-		Size:      "size",
-		Region:    "region",
+		Role:        pb.MinionConfig_MASTER,
+		PrivateIP:   "priv",
+		Spec:        "spec",
+		Provider:    "provider",
+		Size:        "size",
+		Region:      "region",
+		EtcdMembers: []string{"etcd1", "etcd2"},
 	}, *cfg)
 }

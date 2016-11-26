@@ -54,6 +54,13 @@ func (s server) GetMinionConfig(cts context.Context,
 		cfg.Role = db.RoleToPB(db.None)
 	}
 
+	s.Transact(func(view db.Database) error {
+		if etcdRow, err := view.GetEtcd(); err == nil {
+			cfg.EtcdMembers = etcdRow.EtcdIPs
+		}
+		return nil
+	})
+
 	return &cfg, nil
 }
 
@@ -75,28 +82,13 @@ func (s server) SetMinionConfig(ctx context.Context,
 		minion.Self = true
 		view.Commit(minion)
 
-		return nil
-	})
-
-	return &pb.Reply{}, nil
-}
-
-func (s server) BootEtcd(ctx context.Context,
-	members *pb.EtcdMembers) (*pb.Reply, error) {
-	go s.Transact(func(view db.Database) error {
-		etcdSlice := view.SelectFromEtcd(nil)
-		var etcdRow db.Etcd
-		switch len(etcdSlice) {
-		case 0:
+		etcdRow, err := view.GetEtcd()
+		if err != nil {
 			log.Info("Received boot etcd request.")
 			etcdRow = view.InsertEtcd()
-		case 1:
-			etcdRow = etcdSlice[0]
-		default:
-			panic("Not Reached")
 		}
 
-		etcdRow.EtcdIPs = members.IPs
+		etcdRow.EtcdIPs = msg.EtcdMembers
 		sort.Strings(etcdRow.EtcdIPs)
 		view.Commit(etcdRow)
 

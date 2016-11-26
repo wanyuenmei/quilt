@@ -3,9 +3,11 @@ package cluster
 import (
 	"testing"
 
+	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/minion/pb"
-	"github.com/davecgh/go-spew/spew"
 )
 
 type clients struct {
@@ -120,6 +122,54 @@ func TestBoot(t *testing.T) {
 	}
 }
 
+func TestBootEtcd(t *testing.T) {
+	fm, clients := startTest()
+	fm.conn.Transact(func(view db.Database) error {
+		m := view.InsertMachine()
+		m.Role = db.Master
+		m.PublicIP = "m1-pub"
+		m.PrivateIP = "m1-priv"
+		m.CloudID = "ignored"
+		view.Commit(m)
+
+		m = view.InsertMachine()
+		m.Role = db.Worker
+		m.PublicIP = "w1-pub"
+		m.PrivateIP = "w1-priv"
+		m.CloudID = "ignored"
+		view.Commit(m)
+		return nil
+	})
+	fm.runOnce()
+	assert.Equal(t, []string{"m1-priv"}, clients.clients["w1-pub"].mc.EtcdMembers)
+
+	fm.conn.Transact(func(view db.Database) error {
+		m := view.InsertMachine()
+		m.Role = db.Master
+		m.PublicIP = "m2-pub"
+		m.PrivateIP = "m2-priv"
+		m.CloudID = "ignored"
+		view.Commit(m)
+		return nil
+	})
+	fm.runOnce()
+	etcdMembers := clients.clients["w1-pub"].mc.EtcdMembers
+	assert.Len(t, etcdMembers, 2)
+	assert.Contains(t, etcdMembers, "m1-priv")
+	assert.Contains(t, etcdMembers, "m2-priv")
+
+	fm.conn.Transact(func(view db.Database) error {
+		var toDelete = view.SelectFromMachine(func(m db.Machine) bool {
+			return m.PrivateIP == "m1-priv"
+		})[0]
+		view.Remove(toDelete)
+		return nil
+	})
+	fm.runOnce()
+	assert.Equal(t, []string{"m2-priv"},
+		clients.clients["w1-pub"].mc.EtcdMembers)
+}
+
 func TestInitForeman(t *testing.T) {
 	fm := startTestWithRole(pb.MinionConfig_WORKER)
 	fm.conn.Transact(func(view db.Database) error {
@@ -195,9 +245,9 @@ func TestConfigConsistency(t *testing.T) {
 	// Insert the clients into the client list to simulate fetching
 	// from the remote cluster
 	clients.clients["1.1.1.1"] = &fakeClient{clients, "1.1.1.1",
-		pb.MinionConfig{Role: masterRole}, pb.EtcdMembers{}}
+		pb.MinionConfig{Role: masterRole}}
 	clients.clients["2.2.2.2"] = &fakeClient{clients, "2.2.2.2",
-		pb.MinionConfig{Role: workerRole}, pb.EtcdMembers{}}
+		pb.MinionConfig{Role: workerRole}}
 
 	newfm.init()
 	newfm.runOnce()
@@ -233,7 +283,7 @@ func startTest() (foreman, *clients) {
 		if fc, ok := clients.clients[ip]; ok {
 			return fc, nil
 		}
-		fc := &fakeClient{clients, ip, pb.MinionConfig{}, pb.EtcdMembers{}}
+		fc := &fakeClient{clients, ip, pb.MinionConfig{}}
 		clients.clients[ip] = fc
 		clients.newCalls++
 		return fc, nil
@@ -245,8 +295,7 @@ func startTestWithRole(role pb.MinionConfig_Role) foreman {
 	fm := createForeman(db.New())
 	clientInst := &clients{make(map[string]*fakeClient), 0}
 	fm.newClient = func(ip string) (client, error) {
-		fc := &fakeClient{clientInst, ip, pb.MinionConfig{Role: role},
-			pb.EtcdMembers{}}
+		fc := &fakeClient{clientInst, ip, pb.MinionConfig{Role: role}}
 		clientInst.clients[ip] = fc
 		clientInst.newCalls++
 		return fc, nil
@@ -255,19 +304,13 @@ func startTestWithRole(role pb.MinionConfig_Role) foreman {
 }
 
 type fakeClient struct {
-	clients     *clients
-	ip          string
-	mc          pb.MinionConfig
-	etcdMembers pb.EtcdMembers
+	clients *clients
+	ip      string
+	mc      pb.MinionConfig
 }
 
 func (fc *fakeClient) setMinion(mc pb.MinionConfig) error {
 	fc.mc = mc
-	return nil
-}
-
-func (fc *fakeClient) bootEtcd(etcdMembers pb.EtcdMembers) error {
-	fc.etcdMembers = etcdMembers
 	return nil
 }
 

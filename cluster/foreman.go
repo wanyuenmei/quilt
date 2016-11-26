@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -18,7 +19,6 @@ import (
 type client interface {
 	setMinion(pb.MinionConfig) error
 	getMinion() (pb.MinionConfig, error)
-	bootEtcd(pb.EtcdMembers) error
 	Close()
 }
 
@@ -137,25 +137,22 @@ func (fm *foreman) runOnce() {
 		}
 
 		newConfig := pb.MinionConfig{
-			Role:      db.RoleToPB(m.machine.Role),
-			PrivateIP: m.machine.PrivateIP,
-			Spec:      fm.spec,
-			Provider:  string(m.machine.Provider),
-			Size:      m.machine.Size,
-			Region:    m.machine.Region,
+			Role:        db.RoleToPB(m.machine.Role),
+			PrivateIP:   m.machine.PrivateIP,
+			Spec:        fm.spec,
+			Provider:    string(m.machine.Provider),
+			Size:        m.machine.Size,
+			Region:      m.machine.Region,
+			EtcdMembers: etcdIPs,
 		}
 
-		if newConfig == m.config {
+		if reflect.DeepEqual(newConfig, m.config) {
 			return
 		}
 
 		if err := m.client.setMinion(newConfig); err != nil {
 			log.WithError(err).Error("Failed to set minion config.")
 			return
-		}
-
-		if err := m.client.bootEtcd(pb.EtcdMembers{IPs: etcdIPs}); err != nil {
-			log.WithError(err).Warn("Failed send etcd members.")
 		}
 	})
 }
@@ -224,12 +221,6 @@ func (c clientImpl) getMinion() (pb.MinionConfig, error) {
 func (c clientImpl) setMinion(cfg pb.MinionConfig) error {
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 	_, err := c.SetMinionConfig(ctx, &cfg)
-	return err
-}
-
-func (c clientImpl) bootEtcd(members pb.EtcdMembers) error {
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-	_, err := c.BootEtcd(ctx, &members)
 	return err
 }
 

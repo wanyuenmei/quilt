@@ -1,5 +1,9 @@
 package db
 
+import (
+	"errors"
+)
+
 // The Etcd table contains configuration pertaining to the minion etcd cluster including
 // the members and leadership information.
 type Etcd struct {
@@ -66,4 +70,18 @@ func (conn Conn) SelectFromEtcd(check func(Etcd) bool) []Etcd {
 
 func (e Etcd) less(r row) bool {
 	return e.ID < r.(Minion).ID
+}
+
+// GetEtcd gets the Etcd row from the database. There should only ever be a single
+// Etcd row.
+func (db Database) GetEtcd() (Etcd, error) {
+	etcdSlice := db.SelectFromEtcd(nil)
+	switch len(etcdSlice) {
+	case 0:
+		return Etcd{}, errors.New("no etcd row")
+	case 1:
+		return etcdSlice[0], nil
+	default:
+		panic("multiple etcd rows")
+	}
 }
