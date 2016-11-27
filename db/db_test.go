@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMachine(t *testing.T) {
@@ -302,6 +303,25 @@ func TestSortContainers(t *testing.T) {
 	if !reflect.DeepEqual(SortContainers(containers), expected) {
 		t.Errorf("Bad Container Sort: expected %q, got %q", expected, containers)
 	}
+}
+
+func TestGetClusterNamespace(t *testing.T) {
+	conn := New()
+
+	ns, err := conn.GetClusterNamespace()
+	assert.NotNil(t, err)
+	assert.Exactly(t, ns, "")
+
+	conn.Transact(func(view Database) error {
+		clst := view.InsertCluster()
+		clst.Namespace = "test"
+		view.Commit(clst)
+		return nil
+	})
+
+	ns, err = conn.GetClusterNamespace()
+	assert.NoError(t, err)
+	assert.Exactly(t, ns, "test")
 }
 
 type mSort []Machine

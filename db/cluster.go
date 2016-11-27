@@ -44,6 +44,26 @@ func (db Database) GetCluster() (Cluster, error) {
 	return Cluster{}, errors.New("no clusters found")
 }
 
+// GetClusterNamespace returns the namespace of the single cluster object in the cluster
+// table.  Otherwise it returns an error.
+func (db Database) GetClusterNamespace() (string, error) {
+	clst, err := db.GetCluster()
+	if err != nil {
+		return "", err
+	}
+	return clst.Namespace, nil
+}
+
+// GetClusterNamespace returns the namespace of the single cluster object in the cluster
+// table.  Otherwise it returns an error.
+func (conn Conn) GetClusterNamespace() (namespace string, err error) {
+	conn.Transact(func(db Database) error {
+		namespace, err = db.GetClusterNamespace()
+		return nil
+	})
+	return
+}
+
 func (c Cluster) getID() int {
 	return c.ID
 }
