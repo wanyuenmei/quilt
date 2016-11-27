@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"errors"
 	"time"
 
 	"github.com/NetSys/quilt/cluster/acl"
@@ -98,39 +99,34 @@ func (clst *cluster) stop() {
 func (clst cluster) runOnce() {
 	/* Each iteration of this loop does the following:
 	 *
-	 * - Get the current set of machines from the cloud provider.
+	 * - Get the current set of machines and ACLs from the cloud provider.
 	 * - Get the current policy from the database.
 	 * - Compute a diff.
 	 * - Update the cloud provider accordingly.
 	 *
 	 * Updating the cloud provider may have consequences (creating machines for
 	 * instances) that should be reflected in the database.  Therefore, if updates
-	 * are necessary the code loops so that database can be updated before
-	 * the next runOnce() call. */
+	 * are necessary the code loops so that database can be updated before the next
+	 * runOnce() call.  Once the loop as converged, it then updates the cluster ACLs
+	 * before finally exiting. */
 	for i := 0; i < 2; i++ {
-		bootSet, terminateSet := clst.syncMachines()
-		if len(bootSet) == 0 && len(terminateSet) == 0 {
-			break
+		jr, err := clst.join()
+		if err != nil {
+			return
 		}
-		clst.updateCloud(bootSet, true)
-		clst.updateCloud(terminateSet, false)
-	}
 
-	// ACLs must be processed after Quilt learns about what machines are in
-	// the cloud.  If we didn't, inter-machine ACLs could get removed
-	// when the Quilt controller restarts, even if there are running cloud
-	// machines that still need to communicate.
-	var adminACLs []string
-	var appACLs []db.PortRange
-	var machines []db.Machine
-	clst.conn.Transact(func(view db.Database) error {
-		machines = view.SelectFromMachine(nil)
-		aclRow, _ := view.GetACL()
-		adminACLs = aclRow.Admin
-		appACLs = aclRow.ApplicationPorts
-		return nil
-	})
-	clst.syncACLs(adminACLs, appACLs, machines)
+		if len(jr.boot) == 0 && len(jr.terminate) == 0 {
+			// ACLs must be processed after Quilt learns about what machines
+			// are in the cloud.  If we didn't, inter-machine ACLs could get
+			// removed when the Quilt controller restarts, even if there are
+			// running cloud machines that still need to communicate.
+			clst.syncACLs(jr.acl.Admin, jr.acl.ApplicationPorts, jr.machines)
+			return
+		}
+
+		clst.updateCloud(jr.boot, true)
+		clst.updateCloud(jr.terminate, false)
+	}
 }
 
 func (clst cluster) updateCloud(machines []machine.Machine, boot bool) {
@@ -176,18 +172,45 @@ func (clst cluster) updateCloud(machines []machine.Machine, boot bool) {
 	}
 }
 
-func (clst cluster) syncMachines() (bootSet, terminateSet []machine.Machine) {
+type joinResult struct {
+	machines []db.Machine
+	acl      db.ACL
+
+	boot      []machine.Machine
+	terminate []machine.Machine
+}
+
+func (clst cluster) join() (joinResult, error) {
+	res := joinResult{}
+
 	cloudMachines, err := clst.get()
 	if err != nil {
-		log.WithError(err).Error("Failed to list machines.")
-		return
+		log.WithError(err).Error("Failed to list machines")
+		return res, err
 	}
 
-	clst.conn.Transact(func(view db.Database) error {
-		dbMachines := view.SelectFromMachine(nil)
+	err = clst.conn.Transact(func(view db.Database) error {
+		namespace, err := view.GetClusterNamespace()
+		if err != nil {
+			log.WithError(err).Error("Failed to get namespace")
+			return err
+		}
+
+		if clst.namespace != namespace {
+			err := errors.New("namespace change during a cluster run")
+			log.WithError(err).Debug("Cluster run abort")
+			return err
+		}
+
+		res.acl, err = view.GetACL()
+		if err != nil {
+			log.WithError(err).Error("Failed to get ACLs")
+		}
+
+		res.machines = view.SelectFromMachine(nil)
 
 		var pairs []join.Pair
-		pairs, bootSet, terminateSet = syncDB(cloudMachines, dbMachines)
+		pairs, res.boot, res.terminate = syncDB(cloudMachines, res.machines)
 		for _, pair := range pairs {
 			dbm := pair.L.(db.Machine)
 			m := pair.R.(machine.Machine)
@@ -196,9 +219,13 @@ func (clst cluster) syncMachines() (bootSet, terminateSet []machine.Machine) {
 			dbm.PublicIP = m.PublicIP
 			dbm.PrivateIP = m.PrivateIP
 
-			// If we overwrite the machine's size before the machine
-			// has fully booted, the Stitch will flip it back
-			// immediately.
+			// We just booted the machine, can't possibly be connected.
+			if dbm.PublicIP == "" {
+				dbm.Connected = false
+			}
+
+			// If we overwrite the machine's size before the machine has
+			// fully booted, the Stitch will flip it back immediately.
 			if m.Size != "" {
 				dbm.Size = m.Size
 			}
@@ -211,8 +238,7 @@ func (clst cluster) syncMachines() (bootSet, terminateSet []machine.Machine) {
 		}
 		return nil
 	})
-
-	return bootSet, terminateSet
+	return res, err
 }
 
 func (clst cluster) syncACLs(adminACLs []string, appACLs []db.PortRange,

@@ -102,10 +102,10 @@ func (p *fakeProvider) ChooseSize(ram stitch.Range, cpu stitch.Range,
 	return ""
 }
 
-func newTestCluster() *cluster {
+func newTestCluster(namespace string) *cluster {
 	sleep = func(t time.Duration) {}
 	mock()
-	return newCluster(db.New(), "namespace")
+	return newCluster(db.New(), namespace)
 }
 
 func TestPanicBadProvider(t *testing.T) {
@@ -174,13 +174,16 @@ func TestSync(t *testing.T) {
 
 	noBoots := []bootRequest{}
 	noStops := []string{}
+
 	amazonLargeBoot := bootRequest{size: "m4.large", cloudConfig: amazonCloudConfig}
-	amazonXLargeBoot := bootRequest{size: "m4.xlarge", cloudConfig: amazonCloudConfig}
+	amazonXLargeBoot := bootRequest{size: "m4.xlarge",
+		cloudConfig: amazonCloudConfig}
 	vagrantLargeBoot := bootRequest{size: "vagrant.large",
 		cloudConfig: vagrantCloudConfig}
 
 	// Test initial boot
-	clst := newTestCluster()
+	clst := newTestCluster("ns")
+	setNamespace(clst.conn, "ns")
 	clst.conn.Transact(func(view db.Database) error {
 		m := view.InsertMachine()
 		m.Role = db.Master
@@ -251,7 +254,7 @@ func TestACLs(t *testing.T) {
 		return "5.6.7.8", nil
 	}
 
-	clst := newTestCluster()
+	clst := newTestCluster("ns")
 	clst.syncACLs([]string{"admin"},
 		[]db.PortRange{
 			{
