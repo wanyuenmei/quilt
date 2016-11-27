@@ -28,11 +28,9 @@ type provider interface {
 var allProviders = []db.Provider{db.Amazon, db.Google, db.Vagrant}
 
 type cluster struct {
-	conn    db.Conn
-	trigger db.Trigger
-	fm      foreman
-
 	namespace string
+	conn      db.Conn
+	fm        foreman
 	providers map[db.Provider]provider
 }
 
@@ -43,32 +41,41 @@ var sleep = time.Sleep
 // needed.
 func Run(conn db.Conn) {
 	var clst *cluster
-	for range conn.TriggerTick(60, db.ClusterTable).C {
-		namespace, err := conn.GetClusterNamespace()
-		if err != nil {
-			continue
-		}
+	for range conn.TriggerTick(30, db.ClusterTable, db.MachineTable, db.ACLTable).C {
+		clst = updateCluster(conn, clst)
 
-		if clst == nil {
-			clst = newCluster(conn, namespace)
-		}
-
-		if clst != nil && clst.namespace != namespace {
-			clst.fm.stop()
-			clst.trigger.Stop()
-			clst = newCluster(conn, namespace)
-		}
+		// Somewhat of a crude rate-limit of once every five seconds to avoid
+		// stressing out the cloud providers with too many API calls.
+		sleep(5 * time.Second)
 	}
+}
+
+func updateCluster(conn db.Conn, clst *cluster) *cluster {
+	namespace, err := conn.GetClusterNamespace()
+	if err != nil {
+		return clst
+	}
+
+	if clst == nil || clst.namespace != namespace {
+		if clst != nil {
+			clst.stop()
+		}
+		clst = newCluster(conn, namespace)
+		clst.runOnce()
+		clst.fm.init()
+	}
+
+	clst.runOnce()
+	clst.fm.runOnce()
+
+	return clst
 }
 
 func newCluster(conn db.Conn, namespace string) *cluster {
 	clst := &cluster{
-		conn: conn,
-		trigger: conn.TriggerTick(30, db.ClusterTable, db.MachineTable,
-			db.ACLTable),
-
-		fm:        createForeman(conn),
 		namespace: namespace,
+		conn:      conn,
+		fm:        createForeman(conn),
 		providers: make(map[db.Provider]provider),
 	}
 
@@ -81,21 +88,14 @@ func newCluster(conn db.Conn, namespace string) *cluster {
 		}
 	}
 
-	go clst.listen()
 	return clst
 }
 
-func (clst *cluster) listen() {
-	clst.sync()
-	clst.fm.init()
-	for range clst.trigger.C {
-		clst.fm.runOnce()
-		clst.sync()
-		time.Sleep(5 * time.Second)
-	}
+func (clst *cluster) stop() {
+	clst.fm.stop()
 }
 
-func (clst cluster) sync() {
+func (clst cluster) runOnce() {
 	/* Each iteration of this loop does the following:
 	 *
 	 * - Get the current set of machines from the cloud provider.
@@ -106,7 +106,7 @@ func (clst cluster) sync() {
 	 * Updating the cloud provider may have consequences (creating machines for
 	 * instances) that should be reflected in the database.  Therefore, if updates
 	 * are necessary the code loops so that database can be updated before
-	 * the next sync() call. */
+	 * the next runOnce() call. */
 	for i := 0; i < 2; i++ {
 		bootSet, terminateSet := clst.syncMachines()
 		if len(bootSet) == 0 && len(terminateSet) == 0 {
@@ -340,7 +340,7 @@ func groupBy(machines []machine.Machine) map[db.Provider][]machine.Machine {
 	return machineMap
 }
 
-func newProvider(p db.Provider, namespace string) (provider, error) {
+func newProviderImpl(p db.Provider, namespace string) (provider, error) {
 	switch p {
 	case db.Amazon:
 		return amazon.New(namespace)
@@ -352,3 +352,6 @@ func newProvider(p db.Provider, namespace string) (provider, error) {
 		panic("Unimplemented")
 	}
 }
+
+// Stored in a variable so it may be mocked out
+var newProvider = newProviderImpl

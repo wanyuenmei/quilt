@@ -28,6 +28,7 @@ type bootRequest struct {
 }
 
 type fakeProvider struct {
+	namespace   string
 	machines    map[string]machine.Machine
 	idCounter   int
 	cloudConfig string
@@ -37,12 +38,22 @@ type fakeProvider struct {
 	aclRequests  []acl.ACL
 }
 
-func newFakeProvider(cloudConfig string) *fakeProvider {
+func newFakeProvider(p db.Provider, namespace string) (provider, error) {
 	var ret fakeProvider
+	ret.namespace = namespace
 	ret.machines = make(map[string]machine.Machine)
-	ret.cloudConfig = cloudConfig
 	ret.clearLogs()
-	return &ret
+
+	switch p {
+	case FakeAmazon:
+		ret.cloudConfig = amazonCloudConfig
+	case FakeVagrant:
+		ret.cloudConfig = vagrantCloudConfig
+	default:
+		panic("Unreached")
+	}
+
+	return &ret, nil
 }
 
 func (p *fakeProvider) clearLogs() {
@@ -91,18 +102,10 @@ func (p *fakeProvider) ChooseSize(ram stitch.Range, cpu stitch.Range,
 	return ""
 }
 
-func newTestCluster() cluster {
-	conn := db.New()
-	clst := cluster{
-		conn:      conn,
-		providers: make(map[db.Provider]provider),
-	}
-
-	clst.providers[FakeAmazon] = newFakeProvider(amazonCloudConfig)
-	clst.providers[FakeVagrant] = newFakeProvider(vagrantCloudConfig)
-
+func newTestCluster() *cluster {
 	sleep = func(t time.Duration) {}
-	return clst
+	mock()
+	return newCluster(db.New(), "namespace")
 }
 
 func TestPanicBadProvider(t *testing.T) {
@@ -158,9 +161,9 @@ func TestSyncDB(t *testing.T) {
 }
 
 func TestSync(t *testing.T) {
-	checkSync := func(clst cluster, provider db.Provider, expectedBoot []bootRequest,
-		expectedStop []string) {
-		clst.sync()
+	checkSync := func(clst *cluster, provider db.Provider,
+		expectedBoot []bootRequest, expectedStop []string) {
+		clst.runOnce()
 		providerInst := clst.providers[provider].(*fakeProvider)
 		bootResult := providerInst.bootRequests
 		stopResult := providerInst.stopRequests
@@ -289,4 +292,89 @@ func TestACLs(t *testing.T) {
 	}
 	actual := clst.providers[FakeAmazon].(*fakeProvider).aclRequests
 	assert.Equal(t, exp, actual)
+}
+
+func TestUpdateCluster(t *testing.T) {
+	conn := db.New()
+
+	clst := updateCluster(conn, nil)
+	assert.Nil(t, clst)
+
+	setNamespace(conn, "ns1")
+	clst = updateCluster(conn, clst)
+	assert.NotNil(t, clst)
+	assert.Equal(t, "ns1", clst.namespace)
+
+	amzn := clst.providers[FakeAmazon].(*fakeProvider)
+	assert.Empty(t, amzn.bootRequests)
+	assert.Empty(t, amzn.stopRequests)
+	assert.Equal(t, "ns1", amzn.namespace)
+
+	conn.Transact(func(view db.Database) error {
+		m := view.InsertMachine()
+		m.Provider = FakeAmazon
+		m.Size = "size1"
+		view.Commit(m)
+		return nil
+	})
+
+	oldClst := clst
+	oldAmzn := amzn
+
+	clst = updateCluster(conn, clst)
+	assert.NotNil(t, clst)
+
+	// Pointers shouldn't have changed
+	amzn = clst.providers[FakeAmazon].(*fakeProvider)
+	assert.True(t, oldClst == clst)
+	assert.True(t, oldAmzn == amzn)
+
+	assert.Empty(t, amzn.stopRequests)
+	assert.Equal(t, []bootRequest{{"size1", amazonCloudConfig}}, amzn.bootRequests)
+	assert.Equal(t, "ns1", amzn.namespace)
+	amzn.clearLogs()
+
+	conn.Transact(func(view db.Database) error {
+		dbms := view.SelectFromMachine(nil)
+		dbms[0].Size = "size2"
+		view.Commit(dbms[0])
+		return nil
+	})
+
+	oldClst = clst
+	oldAmzn = amzn
+	setNamespace(conn, "ns2")
+	clst = updateCluster(conn, clst)
+	assert.NotNil(t, clst)
+
+	// Pointers should have changed
+	amzn = clst.providers[FakeAmazon].(*fakeProvider)
+	assert.True(t, oldClst != clst)
+	assert.True(t, oldAmzn != amzn)
+
+	assert.Equal(t, "ns1", oldAmzn.namespace)
+	assert.Empty(t, oldAmzn.bootRequests)
+	assert.Empty(t, oldAmzn.stopRequests)
+
+	assert.Equal(t, "ns2", amzn.namespace)
+	assert.Equal(t, []bootRequest{{"size2", amazonCloudConfig}}, amzn.bootRequests)
+	assert.Empty(t, amzn.stopRequests)
+}
+
+func setNamespace(conn db.Conn, ns string) {
+	conn.Transact(func(view db.Database) error {
+		clst, err := view.GetCluster()
+		if err != nil {
+			clst = view.InsertCluster()
+		}
+
+		clst.Namespace = ns
+		view.Commit(clst)
+		return nil
+	})
+}
+
+func mock() {
+	newProvider = newFakeProvider
+	allProviders = []db.Provider{FakeAmazon, FakeVagrant}
 }

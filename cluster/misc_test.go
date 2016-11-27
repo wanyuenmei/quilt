@@ -49,26 +49,13 @@ func TestDefaultRegion(t *testing.T) {
 	m = DefaultRegion(m)
 }
 
-func TestNewProviderSuccess(t *testing.T) {
-	defer func() {
-		if r := recover(); r != nil {
-			t.Error("provider.New panicked on valid provider")
-		}
-	}()
-
-	// XXX: We should also try db.Google and db.Vagrant, but both of those access the
-	// network and/or the local filesystem.  We could fix it, but it's only two lines
-	// of coverage.
-	newProvider(db.Amazon, "namespace")
-}
-
 func TestNewProviderFailure(t *testing.T) {
 	defer func() {
 		if r := recover(); r == nil {
 			t.Error("provider.New did not panic on invalid provider")
 		}
 	}()
-	newProvider("FakeAmazon", "namespace")
+	newProviderImpl("FakeAmazon", "namespace")
 }
 
 func TestGroupBy(t *testing.T) {
