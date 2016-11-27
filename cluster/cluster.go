@@ -100,16 +100,42 @@ func (clst *cluster) listen() {
 	}
 }
 
-func (clst cluster) get() ([]machine.Machine, error) {
-	var cloudMachines []machine.Machine
-	for _, p := range clst.providers {
-		providerMachines, err := p.List()
-		if err != nil {
-			return []machine.Machine{}, err
+func (clst cluster) sync() {
+	/* Each iteration of this loop does the following:
+	 *
+	 * - Get the current set of machines from the cloud provider.
+	 * - Get the current policy from the database.
+	 * - Compute a diff.
+	 * - Update the cloud provider accordingly.
+	 *
+	 * Updating the cloud provider may have consequences (creating machines for
+	 * instances) that should be reflected in the database.  Therefore, if updates
+	 * are necessary the code loops so that database can be updated before
+	 * the next sync() call. */
+	for i := 0; i < 2; i++ {
+		bootSet, terminateSet := clst.syncMachines()
+		if len(bootSet) == 0 && len(terminateSet) == 0 {
+			break
 		}
-		cloudMachines = append(cloudMachines, providerMachines...)
+		clst.updateCloud(bootSet, true)
+		clst.updateCloud(terminateSet, false)
 	}
-	return cloudMachines, nil
+
+	// ACLs must be processed after Quilt learns about what machines are in
+	// the cloud.  If we didn't, inter-machine ACLs could get removed
+	// when the Quilt controller restarts, even if there are running cloud
+	// machines that still need to communicate.
+	var adminACLs []string
+	var appACLs []db.PortRange
+	var machines []db.Machine
+	clst.conn.Transact(func(view db.Database) error {
+		machines = view.SelectFromMachine(nil)
+		aclRow, _ := view.GetACL()
+		adminACLs = aclRow.Admin
+		appACLs = aclRow.ApplicationPorts
+		return nil
+	})
+	clst.syncACLs(adminACLs, appACLs, machines)
 }
 
 func (clst cluster) updateCloud(machines []machine.Machine, boot bool) {
@@ -153,44 +179,6 @@ func (clst cluster) updateCloud(machines []machine.Machine, boot bool) {
 		log.Infof("Due to failures, sleeping for 1 minute")
 		sleep(60 * time.Second)
 	}
-}
-
-func (clst cluster) sync() {
-	/* Each iteration of this loop does the following:
-	 *
-	 * - Get the current set of machines from the cloud provider.
-	 * - Get the current policy from the database.
-	 * - Compute a diff.
-	 * - Update the cloud provider accordingly.
-	 *
-	 * Updating the cloud provider may have consequences (creating machines for
-	 * instances) that should be reflected in the database.  Therefore, if updates
-	 * are necessary the code loops so that database can be updated before
-	 * the next sync() call. */
-	for i := 0; i < 2; i++ {
-		bootSet, terminateSet := clst.syncMachines()
-		if len(bootSet) == 0 && len(terminateSet) == 0 {
-			break
-		}
-		clst.updateCloud(bootSet, true)
-		clst.updateCloud(terminateSet, false)
-	}
-
-	// ACLs must be processed after Quilt learns about what machines are in
-	// the cloud.  If we didn't, inter-machine ACLs could get removed
-	// when the Quilt controller restarts, even if there are running cloud
-	// machines that still need to communicate.
-	var adminACLs []string
-	var appACLs []db.PortRange
-	var machines []db.Machine
-	clst.conn.Transact(func(view db.Database) error {
-		machines = view.SelectFromMachine(nil)
-		aclRow, _ := view.GetACL()
-		adminACLs = aclRow.Admin
-		appACLs = aclRow.ApplicationPorts
-		return nil
-	})
-	clst.syncACLs(adminACLs, appACLs, machines)
 }
 
 func (clst cluster) syncMachines() (bootSet, terminateSet []machine.Machine) {
@@ -331,6 +319,18 @@ func syncDB(cloudMachines []machine.Machine, dbMachines []db.Machine) (
 	}
 
 	return pairs, bootSet, terminateSet
+}
+
+func (clst cluster) get() ([]machine.Machine, error) {
+	var cloudMachines []machine.Machine
+	for _, p := range clst.providers {
+		providerMachines, err := p.List()
+		if err != nil {
+			return []machine.Machine{}, err
+		}
+		cloudMachines = append(cloudMachines, providerMachines...)
+	}
+	return cloudMachines, nil
 }
 
 func groupBy(machines []machine.Machine) map[db.Provider][]machine.Machine {
