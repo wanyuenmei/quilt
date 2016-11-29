@@ -151,6 +151,10 @@ func (t tester) run() error {
 
 	if err := t.setup(); err != nil {
 		log.testerLogger.errorln("Unable to setup the tests, bailing.")
+		// All suites failed if we didn't run them.
+		for _, suite := range t.testSuites {
+			suite.failed = 1
+		}
 		t.slack(false)
 		return err
 	}
