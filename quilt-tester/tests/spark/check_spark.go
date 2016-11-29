@@ -18,7 +18,7 @@ func main() {
 	fmt.Println("`quilt containers` output:")
 	fmt.Println(string(containers))
 
-	matches := regexp.MustCompile(`.* run master.* StitchID: (\d+)`).
+	matches := regexp.MustCompile(`(\d+) .*run master.*`).
 		FindStringSubmatch(string(containers))
 	if len(matches) != 2 {
 		log.Fatal("Unable to find StitchID of Spark master.")
