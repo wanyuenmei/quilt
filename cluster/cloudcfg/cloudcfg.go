@@ -2,8 +2,8 @@ package cloudcfg
 
 import (
 	"bytes"
-	"html/template"
 	"strings"
+	"text/template"
 )
 
 const (
