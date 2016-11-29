@@ -40,7 +40,9 @@ initialize_docker() {
 }
 
 initialize_minion() {
-	cat <<- EOF > /etc/systemd/system/minion.service [Unit] Description=Quilt Minion
+	cat <<- EOF > /etc/systemd/system/minion.service
+	[Unit]
+	Description=Quilt Minion
 	After=docker.service
 	Requires=docker.service
 
