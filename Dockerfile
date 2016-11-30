@@ -6,5 +6,6 @@ RUN mkdir -p /var/run/netns \
 && apt-get install -y --no-install-recommends iproute2 iptables \
 && rm -rf /var/lib/apt/lists/*
 
+Copy ./buildinfo /buildinfo
 Copy ./quilt /usr/local/bin/quilt
 ENTRYPOINT []

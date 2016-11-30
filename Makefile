@@ -94,7 +94,8 @@ tests:
 	done
 
 docker-build-quilt:
-	cd -P . && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build . \
+	cd -P . && git show --pretty=medium --no-patch > buildinfo \
+		&& CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build . \
 	    && ${DOCKER} build -t ${REPO}/quilt .
 
 docker-build-tester: tests

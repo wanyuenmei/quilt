@@ -32,3 +32,4 @@ quilt
 *.pdf
 
 scripts/format
+buildinfo
