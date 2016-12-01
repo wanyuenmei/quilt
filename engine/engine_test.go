@@ -2,20 +2,15 @@ package engine
 
 import (
 	"errors"
-	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/join"
 	"github.com/NetSys/quilt/stitch"
-	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestEngine(t *testing.T) {
-	spew := spew.NewDefaultConfig()
-	spew.MaxDepth = 2
-
 	pre := `var deployment = createDeployment({
 		namespace: "namespace",
 		adminACL: ["1.2.3.4/32"],
@@ -27,62 +22,25 @@ func TestEngine(t *testing.T) {
 		deployment.deploy(baseMachine.asWorker().replicate(3));`
 
 	UpdatePolicy(conn, prog(t, code))
-	err := conn.Transact(func(view db.Database) error {
-		acl, err := view.GetACL()
-		masters := view.SelectFromMachine(func(m db.Machine) bool {
-			return m.Role == db.Master
-		})
-		workers := view.SelectFromMachine(func(m db.Machine) bool {
-			return m.Role == db.Worker
-		})
+	acl, err := selectACL(conn)
+	assert.Nil(t, err)
+	assert.Equal(t, 1, len(acl.Admin))
 
-		if err != nil {
-			return err
-		} else if len(acl.Admin) != 1 {
-			return fmt.Errorf("bad acls: %s", spew.Sdump(acl))
-		}
-
-		if len(masters) != 2 {
-			return fmt.Errorf("bad masters: %s", spew.Sdump(masters))
-		}
-
-		if len(workers) != 3 {
-			return fmt.Errorf("bad workers: %s", spew.Sdump(workers))
-		}
-		return nil
-	})
-	if err != nil {
-		t.Error(err.Error())
-	}
+	masters, workers := selectMachines(conn)
+	assert.Equal(t, 2, len(masters))
+	assert.Equal(t, 3, len(workers))
 
 	/* Verify master increase. */
 	code = pre + `deployment.deploy(baseMachine.asMaster().replicate(4));
 		deployment.deploy(baseMachine.asWorker().replicate(5));`
 
 	UpdatePolicy(conn, prog(t, code))
-	err = conn.Transact(func(view db.Database) error {
-		masters := view.SelectFromMachine(func(m db.Machine) bool {
-			return m.Role == db.Master
-		})
-		workers := view.SelectFromMachine(func(m db.Machine) bool {
-			return m.Role == db.Worker
-		})
-
-		if len(masters) != 4 {
-			return fmt.Errorf("bad masters: %s", spew.Sdump(masters))
-		}
-
-		if len(workers) != 5 {
-			return fmt.Errorf("bad workers: %s", spew.Sdump(workers))
-		}
-		return nil
-	})
-	if err != nil {
-		t.Error(err.Error())
-	}
+	masters, workers = selectMachines(conn)
+	assert.Equal(t, 4, len(masters))
+	assert.Equal(t, 5, len(workers))
 
 	/* Verify that external writes stick around. */
-	err = conn.Transact(func(view db.Database) error {
+	conn.Transact(func(view db.Database) error {
 		masters := view.SelectFromMachine(func(m db.Machine) bool {
 			return m.Role == db.Master
 		})
@@ -111,80 +69,42 @@ func TestEngine(t *testing.T) {
 	code = pre + `deployment.deploy(baseMachine.asMaster());
 		deployment.deploy(baseMachine.asWorker());`
 	UpdatePolicy(conn, prog(t, code))
-	err = conn.Transact(func(view db.Database) error {
-		masters := view.SelectFromMachine(func(m db.Machine) bool {
-			return m.Role == db.Master
-		})
-		workers := view.SelectFromMachine(func(m db.Machine) bool {
-			return m.Role == db.Worker
-		})
 
-		if len(masters) != 1 || masters[0].CloudID != "1" ||
-			masters[0].PublicIP != "2" || masters[0].PrivateIP != "3" {
-			return fmt.Errorf("bad masters: %s", spew.Sdump(masters))
-		}
+	masters, workers = selectMachines(conn)
 
-		if len(workers) != 1 || workers[0].CloudID != "1" ||
-			workers[0].PublicIP != "2" || workers[0].PrivateIP != "3" {
-			return fmt.Errorf("bad workers: %s", spew.Sdump(workers))
-		}
-		return nil
-	})
-	if err != nil {
-		t.Error(err.Error())
-	}
+	assert.Equal(t, 1, len(masters))
+	assert.Equal(t, "1", masters[0].CloudID)
+	assert.Equal(t, "2", masters[0].PublicIP)
+	assert.Equal(t, "3", masters[0].PrivateIP)
+
+	assert.Equal(t, 1, len(workers))
+	assert.Equal(t, "1", workers[0].CloudID)
+	assert.Equal(t, "2", workers[0].PublicIP)
+	assert.Equal(t, "3", workers[0].PrivateIP)
 
 	/* Empty Namespace does nothing. */
 	code = pre + `deployment.namespace = "";
 		deployment.deploy(baseMachine.asMaster());
 		deployment.deploy(baseMachine.asWorker());`
 	UpdatePolicy(conn, prog(t, code))
-	err = conn.Transact(func(view db.Database) error {
-		masters := view.SelectFromMachine(func(m db.Machine) bool {
-			return m.Role == db.Master
-		})
-		workers := view.SelectFromMachine(func(m db.Machine) bool {
-			return m.Role == db.Worker
-		})
+	masters, workers = selectMachines(conn)
 
-		if len(masters) != 1 || masters[0].CloudID != "1" ||
-			masters[0].PublicIP != "2" || masters[0].PrivateIP != "3" {
-			return fmt.Errorf("bad masters: %s", spew.Sdump(masters))
-		}
+	assert.Equal(t, 1, len(masters))
+	assert.Equal(t, "1", masters[0].CloudID)
+	assert.Equal(t, "2", masters[0].PublicIP)
+	assert.Equal(t, "3", masters[0].PrivateIP)
 
-		if len(workers) != 1 || workers[0].CloudID != "1" ||
-			workers[0].PublicIP != "2" || workers[0].PrivateIP != "3" {
-			return fmt.Errorf("bad workers: %s", spew.Sdump(workers))
-		}
-		return nil
-	})
-	if err != nil {
-		t.Error(err.Error())
-	}
+	assert.Equal(t, 1, len(workers))
+	assert.Equal(t, "1", workers[0].CloudID)
+	assert.Equal(t, "2", workers[0].PublicIP)
+	assert.Equal(t, "3", workers[0].PrivateIP)
 
 	/* Verify things go to zero. */
 	code = pre + `deployment.deploy(baseMachine.asWorker())`
 	UpdatePolicy(conn, prog(t, code))
-	err = conn.Transact(func(view db.Database) error {
-		masters := view.SelectFromMachine(func(m db.Machine) bool {
-			return m.Role == db.Master
-		})
-		workers := view.SelectFromMachine(func(m db.Machine) bool {
-			return m.Role == db.Worker
-		})
-
-		if len(masters) != 0 {
-			return fmt.Errorf("bad masters: %s", spew.Sdump(masters))
-		}
-
-		if len(workers) != 0 {
-			return fmt.Errorf("bad workers: %s", spew.Sdump(workers))
-		}
-		return nil
-	})
-	if err != nil {
-		t.Error(err.Error())
-	}
+	masters, workers = selectMachines(conn)
+	assert.Zero(t, len(masters))
+	assert.Zero(t, len(workers))
 
 	// This function checks whether there is a one-to-one mapping for each machine
 	// in `slice` to a provider in `providers`.
@@ -206,65 +126,32 @@ func TestEngine(t *testing.T) {
 		new Machine({provider: "Amazon", size: "m4.large", role: "Worker"}),
 		new Machine({provider: "Google", size: "g.large", role: "Worker"})]);`
 	UpdatePolicy(conn, prog(t, code))
-	err = conn.Transact(func(view db.Database) error {
-		masters := view.SelectFromMachine(func(m db.Machine) bool {
-			return m.Role == db.Master
-		})
-		workers := view.SelectFromMachine(func(m db.Machine) bool {
-			return m.Role == db.Worker
-		})
-
-		if !providersInSlice(masters, db.ProviderSlice{db.Amazon, db.Vagrant}) {
-			return fmt.Errorf("bad masters: %s", spew.Sdump(masters))
-		}
-
-		if !providersInSlice(workers, db.ProviderSlice{db.Amazon, db.Google}) {
-			return fmt.Errorf("bad workers: %s", spew.Sdump(workers))
-		}
-		return nil
-	})
-	if err != nil {
-		t.Error(err.Error())
-	}
+	masters, workers = selectMachines(conn)
+	assert.True(t, providersInSlice(masters,
+		db.ProviderSlice{db.Amazon, db.Vagrant}))
+	assert.True(t, providersInSlice(workers, db.ProviderSlice{db.Amazon, db.Google}))
 
 	/* Test that machines with different providers don't match. */
 	code = `deployment.deploy([
 		new Machine({provider: "Amazon", size: "m4.large", role: "Master"}),
 		new Machine({provider: "Amazon", size: "m4.large", role: "Worker"})]);`
 	UpdatePolicy(conn, prog(t, code))
-	err = conn.Transact(func(view db.Database) error {
-		masters := view.SelectFromMachine(func(m db.Machine) bool {
-			return m.Role == db.Master
-		})
-
-		if !providersInSlice(masters, db.ProviderSlice{db.Amazon}) {
-			return fmt.Errorf("bad masters: %s", spew.Sdump(masters))
-		}
-		return nil
-	})
-	if err != nil {
-		t.Error(err.Error())
-	}
+	masters, _ = selectMachines(conn)
+	assert.True(t, providersInSlice(masters, db.ProviderSlice{db.Amazon}))
 }
 
 func TestSort(t *testing.T) {
-	spew := spew.NewDefaultConfig()
-	spew.MaxDepth = 2
-
 	pre := `var baseMachine = new Machine({provider: "Amazon", size: "m4.large"});`
 	conn := db.New()
 
 	UpdatePolicy(conn, prog(t, pre+`
 	deployment.deploy(baseMachine.asMaster().replicate(3));
 	deployment.deploy(baseMachine.asWorker().replicate(1));`))
-	err := conn.Transact(func(view db.Database) error {
+	conn.Transact(func(view db.Database) error {
 		machines := view.SelectFromMachine(func(m db.Machine) bool {
 			return m.Role == db.Master
 		})
-
-		if len(machines) != 3 {
-			return fmt.Errorf("bad machines: %s", spew.Sdump(machines))
-		}
+		assert.Equal(t, 3, len(machines))
 
 		machines[2].PublicIP = "a"
 		machines[2].PrivateIP = "b"
@@ -275,65 +162,42 @@ func TestSort(t *testing.T) {
 
 		return nil
 	})
-	if err != nil {
-		t.Error(err.Error())
-	}
 
 	UpdatePolicy(conn, prog(t, pre+`
 	deployment.deploy(baseMachine.asMaster().replicate(2));
 	deployment.deploy(baseMachine.asWorker().replicate(1));`))
-	err = conn.Transact(func(view db.Database) error {
+	conn.Transact(func(view db.Database) error {
 		machines := view.SelectFromMachine(func(m db.Machine) bool {
 			return m.Role == db.Master
 		})
-
-		if len(machines) != 2 {
-			return fmt.Errorf("bad machines: %s", spew.Sdump(machines))
-		}
+		assert.Equal(t, 2, len(machines))
 
 		for _, m := range machines {
-			if m.PublicIP == "" && m.PrivateIP == "" {
-				return fmt.Errorf("bad machine: %s",
-					spew.Sdump(machines))
-			}
+			assert.False(t, m.PublicIP == "" && m.PrivateIP == "")
 		}
 
 		return nil
 	})
-	if err != nil {
-		t.Error(err.Error())
-	}
 
 	UpdatePolicy(conn, prog(t, pre+`
 	deployment.deploy(baseMachine.asMaster().replicate(1));
 	deployment.deploy(baseMachine.asWorker().replicate(1));`))
-	err = conn.Transact(func(view db.Database) error {
+	conn.Transact(func(view db.Database) error {
 		machines := view.SelectFromMachine(func(m db.Machine) bool {
 			return m.Role == db.Master
 		})
 
-		if len(machines) != 1 {
-			return fmt.Errorf("bad machines: %s", spew.Sdump(machines))
-		}
+		assert.Equal(t, 1, len(machines))
 
 		for _, m := range machines {
-			if m.PublicIP == "" || m.PrivateIP == "" {
-				return fmt.Errorf("bad machine: %s",
-					spew.Sdump(machines))
-			}
+			assert.False(t, m.PublicIP == "" && m.PrivateIP == "")
 		}
 
 		return nil
 	})
-	if err != nil {
-		t.Error(err.Error())
-	}
 }
 
 func TestACLs(t *testing.T) {
-	spew := spew.NewDefaultConfig()
-	spew.MaxDepth = 2
-
 	conn := db.New()
 
 	code := `createDeployment({adminACL: ["1.2.3.4/32", "local"]})
@@ -346,46 +210,17 @@ func TestACLs(t *testing.T) {
 		return "5.6.7.8", nil
 	}
 	UpdatePolicy(conn, prog(t, code))
-	err := conn.Transact(func(view db.Database) error {
-		acl, err := view.GetACL()
-
-		if err != nil {
-			return err
-		}
-
-		if !reflect.DeepEqual(acl.Admin,
-			[]string{"1.2.3.4/32", "5.6.7.8/32"}) {
-			return fmt.Errorf("bad ACLs: %s",
-				spew.Sdump(acl.Admin))
-		}
-
-		return nil
-	})
-	if err != nil {
-		t.Error(err.Error())
-	}
+	acl, err := selectACL(conn)
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"1.2.3.4/32", "5.6.7.8/32"}, acl.Admin)
 
 	myIP = func() (string, error) {
 		return "", errors.New("")
 	}
 	UpdatePolicy(conn, prog(t, code))
-	err = conn.Transact(func(view db.Database) error {
-		acl, err := view.GetACL()
-
-		if err != nil {
-			return err
-		}
-
-		if !reflect.DeepEqual(acl.Admin, []string{"1.2.3.4/32"}) {
-			return fmt.Errorf("bad ACLs: %s",
-				spew.Sdump(acl.Admin))
-		}
-
-		return nil
-	})
-	if err != nil {
-		t.Error(err.Error())
-	}
+	acl, err = selectACL(conn)
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"1.2.3.4/32"}, acl.Admin)
 }
 
 func prog(t *testing.T, code string) stitch.Stitch {
@@ -396,4 +231,25 @@ func prog(t *testing.T, code string) stitch.Stitch {
 	}
 
 	return result
+}
+
+func selectMachines(conn db.Conn) (masters, workers []db.Machine) {
+	conn.Transact(func(view db.Database) error {
+		masters = view.SelectFromMachine(func(m db.Machine) bool {
+			return m.Role == db.Master
+		})
+		workers = view.SelectFromMachine(func(m db.Machine) bool {
+			return m.Role == db.Worker
+		})
+		return nil
+	})
+	return
+}
+
+func selectACL(conn db.Conn) (acl db.ACL, err error) {
+	err = conn.Transact(func(view db.Database) error {
+		acl, err = view.GetACL()
+		return err
+	})
+	return
 }
