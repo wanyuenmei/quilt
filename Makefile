@@ -8,8 +8,7 @@ LINE_LENGTH_EXCLUDE=./cluster/machine/amazon.go \
 		    ./minion/network/link_test.go \
 		    ./minion/pb/pb.pb.go \
 		    ./api/pb/pb.pb.go \
-		    ./stitch/bindings.js.go \
-		    ./cluster/provider/mocks/EC2Client.go
+		    ./stitch/bindings.js.go
 
 REPO = quilt
 DOCKER = docker
