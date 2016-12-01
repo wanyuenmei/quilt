@@ -39,7 +39,7 @@ import (
 	compute "google.golang.org/api/compute/v1"
 )
 
-// DefaultRegion is the prefered location for machines which haven't a user specified
+// DefaultRegion is the preferred location for machines which haven't a user specified
 // region preference.
 const DefaultRegion = "us-east1-b"
 

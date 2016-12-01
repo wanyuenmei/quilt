@@ -32,7 +32,7 @@ type awsID struct {
 	region string
 }
 
-// DefaultRegion is the prefered location for machines which haven't a user specified
+// DefaultRegion is the preferred location for machines which haven't a user specified
 // region preference.
 const DefaultRegion = "us-west-1"
 
