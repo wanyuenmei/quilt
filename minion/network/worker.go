@@ -557,8 +557,9 @@ func updatePorts(odb ovsdb.Client, containers []db.Container) {
 
 	for _, l := range lefts {
 		if l.(ovsdb.Interface).Type == ovsdb.InterfaceTypeGeneve ||
+			l.(ovsdb.Interface).Type == ovsdb.InterfaceTypeSTT ||
 			l.(ovsdb.Interface).Type == ovsdb.InterfaceTypeInternal {
-			// The "bridge" port and the geneve port should never be deleted.
+			// The "bridge" port and overlay port should never be deleted.
 			continue
 		}
 		if err := odb.DeleteInterface(l.(ovsdb.Interface)); err != nil {

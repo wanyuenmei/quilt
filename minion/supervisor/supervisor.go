@@ -32,6 +32,10 @@ const (
 
 const ovsImage = "quilt/ovs"
 
+// The tunneling protocol to use between machines.
+// "stt" and "geneve" are supported.
+const tunnelingProtocol = "stt"
+
 var images = map[string]string{
 	Etcd:          "quay.io/coreos/etcd:v3.0.2",
 	Ovncontroller: ovsImage,
@@ -147,7 +151,7 @@ func (sv *supervisor) updateWorker(IP string, leaderIP string, etcdIPs []string)
 	err := execRun("ovs-vsctl", "set", "Open_vSwitch", ".",
 		fmt.Sprintf("external_ids:ovn-remote=\"tcp:%s:6640\"", leaderIP),
 		fmt.Sprintf("external_ids:ovn-encap-ip=%s", IP),
-		"external_ids:ovn-encap-type=\"geneve\"",
+		fmt.Sprintf("external_ids:ovn-encap-type=\"%s\"", tunnelingProtocol),
 		fmt.Sprintf("external_ids:api_server=\"http://%s:9000\"", leaderIP),
 		fmt.Sprintf("external_ids:system-id=\"%s\"", IP),
 		"--", "add-br", "quilt-int",

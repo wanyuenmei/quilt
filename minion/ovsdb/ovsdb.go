@@ -68,6 +68,9 @@ const (
 
 	// InterfaceTypeGeneve is the logical interface type `geneve`
 	InterfaceTypeGeneve = "geneve"
+
+	// InterfaceTypeSTT is the logical interface type `stt`
+	InterfaceTypeSTT = "stt"
 )
 
 // ACL is a firewall rule in OVN.
