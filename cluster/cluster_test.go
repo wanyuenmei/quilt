@@ -1,7 +1,6 @@
 package cluster
 
 import (
-	"reflect"
 	"testing"
 	"time"
 
@@ -9,7 +8,7 @@ import (
 	"github.com/NetSys/quilt/cluster/machine"
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/stitch"
-	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
 )
 
 var FakeAmazon db.Provider = "FakeAmazon"
@@ -42,6 +41,7 @@ func newFakeProvider(cloudConfig string) *fakeProvider {
 	var ret fakeProvider
 	ret.machines = make(map[string]machine.Machine)
 	ret.cloudConfig = cloudConfig
+	ret.clearLogs()
 	return &ret
 }
 
@@ -108,9 +108,8 @@ func newTestCluster() cluster {
 func TestPanicBadProvider(t *testing.T) {
 	temp := allProviders
 	defer func() {
-		if r := recover(); r == nil {
-			t.Error("newCluster did not panic on bad provider")
-		}
+		r := recover()
+		assert.NotNil(t, r)
 		allProviders = temp
 	}()
 	allProviders = []db.Provider{FakeAmazon}
@@ -119,24 +118,12 @@ func TestPanicBadProvider(t *testing.T) {
 }
 
 func TestSyncDB(t *testing.T) {
-	spew := spew.NewDefaultConfig()
-	spew.MaxDepth = 2
 	checkSyncDB := func(cloudMachines []machine.Machine,
 		databaseMachines []db.Machine, expectedBoot,
 		expectedStop []machine.Machine) {
 		_, bootResult, stopResult := syncDB(cloudMachines, databaseMachines)
-		if !emptySlices(bootResult, expectedBoot) &&
-			!reflect.DeepEqual(bootResult, expectedBoot) {
-			t.Error(spew.Sprintf(
-				"booted wrong machines. Expected %v, got %v.",
-				expectedBoot, bootResult))
-		}
-		if !emptySlices(stopResult, expectedStop) && !reflect.DeepEqual(
-			stopResult, expectedStop) {
-			t.Error(spew.Sprintf(
-				"stopped wrong machines. Expected %v, got %v.",
-				expectedStop, stopResult))
-		}
+		assert.Equal(t, expectedBoot, bootResult)
+		assert.Equal(t, expectedStop, stopResult)
 	}
 
 	var noMachines []machine.Machine
@@ -171,8 +158,6 @@ func TestSyncDB(t *testing.T) {
 }
 
 func TestSync(t *testing.T) {
-	spew := spew.NewDefaultConfig()
-	spew.MaxDepth = 2
 	checkSync := func(clst cluster, provider db.Provider, expectedBoot []bootRequest,
 		expectedStop []string) {
 		clst.sync()
@@ -180,23 +165,12 @@ func TestSync(t *testing.T) {
 		bootResult := providerInst.bootRequests
 		stopResult := providerInst.stopRequests
 		providerInst.clearLogs()
-		if !emptySlices(bootResult, expectedBoot) &&
-			!reflect.DeepEqual(bootResult, expectedBoot) {
-			t.Error(spew.Sprintf(
-				"booted wrong machines. Expected %s, got %s.",
-				expectedBoot, bootResult))
-		}
-		if !emptySlices(stopResult, expectedStop) &&
-			!reflect.DeepEqual(stopResult,
-				expectedStop) {
-			t.Error(spew.Sprintf(
-				"stopped wrong machines. Expected %s, got %s.",
-				expectedStop, stopResult))
-		}
+		assert.Equal(t, expectedBoot, bootResult)
+		assert.Equal(t, expectedStop, stopResult)
 	}
 
-	var noStops []string
-	var noBoots []bootRequest
+	noBoots := []bootRequest{}
+	noStops := []string{}
 	amazonLargeBoot := bootRequest{size: "m4.large", cloudConfig: amazonCloudConfig}
 	amazonXLargeBoot := bootRequest{size: "m4.xlarge", cloudConfig: amazonCloudConfig}
 	vagrantLargeBoot := bootRequest{size: "vagrant.large",
@@ -314,12 +288,5 @@ func TestACLs(t *testing.T) {
 		},
 	}
 	actual := clst.providers[FakeAmazon].(*fakeProvider).aclRequests
-
-	if !reflect.DeepEqual(exp, actual) {
-		t.Errorf("Wrong ACLs set:  expected %v, got %v.", exp, actual)
-	}
-}
-
-func emptySlices(slice1 interface{}, slice2 interface{}) bool {
-	return reflect.ValueOf(slice1).Len() == 0 && reflect.ValueOf(slice2).Len() == 0
+	assert.Equal(t, exp, actual)
 }
