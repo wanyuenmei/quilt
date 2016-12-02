@@ -12,7 +12,7 @@ initialize_ovs() {
 	[Service]
 	ExecStartPre=/sbin/modprobe gre
 	ExecStartPre=/sbin/modprobe nf_nat_ipv6
-	ExecStart=/usr/bin/docker run --privileged {{.QuiltImage}} \
+	ExecStart=/usr/bin/docker run --rm --privileged {{.QuiltImage}} \
 	bash -c "insmod /modules/openvswitch.ko \
 	         && insmod /modules/vport-geneve.ko \
 	         && insmod /modules/vport-stt.ko"
