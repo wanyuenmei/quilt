@@ -2,7 +2,6 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -106,18 +105,6 @@ func (s server) Deploy(cts context.Context, deployReq *pb.DeployRequest) (
 	if len(stitch.Machines) > ip.MaxMinionCount {
 		return &pb.DeployReply{}, fmt.Errorf("cannot boot more than %d "+
 			"machines", ip.MaxMinionCount)
-	}
-
-	var clusters []db.Cluster
-	s.dbConn.Transact(func(view db.Database) error {
-		clusters = view.SelectFromCluster(nil)
-		return nil
-	})
-	if len(clusters) != 0 && clusters[0].Namespace != stitch.Namespace {
-		return &pb.DeployReply{}, errors.New(
-			"Quilt currently does not support switching namespaces. " +
-				"Kill and restart the daemon if you would like to " +
-				"use a different namespace.")
 	}
 
 	err = engine.UpdatePolicy(s.dbConn, stitch)
