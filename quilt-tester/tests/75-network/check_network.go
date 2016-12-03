@@ -173,7 +173,7 @@ type pingResult struct {
 }
 
 // We have to limit our parallelization because `ping` creates a new SSH login
-// session everytime. Doing this quickly in parallel breaks system-logind
+// session every time. Doing this quickly in parallel breaks system-logind
 // on the remote machine: https://github.com/systemd/systemd/issues/2925.
 const pingConcurrencyLimit = 10
 
