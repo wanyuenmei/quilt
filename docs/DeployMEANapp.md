@@ -122,7 +122,7 @@ from when the VMs are `Connected`, until the proxies and application are ready
 to process requests.
 
 ##### Access Web App
-We can now access our web app by using the public IP addres of any worker
+We can now access our web app by using the public IP address of any worker
 machine. We can get the public IP of a worker machine from the quilt daemon log
 or the output of `quilt machines`. The following shows that there is a Worker VM
 at the public IP address 52.53.236.192:
