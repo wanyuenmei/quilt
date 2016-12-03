@@ -65,6 +65,7 @@ lint: format
 			golint -min_confidence .25 -set_exit_status $$package || exit 1 ; \
 		fi \
 	done
+	find . -path ./vendor -prune -o -name '*' -type file -print | xargs misspell -error
 	ineffassign .
 
 generate:
@@ -76,6 +77,7 @@ providers:
 go-get:
 	go get -v -u \
 	    github.com/golang/protobuf/{proto,protoc-gen-go} \
+	    github.com/client9/misspell/cmd/misspell \
 	    github.com/gordonklaus/ineffassign \
 	    github.com/davecgh/go-spew/spew \
 	    github.com/golang/lint/golint \
