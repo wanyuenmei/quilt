@@ -386,7 +386,11 @@ func updateWorker(view db.Database, self db.Minion, store Store,
 	if self.Subnet == "" {
 		return
 	}
-	subnet := ip.Parse(self.Subnet, ip.QuiltPrefix, ip.QuiltMask)
+	subnet := net.ParseIP(self.Subnet)
+	if subnet == nil {
+		log.Errorf("Subnet %s was invalid", self.Subnet)
+		return
+	}
 
 	oldContainers := view.SelectFromContainer(nil)
 	newIPMap, err := updateContainerIP(etcdData, oldContainers, subnet, self, store)

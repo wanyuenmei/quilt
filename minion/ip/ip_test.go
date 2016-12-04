@@ -73,25 +73,6 @@ func TestSyncIPs(t *testing.T) {
 	}
 }
 
-func TestParseIP(t *testing.T) {
-	expected := net.IPv4(0x01, 0, 0, 0)
-	mask := net.CIDRMask(8, 32)
-	res := Parse("1.0.0.0", expected, mask)
-	if !res.Equal(expected) {
-		t.Errorf("parseIP expected 0x%x, got 0x%x", 0x01000000, res)
-	}
-
-	res = Parse("2.0.0.1", expected, mask)
-	if !res.Equal(net.IPv4zero) {
-		t.Errorf("parseIP expected 0x%x, got 0x%x", 0, res)
-	}
-
-	res = Parse("a", expected, mask)
-	if !res.Equal(net.IPv4zero) {
-		t.Errorf("parseIP expected 0x%x, got 0x%x", 0, res)
-	}
-}
-
 func TestMaskToInt(t *testing.T) {
 	mask := net.CIDRMask(16, 32)
 	if MaskToInt(mask) != 0xffff0000 {

@@ -44,9 +44,10 @@ var (
 func Sync(ipMap map[string]string, prefixIP net.IP, mask net.IPMask) {
 	var unassigned []string
 	ipSet := map[string]struct{}{}
+	subnet := net.IPNet{IP: prefixIP, Mask: mask}
 	for k, ipString := range ipMap {
-		ip := Parse(ipString, prefixIP, mask)
-		if !ip.Equal(net.IPv4zero) {
+		ip := net.ParseIP(ipString)
+		if ip != nil && subnet.Contains(ip) {
 			ipSet[ip.String()] = struct{}{}
 		} else {
 			unassigned = append(unassigned, k)
@@ -66,20 +67,6 @@ func Sync(ipMap map[string]string, prefixIP net.IP, mask net.IPMask) {
 		ipMap[k] = ip.String()
 		ipSet[ip.String()] = struct{}{}
 	}
-}
-
-// Parse takes in an IP string, and parses it with respect to the given prefix and mask.
-func Parse(ipStr string, prefix net.IP, mask net.IPMask) net.IP {
-	ip := net.ParseIP(ipStr)
-	if ip == nil {
-		return net.IPv4zero
-	}
-
-	if !ip.Mask(mask).Equal(prefix) {
-		return net.IPv4zero
-	}
-
-	return ip
 }
 
 // MaskToInt takes in a CIDR Mask and return the integer representation of it.

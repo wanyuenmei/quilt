@@ -140,7 +140,7 @@ func TestGenerateSubnet(t *testing.T) {
 		subnetStr, err := generateSubnet(store, db.Minion{PrivateIP: "10.1.0.1"})
 		assert.Nil(t, err)
 
-		subnet := ip.Parse(subnetStr, ip.QuiltPrefix, ip.QuiltMask)
+		subnet := net.ParseIP(subnetStr)
 		assert.False(t, subnet.Equal(ip.LabelPrefix))
 		assert.True(t, subnet.Mask(ip.QuiltMask).Equal(ip.QuiltPrefix))
 		assert.True(t, subnet.Mask(ip.SubMask).Equal(subnet))
