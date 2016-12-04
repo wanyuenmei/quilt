@@ -6,6 +6,7 @@ import (
 
 	"github.com/NetSys/quilt/cluster/acl"
 	"github.com/NetSys/quilt/cluster/amazon"
+	"github.com/NetSys/quilt/cluster/foreman"
 	"github.com/NetSys/quilt/cluster/google"
 	"github.com/NetSys/quilt/cluster/machine"
 	"github.com/NetSys/quilt/cluster/vagrant"
@@ -31,7 +32,6 @@ var allProviders = []db.Provider{db.Amazon, db.Google, db.Vagrant}
 type cluster struct {
 	namespace string
 	conn      db.Conn
-	fm        foreman
 	providers map[db.Provider]provider
 }
 
@@ -58,16 +58,13 @@ func updateCluster(conn db.Conn, clst *cluster) *cluster {
 	}
 
 	if clst == nil || clst.namespace != namespace {
-		if clst != nil {
-			clst.stop()
-		}
 		clst = newCluster(conn, namespace)
 		clst.runOnce()
-		clst.fm.init()
+		foreman.Init(clst.conn)
 	}
 
 	clst.runOnce()
-	clst.fm.runOnce()
+	foreman.RunOnce(clst.conn)
 
 	return clst
 }
@@ -76,7 +73,6 @@ func newCluster(conn db.Conn, namespace string) *cluster {
 	clst := &cluster{
 		namespace: namespace,
 		conn:      conn,
-		fm:        createForeman(conn),
 		providers: make(map[db.Provider]provider),
 	}
 
@@ -90,10 +86,6 @@ func newCluster(conn db.Conn, namespace string) *cluster {
 	}
 
 	return clst
-}
-
-func (clst *cluster) stop() {
-	clst.fm.stop()
 }
 
 func (clst cluster) runOnce() {

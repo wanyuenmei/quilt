@@ -1,4 +1,4 @@
-package cluster
+package foreman
 
 import (
 	"testing"
@@ -15,12 +15,12 @@ type clients struct {
 }
 
 func TestBoot(t *testing.T) {
-	fm, clients := startTest()
-	fm.runOnce()
+	conn, clients := startTest()
+	RunOnce(conn)
 
 	assert.Zero(t, clients.newCalls)
 
-	fm.conn.Transact(func(view db.Database) error {
+	conn.Transact(func(view db.Database) error {
 		m := view.InsertMachine()
 		m.PublicIP = "1.1.1.1"
 		m.PrivateIP = "1.1.1.1."
@@ -29,17 +29,17 @@ func TestBoot(t *testing.T) {
 		return nil
 	})
 
-	fm.runOnce()
+	RunOnce(conn)
 	assert.Equal(t, 1, clients.newCalls)
 	_, ok := clients.clients["1.1.1.1"]
 	assert.True(t, ok)
 
-	fm.runOnce()
+	RunOnce(conn)
 	assert.Equal(t, 1, clients.newCalls)
 	_, ok = clients.clients["1.1.1.1"]
 	assert.True(t, ok)
 
-	fm.conn.Transact(func(view db.Database) error {
+	conn.Transact(func(view db.Database) error {
 		m := view.InsertMachine()
 		m.PublicIP = "2.2.2.2"
 		m.PrivateIP = "2.2.2.2"
@@ -48,7 +48,7 @@ func TestBoot(t *testing.T) {
 		return nil
 	})
 
-	fm.runOnce()
+	RunOnce(conn)
 	assert.Equal(t, 2, clients.newCalls)
 
 	_, ok = clients.clients["2.2.2.2"]
@@ -57,10 +57,10 @@ func TestBoot(t *testing.T) {
 	_, ok = clients.clients["1.1.1.1"]
 	assert.True(t, ok)
 
-	fm.runOnce()
-	fm.runOnce()
-	fm.runOnce()
-	fm.runOnce()
+	RunOnce(conn)
+	RunOnce(conn)
+	RunOnce(conn)
+	RunOnce(conn)
 	assert.Equal(t, 2, clients.newCalls)
 
 	_, ok = clients.clients["2.2.2.2"]
@@ -69,7 +69,7 @@ func TestBoot(t *testing.T) {
 	_, ok = clients.clients["1.1.1.1"]
 	assert.True(t, ok)
 
-	fm.conn.Transact(func(view db.Database) error {
+	conn.Transact(func(view db.Database) error {
 		machines := view.SelectFromMachine(func(m db.Machine) bool {
 			return m.PublicIP == "1.1.1.1"
 		})
@@ -77,7 +77,7 @@ func TestBoot(t *testing.T) {
 		return nil
 	})
 
-	fm.runOnce()
+	RunOnce(conn)
 	assert.Equal(t, 2, clients.newCalls)
 
 	_, ok = clients.clients["2.2.2.2"]
@@ -86,10 +86,10 @@ func TestBoot(t *testing.T) {
 	_, ok = clients.clients["1.1.1.1"]
 	assert.False(t, ok)
 
-	fm.runOnce()
-	fm.runOnce()
-	fm.runOnce()
-	fm.runOnce()
+	RunOnce(conn)
+	RunOnce(conn)
+	RunOnce(conn)
+	RunOnce(conn)
 	assert.Equal(t, 2, clients.newCalls)
 
 	_, ok = clients.clients["2.2.2.2"]
@@ -100,8 +100,8 @@ func TestBoot(t *testing.T) {
 }
 
 func TestBootEtcd(t *testing.T) {
-	fm, clients := startTest()
-	fm.conn.Transact(func(view db.Database) error {
+	conn, clients := startTest()
+	conn.Transact(func(view db.Database) error {
 		m := view.InsertMachine()
 		m.Role = db.Master
 		m.PublicIP = "m1-pub"
@@ -117,10 +117,10 @@ func TestBootEtcd(t *testing.T) {
 		view.Commit(m)
 		return nil
 	})
-	fm.runOnce()
+	RunOnce(conn)
 	assert.Equal(t, []string{"m1-priv"}, clients.clients["w1-pub"].mc.EtcdMembers)
 
-	fm.conn.Transact(func(view db.Database) error {
+	conn.Transact(func(view db.Database) error {
 		m := view.InsertMachine()
 		m.Role = db.Master
 		m.PublicIP = "m2-pub"
@@ -129,27 +129,27 @@ func TestBootEtcd(t *testing.T) {
 		view.Commit(m)
 		return nil
 	})
-	fm.runOnce()
+	RunOnce(conn)
 	etcdMembers := clients.clients["w1-pub"].mc.EtcdMembers
 	assert.Len(t, etcdMembers, 2)
 	assert.Contains(t, etcdMembers, "m1-priv")
 	assert.Contains(t, etcdMembers, "m2-priv")
 
-	fm.conn.Transact(func(view db.Database) error {
+	conn.Transact(func(view db.Database) error {
 		var toDelete = view.SelectFromMachine(func(m db.Machine) bool {
 			return m.PrivateIP == "m1-priv"
 		})[0]
 		view.Remove(toDelete)
 		return nil
 	})
-	fm.runOnce()
+	RunOnce(conn)
 	assert.Equal(t, []string{"m2-priv"},
 		clients.clients["w1-pub"].mc.EtcdMembers)
 }
 
 func TestInitForeman(t *testing.T) {
-	fm := startTestWithRole(pb.MinionConfig_WORKER)
-	fm.conn.Transact(func(view db.Database) error {
+	conn := startTestWithRole(pb.MinionConfig_WORKER)
+	conn.Transact(func(view db.Database) error {
 		m := view.InsertMachine()
 		m.PublicIP = "2.2.2.2"
 		m.PrivateIP = "2.2.2.2"
@@ -158,13 +158,14 @@ func TestInitForeman(t *testing.T) {
 		return nil
 	})
 
-	fm.init()
-	for _, m := range fm.minions {
+	Init(conn)
+	for _, m := range minions {
 		assert.Equal(t, db.Role(db.Worker), m.machine.Role)
 	}
 
-	fm = startTestWithRole(pb.MinionConfig_Role(-7))
-	for _, m := range fm.minions {
+	conn = startTestWithRole(pb.MinionConfig_Role(-7))
+	Init(conn)
+	for _, m := range minions {
 		assert.Equal(t, db.None, m.machine.Role)
 	}
 }
@@ -173,9 +174,9 @@ func TestConfigConsistency(t *testing.T) {
 	masterRole := db.RoleToPB(db.Master)
 	workerRole := db.RoleToPB(db.Worker)
 
-	fm, _ := startTest()
+	conn, clients := startTest()
 	var master, worker db.Machine
-	fm.conn.Transact(func(view db.Database) error {
+	conn.Transact(func(view db.Database) error {
 		master = view.InsertMachine()
 		master.PublicIP = "1.1.1.1"
 		master.PrivateIP = master.PublicIP
@@ -189,8 +190,8 @@ func TestConfigConsistency(t *testing.T) {
 		return nil
 	})
 
-	fm.init()
-	fm.conn.Transact(func(view db.Database) error {
+	Init(conn)
+	conn.Transact(func(view db.Database) error {
 		master.Role = db.Master
 		worker.Role = db.Worker
 		view.Commit(master)
@@ -198,19 +199,17 @@ func TestConfigConsistency(t *testing.T) {
 		return nil
 	})
 
-	fm.runOnce()
-	checkRoles := func(fore foreman) {
-		r := fore.minions["1.1.1.1"].client.(*fakeClient).mc.Role
+	RunOnce(conn)
+	checkRoles := func() {
+		r := minions["1.1.1.1"].client.(*fakeClient).mc.Role
 		assert.Equal(t, masterRole, r)
 
-		r = fore.minions["2.2.2.2"].client.(*fakeClient).mc.Role
+		r = minions["2.2.2.2"].client.(*fakeClient).mc.Role
 		assert.Equal(t, workerRole, r)
 	}
-	checkRoles(fm)
-	fm.stop()
+	checkRoles()
 
-	newfm, clients := startTest()
-	newfm.conn = fm.conn
+	minions = map[string]*minion{}
 
 	// Insert the clients into the client list to simulate fetching
 	// from the remote cluster
@@ -219,18 +218,18 @@ func TestConfigConsistency(t *testing.T) {
 	clients.clients["2.2.2.2"] = &fakeClient{clients, "2.2.2.2",
 		pb.MinionConfig{Role: workerRole}}
 
-	newfm.init()
-	newfm.runOnce()
-	checkRoles(newfm)
+	Init(conn)
+	RunOnce(conn)
+	checkRoles()
 
 	// After many runs, the roles should never change
 	for i := 0; i < 25; i++ {
-		newfm.runOnce()
+		RunOnce(conn)
 	}
-	checkRoles(newfm)
+	checkRoles()
 
 	// Ensure that the DB machines have the correct roles as well.
-	newfm.conn.Transact(func(view db.Database) error {
+	conn.Transact(func(view db.Database) error {
 		machines := view.SelectFromMachine(nil)
 		for _, m := range machines {
 			if m.PublicIP == "1.1.1.1" {
@@ -244,10 +243,11 @@ func TestConfigConsistency(t *testing.T) {
 	})
 }
 
-func startTest() (foreman, *clients) {
-	fm := createForeman(db.New())
+func startTest() (db.Conn, *clients) {
+	conn := db.New()
+	minions = map[string]*minion{}
 	clients := &clients{make(map[string]*fakeClient), 0}
-	fm.newClient = func(ip string) (client, error) {
+	newClient = func(ip string) (client, error) {
 		if fc, ok := clients.clients[ip]; ok {
 			return fc, nil
 		}
@@ -256,19 +256,18 @@ func startTest() (foreman, *clients) {
 		clients.newCalls++
 		return fc, nil
 	}
-	return fm, clients
+	return conn, clients
 }
 
-func startTestWithRole(role pb.MinionConfig_Role) foreman {
-	fm := createForeman(db.New())
+func startTestWithRole(role pb.MinionConfig_Role) db.Conn {
 	clientInst := &clients{make(map[string]*fakeClient), 0}
-	fm.newClient = func(ip string) (client, error) {
+	newClient = func(ip string) (client, error) {
 		fc := &fakeClient{clientInst, ip, pb.MinionConfig{Role: role}}
 		clientInst.clients[ip] = fc
 		clientInst.newCalls++
 		return fc, nil
 	}
-	return fm
+	return db.New()
 }
 
 type fakeClient struct {

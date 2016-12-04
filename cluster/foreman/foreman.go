@@ -1,4 +1,4 @@
-package cluster
+package foreman
 
 import (
 	"reflect"
@@ -16,6 +16,8 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
+var minions map[string]*minion
+
 type client interface {
 	setMinion(pb.MinionConfig) error
 	getMinion() (pb.MinionConfig, error)
@@ -25,16 +27,6 @@ type client interface {
 type clientImpl struct {
 	pb.MinionClient
 	cc *grpc.ClientConn
-}
-
-type foreman struct {
-	conn db.Conn
-
-	minions map[string]*minion
-	spec    string
-
-	// Making this a struct member allows us to mock it out.
-	newClient func(string) (client, error)
 }
 
 type minion struct {
@@ -47,35 +39,28 @@ type minion struct {
 	mark bool /* Mark and sweep garbage collection. */
 }
 
-func createForeman(conn db.Conn) foreman {
-	return foreman{
-		conn:      conn,
-		minions:   make(map[string]*minion),
-		newClient: newClient,
+// Init the first time the foreman operates on a new namespace.  It queries the currently
+// running VMs for their previously assigned roles, and writes them to the database.
+func Init(conn db.Conn) {
+	for _, m := range minions {
+		m.client.Close()
 	}
-}
+	minions = map[string]*minion{}
 
-func (fm *foreman) stop() {
-	for _, minion := range fm.minions {
-		minion.client.Close()
-	}
-}
-
-func (fm *foreman) init() {
-	fm.conn.Transact(func(view db.Database) error {
+	conn.Transact(func(view db.Database) error {
 		machines := view.SelectFromMachine(func(m db.Machine) bool {
 			return m.PublicIP != "" && m.PrivateIP != "" && m.CloudID != ""
 		})
 
-		fm.updateMinionMap(machines)
+		updateMinionMap(machines)
 
-		fm.forEachMinion(func(m *minion) {
+		forEachMinion(func(m *minion) {
 			var err error
 			m.config, err = m.client.getMinion()
 			m.connected = err == nil
 		})
 
-		for _, m := range fm.minions {
+		for _, m := range minions {
 			if m.connected {
 				m.machine.Role = db.PBToRole(m.config.Role)
 				m.machine.Connected = m.connected
@@ -87,23 +72,25 @@ func (fm *foreman) init() {
 	})
 }
 
-func (fm *foreman) runOnce() {
+// RunOnce should be called regularly to allow the foreman to update minion roles.
+func RunOnce(conn db.Conn) {
+	var spec string
 	var machines []db.Machine
-	fm.conn.Transact(func(view db.Database) error {
+	conn.Transact(func(view db.Database) error {
 		machines = view.SelectFromMachine(func(m db.Machine) bool {
 			return m.PublicIP != "" && m.PrivateIP != "" && m.CloudID != ""
 		})
 
-		fm.spec = ""
 		clst, _ := view.GetCluster()
-		fm.spec = clst.Spec
+		spec = clst.Spec
+
 		return nil
 	})
 
-	fm.updateMinionMap(machines)
+	updateMinionMap(machines)
 
 	/* Request the current configuration from each minion. */
-	fm.forEachMinion(func(m *minion) {
+	forEachMinion(func(m *minion) {
 		var err error
 		m.config, err = m.client.getMinion()
 
@@ -113,7 +100,7 @@ func (fm *foreman) runOnce() {
 		}
 
 		if connected != m.machine.Connected {
-			fm.conn.Transact(func(view db.Database) error {
+			conn.Transact(func(view db.Database) error {
 				m.machine.Connected = connected
 				view.Commit(m.machine)
 				return nil
@@ -124,14 +111,14 @@ func (fm *foreman) runOnce() {
 	})
 
 	var etcdIPs []string
-	for _, m := range fm.minions {
+	for _, m := range minions {
 		if m.machine.Role == db.Master && m.machine.PrivateIP != "" {
 			etcdIPs = append(etcdIPs, m.machine.PrivateIP)
 		}
 	}
 
 	// Assign all of the minions their new configs
-	fm.forEachMinion(func(m *minion) {
+	forEachMinion(func(m *minion) {
 		if !m.connected {
 			return
 		}
@@ -139,7 +126,7 @@ func (fm *foreman) runOnce() {
 		newConfig := pb.MinionConfig{
 			Role:        db.RoleToPB(m.machine.Role),
 			PrivateIP:   m.machine.PrivateIP,
-			Spec:        fm.spec,
+			Spec:        spec,
 			Provider:    string(m.machine.Provider),
 			Size:        m.machine.Size,
 			Region:      m.machine.Region,
@@ -157,36 +144,36 @@ func (fm *foreman) runOnce() {
 	})
 }
 
-func (fm *foreman) updateMinionMap(machines []db.Machine) {
+func updateMinionMap(machines []db.Machine) {
 	for _, m := range machines {
-		min, ok := fm.minions[m.PublicIP]
+		min, ok := minions[m.PublicIP]
 		if !ok {
-			client, err := fm.newClient(m.PublicIP)
+			client, err := newClient(m.PublicIP)
 			if err != nil {
 				continue
 			}
 			min = &minion{client: client}
-			fm.minions[m.PublicIP] = min
+			minions[m.PublicIP] = min
 		}
 
 		min.machine = m
 		min.mark = true
 	}
 
-	for k, minion := range fm.minions {
+	for k, minion := range minions {
 		if minion.mark {
 			minion.mark = false
 		} else {
 			minion.client.Close()
-			delete(fm.minions, k)
+			delete(minions, k)
 		}
 	}
 }
 
-func (fm *foreman) forEachMinion(do func(minion *minion)) {
+func forEachMinion(do func(minion *minion)) {
 	var wg sync.WaitGroup
-	wg.Add(len(fm.minions))
-	for _, m := range fm.minions {
+	wg.Add(len(minions))
+	for _, m := range minions {
 		go func(m *minion) {
 			do(m)
 			wg.Done()
@@ -195,7 +182,7 @@ func (fm *foreman) forEachMinion(do func(minion *minion)) {
 	wg.Wait()
 }
 
-func newClient(ip string) (client, error) {
+func newClientImpl(ip string) (client, error) {
 	cc, err := grpc.Dial(ip+":9999", grpc.WithInsecure())
 	if err != nil {
 		return nil, err
@@ -203,6 +190,9 @@ func newClient(ip string) (client, error) {
 
 	return clientImpl{pb.NewMinionClient(cc), cc}, nil
 }
+
+// Storing in a variable allows us to mock it out for unit tests
+var newClient = newClientImpl
 
 func (c clientImpl) getMinion() (pb.MinionConfig, error) {
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
