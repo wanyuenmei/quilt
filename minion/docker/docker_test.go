@@ -74,12 +74,12 @@ func TestCreateGet(t *testing.T) {
 	md, dk := NewMock()
 
 	md.PullError = true
-	_, err := dk.create("name", "image", nil, nil, nil, nil)
+	_, err := dk.create("name", "image", nil, nil, nil, nil, nil)
 	assert.NotNil(t, err)
 	md.PullError = false
 
 	md.CreateError = true
-	_, err = dk.create("name", "image", nil, nil, nil, nil)
+	_, err = dk.create("name", "image", nil, nil, nil, nil, nil)
 	assert.NotNil(t, err)
 	md.CreateError = false
 
@@ -91,7 +91,7 @@ func TestCreateGet(t *testing.T) {
 		"envA=B": {},
 	}
 	labels := map[string]string{"label": "foo"}
-	id, err := dk.create("name", "image", args, labels, env, nil)
+	id, err := dk.create("name", "image", args, labels, env, nil, nil)
 	assert.Nil(t, err)
 
 	container, err := dk.Get(id)

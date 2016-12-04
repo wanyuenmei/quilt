@@ -10,6 +10,7 @@ import (
 	"github.com/NetSys/quilt/minion/docker"
 	"github.com/NetSys/quilt/minion/etcd"
 	"github.com/NetSys/quilt/minion/network"
+	"github.com/NetSys/quilt/minion/network/plugin"
 	"github.com/NetSys/quilt/minion/pprofile"
 	"github.com/NetSys/quilt/minion/scheduler"
 	"github.com/NetSys/quilt/minion/supervisor"
@@ -27,6 +28,10 @@ func Run() {
 
 	conn := db.New()
 	dk := docker.New("unix:///var/run/docker.sock")
+
+	// Not in a goroutine, want the plugin to start before the scheduler
+	plugin.Run()
+
 	go minionServerRun(conn)
 	go supervisor.Run(conn, dk)
 	go scheduler.Run(conn, dk)

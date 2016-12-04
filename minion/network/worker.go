@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
-	"net"
 	"os"
 	"os/exec"
 	"regexp"
@@ -43,19 +42,6 @@ type nsInfo struct {
 }
 
 type nsInfoSlice []nsInfo
-
-// This represents a network device
-type netdev struct {
-	// These apply to all links
-	name string
-	up   bool
-
-	// These only apply to veths
-	peerNS  string
-	peerMTU int
-}
-
-type netdevSlice []netdev
 
 // This represents a route in the routing table
 type route struct {
@@ -166,13 +152,12 @@ func runWorker(conn db.Conn, dk docker.Client) {
 		}()
 
 		updateNamespaces(containers)
-		updateVeths(containers)
 		if publicInterface != "" {
 			updateNAT(publicInterface, containers, connections)
 		}
 		updatePorts(odb, containers)
 
-		if exists, err := linkExists("", quiltBridge); exists {
+		if exists, err := LinkExists("", quiltBridge); exists {
 			updateDefaultGw(odb)
 			wg.Add(1)
 			// XXX: Should be a go routine.
@@ -286,137 +271,6 @@ func updateLoopback(containers []db.Container) {
 			log.WithError(err).Error("failed to up loopback device")
 		}
 	}
-}
-
-func updateVeths(containers []db.Container) {
-	// A virtual ethernet link that links the host and container is a "veth".
-	//
-	// The ends of the veth have different config options like mtu, etc.
-	// However if you delete one side, both will be deleted.
-
-	targetVeths := generateTargetVeths(containers)
-	currentVeths, err := generateCurrentVeths(containers)
-	if err != nil {
-		log.WithError(err).Error("failed to get veths")
-		return
-	}
-
-	key := func(val interface{}) interface{} {
-		return val.(netdev).name
-	}
-
-	pairs, lefts, rights := join.HashJoin(currentVeths, targetVeths, key, key)
-
-	// Changing veths takes a long time, so we do it concurrently
-	doVeths(lefts, delVeth, "delete")
-	doVeths(rights, addVeth, "add")
-	for _, p := range pairs {
-		if err := modVeth(p.L.(netdev), p.R.(netdev)); err != nil {
-			log.WithError(err).Error("failed to modify veth")
-			continue
-		}
-	}
-}
-
-func doVeths(veths []interface{}, do func(netdev) error, action string) {
-	var wg sync.WaitGroup
-	vethsChannel := make(chan netdev, len(veths))
-	for _, v := range veths {
-		vethsChannel <- v.(netdev)
-	}
-	close(vethsChannel)
-
-	wg.Add(concurrencyLimit)
-	for i := 0; i < concurrencyLimit; i++ {
-		go func() {
-			defer wg.Done()
-			for v := range vethsChannel {
-				if err := do(v); err != nil {
-					log.WithError(err).Errorf("failed to %s veth",
-						action)
-				}
-			}
-		}()
-	}
-	wg.Wait()
-}
-
-func generateTargetVeths(containers []db.Container) netdevSlice {
-	var configs netdevSlice
-	for _, dbc := range containers {
-		_, vethOut := veths(dbc.DockerID)
-		cfg := netdev{
-			name:    vethOut,
-			up:      true,
-			peerNS:  networkNS(dbc.DockerID),
-			peerMTU: innerMTU,
-		}
-		configs = append(configs, cfg)
-	}
-	return configs
-}
-
-func generateCurrentVeths(containers []db.Container) (netdevSlice, error) {
-	names, err := listVeths()
-	if err != nil {
-		return nil, err
-	}
-
-	var configs netdevSlice
-	for _, name := range names {
-		cfg := netdev{
-			name: name,
-		}
-
-		iface, err := net.InterfaceByName(name)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"name":  name,
-				"error": err,
-			}).Error("failed to get interface")
-			continue
-		}
-
-		for _, dbc := range containers {
-			_, vethOut := veths(dbc.DockerID)
-			if vethOut == name {
-				cfg.peerNS = networkNS(dbc.DockerID)
-				break
-			}
-		}
-		if cfg.peerNS != "" {
-			if nsExists, err := namespaceExists(cfg.peerNS); err != nil {
-				log.WithFields(log.Fields{
-					"namespace": cfg.peerNS,
-					"error":     err,
-				}).Error("error while searching for namespace")
-				continue
-			} else if nsExists {
-				lkExists, err := linkExists(cfg.peerNS, innerVeth)
-				if err != nil {
-					log.WithFields(log.Fields{
-						"namespace": cfg.peerNS,
-						"link":      innerVeth,
-						"error":     err,
-					}).Error("error while checking " +
-						"whether link exists in namespace")
-					continue
-				} else if lkExists {
-					cfg.peerMTU, err = getLinkMTU(cfg.peerNS,
-						innerVeth)
-					if err != nil {
-						log.WithError(err).Error(
-							"failed to get link mtu")
-						continue
-					}
-				}
-			}
-		}
-
-		cfg.up = (iface.Flags&net.FlagUp == net.FlagUp)
-		configs = append(configs, cfg)
-	}
-	return configs, nil
 }
 
 func updateNAT(publicInterface string, containers []db.Container,
@@ -586,7 +440,7 @@ func updatePorts(odb ovsdb.Client, containers []db.Container) {
 func generateTargetPorts(containers []db.Container) ovsdb.InterfaceSlice {
 	var configs ovsdb.InterfaceSlice
 	for _, dbc := range containers {
-		_, vethOut := veths(dbc.DockerID)
+		_, vethOut := VethPairNames(dbc.EndpointID)
 		peerBr, peerQuilt := patchPorts(dbc.DockerID)
 		configs = append(configs, ovsdb.Interface{
 			Name:   vethOut,
@@ -919,7 +773,7 @@ func generateTargetOpenFlow(odb ovsdb.Client, containers []db.Container,
 
 	var rules []string
 	for _, dbc := range containers {
-		_, vethOut := veths(dbc.DockerID)
+		_, vethOut := VethPairNames(dbc.EndpointID)
 		_, peerQuilt := patchPorts(dbc.DockerID)
 		dbcMac := dbc.Mac
 
@@ -1295,14 +1149,9 @@ func networkNS(id string) string {
 	return fmt.Sprintf("%s_ns", id[0:13])
 }
 
-func veths(id string) (in, out string) {
+// VethPairNames returns the veth pair for the given id.
+func VethPairNames(id string) (in, out string) {
 	return fmt.Sprintf("%s_i", id[0:13]), fmt.Sprintf("%s_c", id[0:13])
-}
-
-// Generate the temporary internal veth name from the name of the
-// external veth
-func tempVethPairName(out string) (in string) {
-	return fmt.Sprintf("%s_i", out[0:13])
 }
 
 func patchPorts(id string) (br, quilt string) {
@@ -1572,14 +1421,6 @@ func (nsis nsInfoSlice) Get(ii int) interface{} {
 
 func (nsis nsInfoSlice) Len() int {
 	return len(nsis)
-}
-
-func (nds netdevSlice) Get(ii int) interface{} {
-	return nds[ii]
-}
-
-func (nds netdevSlice) Len() int {
-	return len(nds)
 }
 
 func (iprs ipRuleSlice) Get(ii int) interface{} {

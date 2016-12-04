@@ -21,11 +21,13 @@ type MockClient struct {
 	*sync.Mutex
 	Pulled     map[string]struct{}
 	Containers map[string]mockContainer
+	Networks   map[string]*dkc.Network
 
 	createdExecs map[string]dkc.CreateExecOptions
 	Executions   map[string][]string
 
 	CreateError     bool
+	NetworkError    bool
 	CreateExecError bool
 	InspectError    bool
 	ListError       bool
@@ -42,6 +44,7 @@ func NewMock() (*MockClient, Client) {
 		Mutex:        &sync.Mutex{},
 		Pulled:       map[string]struct{}{},
 		Containers:   map[string]mockContainer{},
+		Networks:     map[string]*dkc.Network{},
 		createdExecs: map[string]dkc.CreateExecOptions{},
 		Executions:   map[string][]string{},
 	}
@@ -131,6 +134,24 @@ func (dk MockClient) ListContainers(opts dkc.ListContainersOptions) ([]dkc.APICo
 		apics = append(apics, dkc.APIContainers{ID: id})
 	}
 	return apics, nil
+}
+
+// CreateNetwork creates a network according to opts.
+func (dk MockClient) CreateNetwork(opts dkc.CreateNetworkOptions) (*dkc.Network, error) {
+	dk.Lock()
+	defer dk.Unlock()
+
+	if dk.NetworkError {
+		return nil, errors.New("create network error")
+	}
+
+	network := &dkc.Network{
+		Name:   opts.Name,
+		Driver: opts.Driver,
+		IPAM:   opts.IPAM,
+	}
+	dk.Networks[opts.Driver] = network
+	return network, nil
 }
 
 // InspectContainer returns details of the specified container.

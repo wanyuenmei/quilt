@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -24,6 +25,7 @@ var ErrNoSuchContainer = errors.New("container does not exist")
 // A Container as returned by the docker client API.
 type Container struct {
 	ID     string
+	EID    string
 	Name   string
 	Image  string
 	IP     string
@@ -48,6 +50,7 @@ type Client struct {
 type RunOptions struct {
 	Name   string
 	Image  string
+	IP     string
 	Args   []string
 	Labels map[string]string
 	Env    map[string]string
@@ -67,6 +70,7 @@ type client interface {
 	ListContainers(opts dkc.ListContainersOptions) ([]dkc.APIContainers, error)
 	InspectContainer(id string) (*dkc.Container, error)
 	CreateContainer(dkc.CreateContainerOptions) (*dkc.Container, error)
+	CreateNetwork(dkc.CreateNetworkOptions) (*dkc.Network, error)
 }
 
 // New creates client to the docker daemon.
@@ -99,7 +103,17 @@ func (dk Client) Run(opts RunOptions) (string, error) {
 		Privileged:  opts.Privileged,
 		VolumesFrom: opts.VolumesFrom,
 	}
-	id, err := dk.create(opts.Name, opts.Image, opts.Args, opts.Labels, env, &hc)
+
+	var nc *dkc.NetworkingConfig
+	if opts.IP != "" {
+		nc = &dkc.NetworkingConfig{
+			EndpointsConfig: map[string]*dkc.EndpointConfig{
+				opts.NetworkMode: {IPAddress: opts.IP},
+			},
+		}
+	}
+
+	id, err := dk.create(opts.Name, opts.Image, opts.Args, opts.Labels, env, &hc, nc)
 	if err != nil {
 		return "", err
 	}
@@ -110,6 +124,19 @@ func (dk Client) Run(opts RunOptions) (string, error) {
 	}
 
 	return id, nil
+}
+
+// ConfigureNetwork makes a request to docker to create a network running on driver with
+// the given subnet.
+func (dk Client) ConfigureNetwork(driver string, subnet net.IPNet) error {
+	_, err := dk.CreateNetwork(dkc.CreateNetworkOptions{
+		Name:   driver,
+		Driver: driver,
+		IPAM: dkc.IPAMOptions{
+			Config: []dkc.IPAMConfig{{Subnet: subnet.String()}},
+		},
+	})
+	return err
 }
 
 // WriteToContainer writes the contents of SRC into the file at path DST on the
@@ -234,30 +261,50 @@ func (dk Client) list(filters map[string][]string, all bool) ([]Container, error
 
 // Get returns a Container corresponding to the supplied ID.
 func (dk Client) Get(id string) (Container, error) {
-	c, err := dk.InspectContainer(id)
+	dkc, err := dk.InspectContainer(id)
 	if err != nil {
 		return Container{}, err
 	}
 
 	env := make(map[string]string)
-	for _, value := range c.Config.Env {
+	for _, value := range dkc.Config.Env {
 		e := strings.Split(value, "=")
 		if len(e) > 1 {
 			env[e[0]] = e[1]
 		}
 	}
 
-	return Container{
-		Name:   c.Name,
-		ID:     c.ID,
-		IP:     c.NetworkSettings.IPAddress,
-		Image:  c.Config.Image,
-		Path:   c.Path,
-		Args:   c.Args,
-		Pid:    c.State.Pid,
+	c := Container{
+		Name:   dkc.Name,
+		ID:     dkc.ID,
+		IP:     dkc.NetworkSettings.IPAddress,
+		EID:    dkc.NetworkSettings.EndpointID,
+		Image:  dkc.Config.Image,
+		Path:   dkc.Path,
+		Args:   dkc.Args,
+		Pid:    dkc.State.Pid,
 		Env:    env,
-		Labels: c.Config.Labels,
-	}, nil
+		Labels: dkc.Config.Labels,
+	}
+
+	networks := keys(dkc.NetworkSettings.Networks)
+	if len(networks) == 1 {
+		config := dkc.NetworkSettings.Networks[networks[0]]
+		c.IP = config.IPAddress
+		c.EID = config.EndpointID
+	} else if len(networks) > 1 {
+		log.Warnf("Multiple networks for container: %s", dkc.ID)
+	}
+
+	return c, nil
+}
+
+func keys(networks map[string]dkc.ContainerNetwork) []string {
+	keySet := []string{}
+	for key := range networks {
+		keySet = append(keySet, key)
+	}
+	return keySet
 }
 
 // IsRunning returns true if the container with the given `name` is running.
@@ -272,7 +319,9 @@ func (dk Client) IsRunning(name string) (bool, error) {
 }
 
 func (dk Client) create(name, image string, args []string, labels map[string]string,
-	env map[string]struct{}, hc *dkc.HostConfig) (string, error) {
+	env map[string]struct{}, hc *dkc.HostConfig, nc *dkc.NetworkingConfig) (string,
+	error) {
+
 	if err := dk.Pull(image); err != nil {
 		return "", err
 	}
@@ -289,7 +338,8 @@ func (dk Client) create(name, image string, args []string, labels map[string]str
 			Cmd:    args,
 			Labels: labels,
 			Env:    envList},
-		HostConfig: hc,
+		HostConfig:       hc,
+		NetworkingConfig: nc,
 	})
 	if err != nil {
 		return "", err

@@ -14,16 +14,17 @@ import (
 type Container struct {
 	ID int // The database ID of this container.
 
-	Pid      int    // The PID of the running container.
-	IP       string // The virtual IP address of this container.
-	Mac      string // The virtual MAC address of this container.
-	Minion   string // The private IP of the minion this container is running on.
-	StitchID int    // A unique ID given to this container by the stitch compiler.
-	DockerID string
-	Image    string
-	Command  []string
-	Labels   []string
-	Env      map[string]string
+	Pid        int    // The PID of the running container.
+	IP         string // The virtual IP address of this container.
+	Mac        string // The virtual MAC address of this container.
+	Minion     string // The private IP of the minion this container is running on.
+	EndpointID string // The ID libnetwork has assigned to this container's veth.
+	StitchID   int    // A unique ID given to this container by the stitch compiler.
+	DockerID   string
+	Image      string
+	Command    []string
+	Labels     []string
+	Env        map[string]string
 }
 
 // ContainerSlice is an alias for []Container to allow for joins

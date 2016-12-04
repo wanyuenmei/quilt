@@ -384,84 +384,42 @@ func updateWorker(view db.Database, self db.Minion, store Store,
 		view.Commit(dbc)
 	}
 
-	if self.Subnet == "" {
-		return
-	}
-	subnet := net.ParseIP(self.Subnet)
-	if subnet == nil {
-		log.Errorf("Subnet %s was invalid", self.Subnet)
-		return
-	}
-
-	oldContainers := view.SelectFromContainer(nil)
-	newIPMap, err := updateContainerIP(etcdData, oldContainers, subnet, self, store)
-	if err != nil {
-		return
-	}
-
-	for _, c := range oldContainers {
-		ipAddr, ok := newIPMap[strconv.Itoa(c.StitchID)]
-		if ok && ipAddr != c.IP {
-			c.IP = ipAddr
-			c.Mac = ip.ToMac(ipAddr)
-			view.Commit(c)
-		}
-	}
+	updateContainerIP(view.SelectFromContainer(nil), self.PrivateIP, store)
 }
 
-func updateContainerIP(etcdData storeData, containers []db.Container,
-	subnet net.IP, self db.Minion, store Store) (map[string]string, error) {
+func updateContainerIP(containers []db.Container, privateIP string, store Store) {
 
 	oldIPMap := map[string]string{}
-	selfStore := path.Join(nodeStore, self.PrivateIP)
+	selfStore := path.Join(nodeStore, privateIP)
 	etcdIPs, err := store.Get(path.Join(selfStore, minionIPStore))
 	if err != nil {
 		etcdErr, ok := err.(client.Error)
 		if !ok || etcdErr.Code != client.ErrorCodeKeyNotFound {
 			log.WithError(err).Error("Failed to load current IPs from Etcd")
-			return nil, err
+			return
 		}
 	}
 	json.Unmarshal([]byte(etcdIPs), &oldIPMap)
 
-	dbContainers := dbSliceToStoreSlice(containers)
-	score := func(left, right interface{}) int {
-		return containerJoinScore(left.(storeContainer), right.(storeContainer))
-	}
-
-	// All containers on this minion should pair, since we just synced up with Etcd
-	pairs, _, _ := join.Join(dbContainers, etcdData.containers, score)
-
 	newIPMap := map[string]string{}
-	for _, c := range dbContainers {
-		newIPMap[strconv.Itoa(c.StitchID)] = ""
+	for _, c := range containers {
+		newIPMap[strconv.Itoa(c.StitchID)] = c.IP
 	}
-
-	for _, pair := range pairs {
-		sdc := pair.R.(storeContainer)
-		sid := strconv.Itoa(sdc.StitchID)
-		newIPMap[sid] = oldIPMap[sid]
-	}
-
-	syncIPs(newIPMap, subnet, ip.SubMask)
 
 	if util.StrStrMapEqual(oldIPMap, newIPMap) {
-		return oldIPMap, nil
+		return
 	}
 
 	jsonData, err := json.Marshal(newIPMap)
 	if err != nil {
 		log.WithError(err).Error("Failed to marshal minion container IP map")
-		return oldIPMap, err
+		return
 	}
 
 	err = store.Set(path.Join(selfStore, minionIPStore), string(jsonData), 0)
 	if err != nil {
 		log.WithError(err).Error("Failed to update minion container IP map")
-		return oldIPMap, err
 	}
-
-	return newIPMap, nil
 }
 
 func updateDBLabels(view db.Database, etcdData storeData, ipMap map[string]string) {

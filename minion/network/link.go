@@ -11,87 +11,36 @@ import (
 	"strings"
 )
 
-func delVeth(config netdev) error {
-	if err := linkDelete("", config.name); err != nil {
+// DelVeth deletes a virtual ethernet interface.
+var DelVeth = func(endpointID string) error {
+	_, name := VethPairNames(endpointID)
+	if err := linkDelete("", name); err != nil {
 		return err
 	}
 	return nil
 }
 
-func addVeth(config netdev) error {
-	tmpPeer := tempVethPairName(config.name)
+// AddVeth creates a virtual ethernet interface.
+var AddVeth = func(endpointID string) (string, error) {
+	tmpPeer, name := VethPairNames(endpointID)
+
 	// Create veth pair
-	err := ipExec("", "link add %s type veth peer name %s",
-		config.name, tmpPeer)
+	err := ipExec("", "link add %s type veth peer name %s", name, tmpPeer)
 	if err != nil {
-		return fmt.Errorf("error adding veth %s with peer %s: %s",
-			config.name, tmpPeer, err)
+		return "", fmt.Errorf("error adding veth %s with peer %s: %v",
+			name, tmpPeer, err)
 	}
 
-	if err := modVeth(netdev{name: config.name}, config); err != nil {
-		return err
-	}
-	return nil
-}
-
-func modVeth(current netdev, target netdev) error {
-	if current.name != target.name {
-		panic("unmatched veths, cannot modify")
+	// Set the host side link status to up
+	if err = ipExec("", "link set %s up", name); err != nil {
+		return "", fmt.Errorf("error bringing veth %s up: %v", name, err)
 	}
 
-	var err error
-	tmpPeer := tempVethPairName(target.name)
-
-	if ok, err := linkExists("", tmpPeer); err != nil {
-		return err
-	} else if ok {
-		// Move the internal veth inside the container.
-		err = ipExec("", "link set %s netns %s", tmpPeer, target.peerNS)
-		if err != nil {
-			return fmt.Errorf("error moving veth %s inside %s: %s",
-				tmpPeer, target.peerNS, err)
-		}
+	if err = ipExec("", "link set dev %s mtu %d", tmpPeer, innerMTU); err != nil {
+		return "", fmt.Errorf("error setting peer %s MTU: %v", tmpPeer, err)
 	}
 
-	if exists, err := linkExists(target.peerNS, tmpPeer); err != nil {
-		return err
-	} else if exists && tmpPeer != innerVeth {
-		// Rename the internal veth to the final name
-		err = ipExec(target.peerNS, "link set dev %s name %s",
-			tmpPeer, innerVeth)
-		if err != nil {
-			return fmt.Errorf("error renaming %s to %s in namespace %s: %s",
-				target.name, innerVeth, target.peerNS, err)
-		}
-	}
-
-	if current.peerMTU != target.peerMTU {
-		err = ipExec(target.peerNS, "link set dev %s mtu %d",
-			innerVeth, innerMTU)
-		if err != nil {
-			return fmt.Errorf("error setting veth %s inside %s to mtu %d: %s",
-				innerVeth, target.peerNS, innerMTU, err)
-		}
-	}
-
-	if current.up != target.up {
-		var state string
-		if target.up {
-			state = "up"
-		} else {
-			state = "down"
-		}
-		if err = ipExec("", "link set %s %s", target.name, state); err != nil {
-			return fmt.Errorf("error bringing veth %s %s: %s",
-				target.name, state, err)
-		}
-		err = ipExec(target.peerNS, "link set %s %s", innerVeth, state)
-		if err != nil {
-			return fmt.Errorf("error bringing veth %s inside %s %s: %s",
-				innerVeth, target.peerNS, state, err)
-		}
-	}
-	return nil
+	return tmpPeer, nil
 }
 
 func getLinkMTU(namespace, name string) (int, error) {
@@ -106,7 +55,8 @@ func getLinkMTU(namespace, name string) (int, error) {
 	return mtu, nil
 }
 
-func linkExists(namespace, name string) (bool, error) {
+// LinkExists reports whether or not the virtual link exists.
+var LinkExists = func(namespace, name string) (bool, error) {
 	cmd := fmt.Sprintf("ip link show %s", name)
 	if namespace != "" {
 		cmd = fmt.Sprintf("ip netns exec %s %s", namespace, cmd)

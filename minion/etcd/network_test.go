@@ -283,27 +283,26 @@ func testUpdateWorkerDBC(t *testing.T, view db.Database) {
 	minion.Self = true
 	view.Commit(minion)
 
-	for id := 1; id < 4; id++ {
+	for id := 1; id < 3; id++ {
 		container := view.InsertContainer()
 		container.StitchID = id
+		container.IP = fmt.Sprintf("10.1.0.%d", id-1)
+		container.Minion = "1.2.3.4"
+		container.Command = []string{"echo", "hi"}
+		container.Env = map[string]string{"GOPATH": "~"}
 		view.Commit(container)
 	}
-
-	container := view.InsertContainer()
-	container.StitchID = 3
-	container.IP = "junk"
-	view.Commit(container)
 
 	cs := storeContainerSlice{
 		{
 			StitchID: 1,
 			Command:  []string{"echo", "hi"},
 			Labels:   []string{"red", "blue"},
-			Env:      map[string]string{"GOPATH": "~/gocode"},
+			Env:      map[string]string{"GOPATH": "~"},
 			Minion:   "1.2.3.4",
 		}, {
 			StitchID: 2,
-			Command:  []string{"echo", "bye"},
+			Command:  []string{"echo", "hi"},
 			Labels:   []string{"blue", "green"},
 			Env:      map[string]string{"GOPATH": "~"},
 			Minion:   "1.2.3.4",
@@ -315,17 +314,6 @@ func testUpdateWorkerDBC(t *testing.T, view db.Database) {
 			Minion:   "1.2.3.5",
 		},
 	}
-
-	nextRand := uint32(0)
-	ip.Rand32 = func() uint32 {
-		ret := nextRand
-		nextRand++
-		return ret
-	}
-
-	defer func() {
-		ip.Rand32 = rand.Uint32
-	}()
 
 	store := newTestMock()
 
@@ -356,18 +344,14 @@ func testUpdateWorkerDBC(t *testing.T, view db.Database) {
 		envMap[c.DockerID] = c.Env
 	}
 
-	expIPMap1 := map[int]string{
+	expIPMap := map[int]string{
 		1: "10.1.0.0",
 		2: "10.1.0.1",
 	}
 
-	expIPMap2 := map[int]string{
-		1: expIPMap1[2],
-		2: expIPMap1[1],
-	}
-	if !eq(expIPMap1, ipMap) && !eq(expIPMap2, ipMap) {
-		t.Error(spew.Sprintf("\nGot: %v\nExp: %v or %v\n",
-			ipMap, expIPMap1, expIPMap2))
+	if !eq(expIPMap, ipMap) {
+		t.Error(spew.Sprintf("\nGot: %v\nExp: %v\n",
+			ipMap, expIPMap))
 	}
 
 	resultMap := map[string]string{}

@@ -1,8 +1,11 @@
 package network
 
 import (
+	"errors"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestListIP(t *testing.T) {
@@ -41,6 +44,79 @@ func TestLinkIsUp(t *testing.T) {
 		t.Errorf("Got wrong link state.\nExpected:\n%t\n\nGot:\n%t\n", exp,
 			isUp)
 	}
+}
+
+type execCount struct {
+	c int
+}
+
+func (ec *execCount) exec(a, b string, c ...interface{}) ([]byte, []byte, error) {
+	ec.c++
+	return nil, nil, nil
+}
+
+func (ec *execCount) execErr(a, b string, c ...interface{}) ([]byte, []byte, error) {
+	ec.c++
+	return nil, nil, errors.New("err")
+}
+
+func (ec *execCount) sh(a string, c ...interface{}) ([]byte, []byte, error) {
+	ec.c++
+	return nil, nil, nil
+}
+
+func (ec *execCount) shErr(a string, c ...interface{}) ([]byte, []byte, error) {
+	ec.c++
+	return nil, nil, errors.New("err")
+}
+
+func TestDelVeth(t *testing.T) {
+	ec := &execCount{}
+	oldIPExecVerbose := ipExecVerbose
+	defer func() { ipExecVerbose = oldIPExecVerbose }()
+	ipExecVerbose = ec.exec
+
+	err := DelVeth("0000000000000")
+	assert.Nil(t, err)
+	assert.Equal(t, 1, ec.c)
+}
+
+func TestAddVeth(t *testing.T) {
+	ec := &execCount{}
+	oldIPExecVerbose := ipExecVerbose
+	defer func() { ipExecVerbose = oldIPExecVerbose }()
+	ipExecVerbose = ec.exec
+
+	peer, err := AddVeth("0000000000000")
+	assert.Nil(t, err)
+	assert.Equal(t, 3, ec.c)
+
+	expPeer, _ := VethPairNames("0000000000000")
+	assert.Equal(t, expPeer, peer)
+
+	ipExecVerbose = ec.execErr
+	peer, err = AddVeth("1111111111111")
+	assert.NotNil(t, err)
+	assert.Equal(t, 4, ec.c)
+	assert.Equal(t, "", peer)
+}
+
+func TestLinkExists(t *testing.T) {
+	ec := &execCount{}
+	oldSHVerbose := shVerbose
+	defer func() { shVerbose = oldSHVerbose }()
+	shVerbose = ec.sh
+
+	ok, err := LinkExists("", "0000000000000")
+	assert.Nil(t, err)
+	assert.False(t, ok)
+	assert.Equal(t, 1, ec.c)
+
+	shVerbose = ec.shErr
+	ok, err = LinkExists("", "0000000000000")
+	assert.NotNil(t, err)
+	assert.False(t, ok)
+	assert.Equal(t, 2, ec.c)
 }
 
 func ips() string {

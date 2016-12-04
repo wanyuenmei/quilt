@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"net"
 	"testing"
 
 	"github.com/NetSys/quilt/db"
@@ -8,22 +9,30 @@ import (
 	"github.com/davecgh/go-spew/spew"
 )
 
+var (
+	_, subnet, _ = net.ParseCIDR("5.6.7.8/20")
+)
+
 func TestRunWorker(t *testing.T) {
 	t.Parallel()
 
 	md, dk := docker.NewMock()
 	conn := db.New()
-
 	conn.Transact(func(view db.Database) error {
 		container := view.InsertContainer()
 		container.Image = "Image"
 		container.Minion = "1.2.3.4"
 		view.Commit(container)
+
+		m := view.InsertMinion()
+		m.Self = true
+		m.PrivateIP = "1.2.3.4"
+		view.Commit(m)
 		return nil
 	})
 
 	// Wrong Minion IP, should do nothing.
-	runWorker(conn, dk, "5.6.7.8")
+	runWorker(conn, dk, "1.2.3.5", *subnet)
 	dkcs, err := dk.List(nil)
 	if err != nil {
 		t.Errorf("Unexpected err %v", err)
@@ -34,7 +43,7 @@ func TestRunWorker(t *testing.T) {
 
 	// Run with a list error, should do nothing.
 	md.ListError = true
-	runWorker(conn, dk, "1.2.3.4")
+	runWorker(conn, dk, "1.2.3.4", *subnet)
 	md.ListError = false
 	dkcs, err = dk.List(nil)
 	if err != nil {
@@ -44,7 +53,7 @@ func TestRunWorker(t *testing.T) {
 		t.Error(spew.Sprintf("Unexpected containers: %v", dkcs))
 	}
 
-	runWorker(conn, dk, "1.2.3.4")
+	runWorker(conn, dk, "1.2.3.4", *subnet)
 	dkcs, err = dk.List(nil)
 	if err != nil {
 		t.Errorf("Unexpected err %v", err)
@@ -55,9 +64,9 @@ func TestRunWorker(t *testing.T) {
 }
 
 func runSync(dk docker.Client, dbcs []db.Container,
-	dkcs []docker.Container) []db.Container {
+	dkcs []docker.Container, subnet net.IPNet) []db.Container {
 
-	changes, tdbcs, tdkcs := syncWorker(dbcs, dkcs)
+	changes, tdbcs, tdkcs := syncWorker(dbcs, dkcs, subnet)
 	doContainers(dk, tdkcs, dockerKill)
 	doContainers(dk, tdbcs, dockerRun)
 	return changes
@@ -67,7 +76,6 @@ func TestSyncWorker(t *testing.T) {
 	t.Parallel()
 
 	md, dk := docker.NewMock()
-
 	dbcs := []db.Container{
 		{
 			ID:      1,
@@ -78,15 +86,15 @@ func TestSyncWorker(t *testing.T) {
 	}
 
 	md.StartError = true
-	changed := runSync(dk, dbcs, nil)
+	changed := runSync(dk, dbcs, nil, *subnet)
 	md.StartError = false
 	if len(changed) > 0 {
 		t.Error(spew.Sprintf("Expected no changed to to an error\n%v", changed))
 	}
 
-	runSync(dk, dbcs, nil)
+	runSync(dk, dbcs, nil, *subnet)
 	dkcs, err := dk.List(nil)
-	changed, _, _ = syncWorker(dbcs, dkcs)
+	changed, _, _ = syncWorker(dbcs, dkcs, *subnet)
 	if err != nil {
 		t.Errorf("Unexpected err %v", err)
 	}
@@ -114,7 +122,7 @@ func TestSyncWorker(t *testing.T) {
 	}
 
 	dbcs[0].DockerID = ""
-	changed = runSync(dk, dbcs, dkcs)
+	changed = runSync(dk, dbcs, dkcs, *subnet)
 
 	newDkcs, err := dk.List(nil)
 	if err != nil {
@@ -131,7 +139,7 @@ func TestSyncWorker(t *testing.T) {
 
 	// Atempt a failed remove
 	md.RemoveError = true
-	changed = runSync(dk, nil, dkcs)
+	changed = runSync(dk, nil, dkcs, *subnet)
 	md.RemoveError = false
 	if len(changed) > 0 {
 		t.Error(spew.Sprintf("Expected no changed to to an error\n%v", changed))
@@ -144,7 +152,7 @@ func TestSyncWorker(t *testing.T) {
 		t.Error(expLog("Unexpected container change", newDkcs, dkcs))
 	}
 
-	changed = runSync(dk, nil, dkcs)
+	changed = runSync(dk, nil, dkcs, *subnet)
 	if len(changed) > 0 {
 		t.Error(spew.Sprintf("Expected no changed to to an error\n%v", changed))
 	}

@@ -1,11 +1,14 @@
 package scheduler
 
 import (
+	"net"
 	"sync"
 
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/join"
 	"github.com/NetSys/quilt/minion/docker"
+	"github.com/NetSys/quilt/minion/ip"
+	"github.com/NetSys/quilt/minion/network/plugin"
 	"github.com/NetSys/quilt/util"
 	log "github.com/Sirupsen/logrus"
 )
@@ -15,7 +18,7 @@ const labelValue = "scheduler"
 const labelPair = labelKey + "=" + labelValue
 const concurrencyLimit = 1
 
-func runWorker(conn db.Conn, dk docker.Client, myIP string) {
+func runWorker(conn db.Conn, dk docker.Client, myIP string, subnet net.IPNet) {
 	if myIP == "" {
 		return
 	}
@@ -31,16 +34,24 @@ func runWorker(conn db.Conn, dk docker.Client, myIP string) {
 		}
 
 		conn.Transact(func(view db.Database) error {
+			_, err := view.MinionSelf()
+			if err != nil {
+				return nil
+			}
+
 			dbcs := view.SelectFromContainer(func(dbc db.Container) bool {
 				return dbc.Minion == myIP
 			})
 
+			dkcs, badDcks := filterOnSubnet(subnet, dkcs)
+
 			var changed []db.Container
-			changed, toBoot, toKill = syncWorker(dbcs, dkcs)
+			changed, toBoot, toKill = syncWorker(dbcs, dkcs, subnet)
 			for _, dbc := range changed {
 				view.Commit(dbc)
 			}
 
+			toKill = append(toKill, badDcks...)
 			return nil
 		})
 
@@ -49,8 +60,23 @@ func runWorker(conn db.Conn, dk docker.Client, myIP string) {
 	}
 }
 
-func syncWorker(dbcs []db.Container, dkcs []docker.Container) (changed []db.Container,
-	toBoot, toKill []interface{}) {
+func filterOnSubnet(subnet net.IPNet, dkcs []docker.Container) (good []docker.Container,
+	bad []interface{}) {
+
+	for _, dkc := range dkcs {
+		dkIP := net.ParseIP(dkc.IP)
+		if subnet.Contains(dkIP) {
+			good = append(good, dkc)
+		} else {
+			bad = append(bad, dkc)
+		}
+	}
+
+	return good, bad
+}
+
+func syncWorker(dbcs []db.Container, dkcs []docker.Container, subnet net.IPNet) (
+	changed []db.Container, toBoot, toKill []interface{}) {
 
 	pairs, dbci, dkci := join.Join(dbcs, dkcs, syncJoinScore)
 
@@ -58,19 +84,32 @@ func syncWorker(dbcs []db.Container, dkcs []docker.Container) (changed []db.Cont
 		toKill = append(toKill, i.(docker.Container))
 	}
 
-	for _, i := range dbci {
-		toBoot = append(toBoot, i.(db.Container))
-	}
-
+	pool := ip.NewPool(subnet.IP, subnet.Mask)
 	for _, pair := range pairs {
 		dbc := pair.L.(db.Container)
 		dkc := pair.R.(docker.Container)
+		pool.AddIP(dkc.IP)
 
 		if dbc.DockerID != dkc.ID {
 			dbc.DockerID = dkc.ID
 			dbc.Pid = dkc.Pid
+			dbc.IP = dkc.IP
+			dbc.Mac = ip.ToMac(dkc.IP)
+			dbc.EndpointID = dkc.EID
 			changed = append(changed, dbc)
 		}
+	}
+
+	for _, i := range dbci {
+		dbc := i.(db.Container)
+		ip, err := pool.Allocate()
+		if err != nil {
+			log.WithError(err).Errorf("Failed to allocate IP "+
+				"for container: %v", dbc)
+			continue
+		}
+		dbc.IP = ip.String()
+		toBoot = append(toBoot, dbc)
 	}
 
 	return changed, toBoot, toKill
@@ -101,10 +140,12 @@ func dockerRun(dk docker.Client, in chan interface{}) {
 		dbc := i.(db.Container)
 		log.WithField("container", dbc).Info("Start container")
 		_, err := dk.Run(docker.RunOptions{
-			Image:  dbc.Image,
-			Args:   dbc.Command,
-			Env:    dbc.Env,
-			Labels: map[string]string{labelKey: labelValue},
+			Image:       dbc.Image,
+			Args:        dbc.Command,
+			Env:         dbc.Env,
+			IP:          dbc.IP,
+			Labels:      map[string]string{labelKey: labelValue},
+			NetworkMode: plugin.NetworkName,
 		})
 		if err != nil {
 			log.WithFields(log.Fields{

@@ -55,7 +55,8 @@ initialize_minion() {
 	ExecStart=/usr/bin/docker run --net=host --name=minion --privileged \
 	-v /var/run/docker.sock:/var/run/docker.sock \
 	-v /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt \
-	-v /proc:/hostproc:ro -v /var/run/netns:/var/run/netns:rw {{.QuiltImage}} \
+	-v /proc:/hostproc:ro -v /var/run/netns:/var/run/netns:rw \
+	-v /run/docker:/run/docker:rw {{.QuiltImage}} \
 	quilt minion
 
 	[Install]
@@ -94,6 +95,9 @@ export DEBIAN_FRONTEND=noninteractive
 
 ssh_keys="{{.SSHKeys}}"
 setup_user quilt "$ssh_keys"
+
+sudo mkdir /run/docker/plugins
+sudo chmod -R /run/docker/plugins 0755
 
 install_docker
 initialize_ovs
