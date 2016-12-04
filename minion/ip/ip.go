@@ -24,6 +24,9 @@ var (
 	// resprents a /20 subnet.
 	SubMask = net.CIDRMask(20, 32)
 
+	// MinionCIDRSuffix is the CIDR suffic for the minion subnet.
+	MinionCIDRSuffix = "/20"
+
 	// LabelPrefix is the subnet that is reserved for label IPs. It represents
 	// 10.0.0.0/20
 	LabelPrefix = net.IPv4(10, 0, 0, 0) // Labels get their own /20

@@ -26,6 +26,9 @@ var (
 	subnetAttempts = 1000
 	subnetTTL      = 5 * time.Minute
 	sleep          = time.Sleep
+
+	// The zero subnet, used as a placeholder on error conditions.
+	_, zero, _ = net.ParseCIDR("0.0.0.0/0")
 )
 
 func runMinionSync(conn db.Conn, store Store) {
@@ -171,24 +174,33 @@ func writeMinion(conn db.Conn, store Store) {
 	}
 }
 
-func generateSubnet(store Store, minion db.Minion) (string, error) {
+func generateSubnet(store Store, minion db.Minion) (net.IPNet, error) {
 	for i := 0; i < subnetAttempts; i++ {
 		subnet := randomMinionSubnet()
-		err := store.Create(subnetKey(subnet), minion.PrivateIP, subnetTTL)
+		_, ipnet, err := net.ParseCIDR(subnet + ip.MinionCIDRSuffix)
+		if err != nil {
+			panic("generated invalid subnet")
+		}
+
+		err = store.Create(subnetKey(subnet), minion.PrivateIP, subnetTTL)
 		if err == nil {
-			return subnet, nil
+			return *ipnet, nil
 		}
 		log.WithError(err).WithField("subnet",
 			subnet).Debug("Subnet taken, trying again.")
 	}
 
-	return "", errors.New("failed to allocate subnet")
+	return *zero, errors.New("failed to allocate subnet")
 }
 
 func updateSubnet(conn db.Conn, store Store, minion db.Minion) db.Minion {
-	var err error
 	if minion.Subnet != "" {
-		err = store.Refresh(subnetKey(minion.Subnet), minion.PrivateIP,
+		prefix, _, err := net.ParseCIDR(minion.Subnet)
+		if err != nil {
+			panic("Invalid minion subnet: " + err.Error())
+		}
+
+		err = store.Refresh(subnetKey(prefix.String()), minion.PrivateIP,
 			subnetTTL)
 		if err == nil {
 			return minion
@@ -202,7 +214,8 @@ func updateSubnet(conn db.Conn, store Store, minion db.Minion) db.Minion {
 
 	// If we failed to refresh, someone took our subnet or we never had one.
 	for {
-		minion.Subnet, err = generateSubnet(store, minion)
+		sub, err := generateSubnet(store, minion)
+		minion.Subnet = sub.String()
 		if err == nil {
 			break
 		}
