@@ -12,14 +12,14 @@ import (
 // eventually be instantiated within its corresponding cluster.
 // Used only by the minion.
 type Container struct {
-	ID int
+	ID int // The database ID of this container.
 
-	Pid      int
-	IP       string
-	Mac      string
-	Minion   string
+	Pid      int    // The PID of the running container.
+	IP       string // The virtual IP address of this container.
+	Mac      string // The virtual MAC address of this container.
+	Minion   string // The private IP of the minion this container is running on.
+	StitchID int    // A unique ID given to this container by the stitch compiler.
 	DockerID string
-	StitchID int
 	Image    string
 	Command  []string
 	Labels   []string
