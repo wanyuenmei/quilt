@@ -12,19 +12,13 @@ import (
 
 func TestMaskToInt(t *testing.T) {
 	mask := net.CIDRMask(16, 32)
-	if MaskToInt(mask) != 0xffff0000 {
-		t.Fatalf("Wrong mask int, expected 0xffff0000, got %x", MaskToInt(mask))
-	}
+	assert.Equal(t, uint32(0xffff0000), MaskToInt(mask))
 
 	mask = net.CIDRMask(19, 32)
-	if MaskToInt(mask) != 0xffffe000 {
-		t.Fatalf("Wrong mask int, expected 0xffffe000, got %x", MaskToInt(mask))
-	}
+	assert.Equal(t, uint32(0xffffe000), MaskToInt(mask))
 
 	mask = net.CIDRMask(32, 32)
-	if MaskToInt(mask) != 0xffffffff {
-		t.Fatalf("Wrong mask int, expected 0xffffffff, got %x", MaskToInt(mask))
-	}
+	assert.Equal(t, uint32(0xffffffff), MaskToInt(mask))
 }
 
 func TestAllocate(t *testing.T) {
@@ -44,19 +38,11 @@ func TestAllocate(t *testing.T) {
 			t.Fatalf("IP Double allocation: 0x%x", ip)
 		}
 
-		if !prefix.Mask(mask).Equal(ip.Mask(mask)) {
-			t.Fatalf("Bad IP allocation: %v & %v != %v",
-				ip, mask, prefix.Mask(mask))
-		}
-
+		assert.Equal(t, prefix.Mask(mask), ip.Mask(mask))
 		conflicts[ip.String()] = struct{}{}
 	}
 
-	if len(conflicts) != len(pool.ipSet) {
-		t.Fatalf("The IP Pool has a different number of IPs than conflicts.\n"+
-			"Got: %d, Expected: %d", len(pool.ipSet), len(conflicts))
-	}
-
+	assert.Equal(t, len(conflicts), len(pool.ipSet))
 	if len(conflicts) < 2500 || len(conflicts) > 4096 {
 		// If the code's working, this is possible but *extremely* unlikely.
 		// Probably a bug.
