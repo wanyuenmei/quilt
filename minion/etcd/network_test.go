@@ -14,6 +14,7 @@ import (
 	"github.com/NetSys/quilt/minion/ip"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestUpdateEtcdContainers(t *testing.T) {
@@ -52,32 +53,21 @@ func TestUpdateEtcdContainers(t *testing.T) {
 
 	testContainers, _ := json.Marshal(cs)
 	err := store.Set(containerStore, string(testContainers), 0)
-	if err != nil {
-		t.Fatal("Failed to write to store.")
-	}
+	assert.Nil(t, err)
 
 	*store.writes = 0
 	etcdData, _ := readEtcd(store)
 	etcdData, _ = updateEtcdContainer(store, etcdData, containers)
 
 	resultContainers, err := store.Get(containerStore)
-	if err != nil {
-		t.Fatal("Failed to read from store")
-	}
+	assert.Nil(t, err)
 
 	resultSlice := []storeContainer{}
 	json.Unmarshal([]byte(resultContainers), &resultSlice)
-
-	if !eq(cs, resultSlice) {
-		t.Error(spew.Sprintf("Unexpected change to etcd store. Got %v,"+
-			" expected %v.", resultSlice, cs))
-	}
+	assert.Equal(t, cs, resultSlice)
 
 	// etcd and the db agree, there should be no writes
-	if *store.writes != 0 {
-		t.Error(spew.Sprintf("Unexpected writes (%d) to etcd store.",
-			*store.writes))
-	}
+	assert.Equal(t, 0, *store.writes)
 
 	// simulate etcd having out of date information, except the IP
 	badEtcdSlice := []storeContainer{}
@@ -110,36 +100,23 @@ func TestUpdateEtcdContainers(t *testing.T) {
 
 	badTestContainers, _ := json.Marshal(badEtcdSlice)
 	err = store.Set(containerStore, string(badTestContainers), 0)
-	if err != nil {
-		t.Fatalf("Failed to write to store.")
-	}
+	assert.Nil(t, err)
 
 	*store.writes = 0
 	etcdData, _ = readEtcd(store)
 	etcdData, _ = updateEtcdContainer(store, etcdData, containers)
 
 	resultContainers, err = store.Get(containerStore)
-	if err != nil {
-		t.Fatal("Failed to read from store.")
-	}
+	assert.Nil(t, err)
 
 	resultSlice = []storeContainer{}
 	json.Unmarshal([]byte(resultContainers), &resultSlice)
 
-	if !eq(cs, resultSlice) {
-		t.Error(spew.Sprintf("Expected change to etcd store.\nGot      %v"+
-			"\nExpected %v.", resultSlice, cs))
-	}
-
-	if !eq(cs, etcdData.containers) {
-		t.Error("updateEtcdContainer did change the storeData struct")
-	}
+	assert.Equal(t, cs, resultSlice)
+	assert.Equal(t, cs, etcdData.containers)
 
 	// if etcd and the db don't agree, there should be exactly 1 write
-	if *store.writes != 1 {
-		t.Error(spew.Sprintf("Expected a single write to etcd. Found %d.",
-			*store.writes))
-	}
+	assert.Equal(t, 1, *store.writes)
 }
 
 func TestUpdateEtcdLabel(t *testing.T) {
@@ -162,32 +139,22 @@ func TestUpdateEtcdLabel(t *testing.T) {
 	labelStruct := map[string]string{}
 	testLabel, _ := json.Marshal(labelStruct)
 	err := store.Set(labelToIPStore, string(testLabel), 0)
-	if err != nil {
-		t.Fatal("Failed to write to store.")
-	}
+	assert.Nil(t, err)
 
 	*store.writes = 0
 	etcdData, _ := readEtcd(store)
 	etcdData, _ = updateEtcdLabel(store, etcdData, containers)
 
 	resultLabels, err := store.Get(labelToIPStore)
-	if err != nil {
-		t.Fatal("Failed to read from store")
-	}
+	assert.Nil(t, err)
 
 	resultStruct := map[string]string{}
 	json.Unmarshal([]byte(resultLabels), &resultStruct)
 
-	if !eq(labelStruct, resultStruct) {
-		t.Error(spew.Sprintf("Unexpected change to etcd store. Got %v,"+
-			" expected %v.", resultStruct, labelStruct))
-	}
+	assert.Equal(t, labelStruct, resultStruct)
 
 	// etcd and the db agree, there should be no writes
-	if *store.writes != 0 {
-		t.Error(spew.Sprintf("Unexpected writes (%d) to etcd store.",
-			*store.writes))
-	}
+	assert.Equal(t, 0, *store.writes)
 
 	conn.Transact(func(view db.Database) error {
 		c := view.InsertContainer()
@@ -202,9 +169,7 @@ func TestUpdateEtcdLabel(t *testing.T) {
 	labelStruct["2"] = "10.0.0.11"
 	testLabel, _ = json.Marshal(labelStruct)
 	err = store.Set(labelToIPStore, string(testLabel), 0)
-	if err != nil {
-		t.Fatal("Failed to write to store.")
-	}
+	assert.Nil(t, err)
 
 	// the dockerIP map still has label 3's IP, but label 3 is now multihost, so it
 	// should get a new IP
@@ -226,26 +191,14 @@ func TestUpdateEtcdLabel(t *testing.T) {
 	etcdData, _ = updateEtcdLabel(store, etcdData, containers)
 
 	resultLabels, err = store.Get(labelToIPStore)
-	if err != nil {
-		t.Fatal("Failed to read from store.")
-	}
+	assert.Nil(t, err)
 
 	resultStruct = map[string]string{}
 	json.Unmarshal([]byte(resultLabels), &resultStruct)
 
-	if !eq(labelStruct, resultStruct) {
-		t.Error(spew.Sprintf("Expected change to etcd store. Got %v, expected "+
-			"%v.", resultStruct, labelStruct))
-	}
-
-	if !eq(labelStruct, etcdData.multiHost) {
-		t.Error("updateEtcdLabel did not change storeData struct")
-	}
-
-	if *store.writes != 1 {
-		t.Error(spew.Sprintf("Unexpected writes (%d) to etcd store.",
-			*store.writes))
-	}
+	assert.Equal(t, labelStruct, resultStruct)
+	assert.Equal(t, labelStruct, etcdData.multiHost)
+	assert.Equal(t, 1, *store.writes)
 }
 
 func TestUpdateLeaderDBC(t *testing.T) {
@@ -319,16 +272,12 @@ func testUpdateWorkerDBC(t *testing.T, view db.Database) {
 
 	jsonCS, _ := json.Marshal(cs)
 	err := store.Set(containerStore, string(jsonCS), 0)
-	if err != nil {
-		t.Fatalf("Failed to write to store.")
-	}
+	assert.Nil(t, err)
 
 	jsonNull, _ := json.Marshal(map[string]string{})
 	minionDirKey := path.Join(nodeStore, "1.2.3.4")
 	err = store.Set(path.Join(minionDirKey, minionIPStore), string(jsonNull), 0)
-	if err != nil {
-		t.Fatalf("Failed to write to store.")
-	}
+	assert.Nil(t, err)
 
 	updateWorker(view, db.Minion{PrivateIP: "1.2.3.4",
 		Subnet: "10.1.0.0"}, store, storeData{containers: cs})
@@ -349,10 +298,7 @@ func testUpdateWorkerDBC(t *testing.T, view db.Database) {
 		2: "10.1.0.1",
 	}
 
-	if !eq(expIPMap, ipMap) {
-		t.Error(spew.Sprintf("\nGot: %v\nExp: %v\n",
-			ipMap, expIPMap))
-	}
+	assert.Equal(t, expIPMap, ipMap)
 
 	resultMap := map[string]string{}
 	storeIPs, _ := store.Get(path.Join(minionDirKey, minionIPStore))
@@ -370,9 +316,7 @@ func testUpdateWorkerDBC(t *testing.T, view db.Database) {
 		2: {"blue", "green"},
 	}
 
-	if !eq(labelMap, expLabelMap) {
-		t.Error(spew.Sprintf("\nGot: %v\nExp: %v\n", labelMap, expLabelMap))
-	}
+	assert.Equal(t, expLabelMap, labelMap)
 }
 
 func TestContainerJoinScore(t *testing.T) {
@@ -386,16 +330,11 @@ func TestContainerJoinScore(t *testing.T) {
 	b := a
 
 	score := containerJoinScore(a, b)
-	if score != 0 {
-		t.Errorf("Unexpected score: %d", score)
-	}
+	assert.Equal(t, 0, score)
 
 	b.Image = "Wrong"
 	score = containerJoinScore(a, b)
-	if score != -1 {
-		t.Errorf("Unexpected score: %d", score)
-	}
-	b = a
+	assert.Equal(t, -1, score)
 }
 
 func TestUpdateDBLabels(t *testing.T) {
@@ -431,9 +370,9 @@ func testUpdateDBLabels(t *testing.T, view db.Database) {
 	}
 	lip := map[string]labelIPs{}
 	for _, l := range view.SelectFromLabel(nil) {
-		if _, ok := lip[l.Label]; ok {
-			t.Errorf("Duplicate labels in the DB: %s", l.Label)
-		}
+		_, ok := lip[l.Label]
+		assert.False(t, ok)
+
 		lip[l.Label] = labelIPs{
 			labelIP:      l.IP,
 			containerIPs: l.ContainerIPs,
@@ -451,9 +390,7 @@ func testUpdateDBLabels(t *testing.T, view db.Database) {
 		},
 	}
 
-	if !eq(lip, resultLabels) {
-		t.Error(spew.Sprintf("Found: %v\nExpected: %v\n", lip, labelStruct))
-	}
+	assert.Equal(t, resultLabels, lip)
 }
 
 func TestSyncIPs(t *testing.T) {
@@ -486,11 +423,7 @@ func TestSyncIPs(t *testing.T) {
 		ipSet[ip] = struct{}{}
 	}
 
-	if !eq(ipSet, exp) {
-		t.Error(spew.Sprintf("Unexpected IP allocations."+
-			"\nFound %s\nExpected %s\nMap %s",
-			ipSet, exp, ipMap))
-	}
+	assert.Equal(t, exp, ipSet)
 
 	ipMap["d"] = "junk"
 
@@ -498,10 +431,7 @@ func TestSyncIPs(t *testing.T) {
 
 	aIP := ipMap["d"]
 	expected := "10.0.0.4"
-	if aIP != expected {
-		t.Error(spew.Sprintf("Unexpected IP allocations.\nFound %s\nExpected %s",
-			aIP, expected))
-	}
+	assert.Equal(t, expected, aIP)
 
 	// Force collisions
 	ip.Rand32 = func() uint32 {
@@ -515,9 +445,7 @@ func TestSyncIPs(t *testing.T) {
 
 	syncIPs(ipMap, prefix, net.CIDRMask(30, 32)) // only 3 addresses in this mask
 
-	if ip, _ := ipMap["e"]; ip != "" {
-		t.Error(spew.Sprintf("Expected IP deletion, found %s", ip))
-	}
+	assert.Empty(t, "", ipMap["e"])
 }
 
 func sliceToSet(slice []string) map[string]struct{} {
