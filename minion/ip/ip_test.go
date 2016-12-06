@@ -1,6 +1,7 @@
 package ip
 
 import (
+	"fmt"
 	"math/rand"
 	"net"
 	"reflect"
@@ -101,6 +102,16 @@ func testAddIP(t *testing.T) {
 	}
 
 	assert.Equal(t, ipSet, allocSet)
+}
+
+func TestToMac(t *testing.T) {
+	for i := 0; i < 256; i++ {
+		a, b, c, d := rand.Intn(256), rand.Intn(256),
+			rand.Intn(256), rand.Intn(256)
+		addr := net.IPv4(byte(a), byte(b), byte(c), byte(d))
+		exp := fmt.Sprintf("02:00:%02x:%02x:%02x:%02x", a, b, c, d)
+		assert.Equal(t, exp, ToMac(addr.String()))
+	}
 }
 
 func sliceToSet(slice []string) map[string]struct{} {
