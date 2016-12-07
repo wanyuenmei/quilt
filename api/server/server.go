@@ -107,10 +107,6 @@ func (s server) Deploy(cts context.Context, deployReq *pb.DeployRequest) (
 			"machines", ip.MaxMinionCount)
 	}
 
-	err = engine.UpdatePolicy(s.dbConn, stitch)
-	if err != nil {
-		return &pb.DeployReply{}, err
-	}
-
+	engine.UpdatePolicy(s.dbConn, stitch)
 	return &pb.DeployReply{}, nil
 }

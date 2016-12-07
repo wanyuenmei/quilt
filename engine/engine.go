@@ -15,35 +15,16 @@ var defaultDiskSize = 32
 
 // UpdatePolicy executes transactions on 'conn' to make it reflect a new policy,
 // 'stitch'.
-func UpdatePolicy(conn db.Conn, stitch stitch.Stitch) error {
-	txn := func(db db.Database) error {
-		return updateTxn(db, stitch)
-	}
-
-	if err := conn.Transact(txn); err != nil {
-		return err
-	}
-
-	return nil
+func UpdatePolicy(conn db.Conn, stitch stitch.Stitch) {
+	conn.Transact(func(view db.Database) error {
+		clusterTxn(view, stitch)
+		machineTxn(view, stitch)
+		aclTxn(view, stitch)
+		return nil
+	})
 }
 
-func updateTxn(view db.Database, stitch stitch.Stitch) error {
-	if err := clusterTxn(view, stitch); err != nil {
-		return err
-	}
-
-	if err := machineTxn(view, stitch); err != nil {
-		return err
-	}
-
-	if err := aclTxn(view, stitch); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func clusterTxn(view db.Database, stitch stitch.Stitch) error {
+func clusterTxn(view db.Database, stitch stitch.Stitch) {
 	cluster, err := view.GetCluster()
 	if err != nil {
 		cluster = view.InsertCluster()
@@ -52,10 +33,9 @@ func clusterTxn(view db.Database, stitch stitch.Stitch) error {
 	cluster.Namespace = stitch.Namespace
 	cluster.Spec = stitch.String()
 	view.Commit(cluster)
-	return nil
 }
 
-func aclTxn(view db.Database, specHandle stitch.Stitch) error {
+func aclTxn(view db.Database, specHandle stitch.Stitch) {
 	aclRow, err := view.GetACL()
 	if err != nil {
 		aclRow = view.InsertACL()
@@ -75,7 +55,6 @@ func aclTxn(view db.Database, specHandle stitch.Stitch) error {
 	aclRow.ApplicationPorts = applicationPorts
 
 	view.Commit(aclRow)
-	return nil
 }
 
 // toDBMachine converts machines specified in the Stitch into db.Machines that can
@@ -137,7 +116,7 @@ func toDBMachine(machines []stitch.Machine, maxPrice float64) []db.Machine {
 	return dbMachines
 }
 
-func machineTxn(view db.Database, stitch stitch.Stitch) error {
+func machineTxn(view db.Database, stitch stitch.Stitch) {
 	// XXX: How best to deal with machines that don't specify enough information?
 	maxPrice := stitch.MaxPrice
 	stitchMachines := toDBMachine(stitch.Machines, maxPrice)
@@ -193,8 +172,6 @@ func machineTxn(view db.Database, stitch stitch.Stitch) error {
 		dbMachine.SSHKeys = stitchMachine.SSHKeys
 		view.Commit(dbMachine)
 	}
-
-	return nil
 }
 
 func resolveACLs(acls []string) []string {
