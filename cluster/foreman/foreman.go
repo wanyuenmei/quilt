@@ -61,8 +61,9 @@ func Init(conn db.Conn) {
 		})
 
 		for _, m := range minions {
-			if m.connected {
-				m.machine.Role = db.PBToRole(m.config.Role)
+			role := db.PBToRole(m.config.Role)
+			if m.connected && role != db.None {
+				m.machine.Role = role
 				m.machine.Connected = m.connected
 				view.Commit(m.machine)
 			}
