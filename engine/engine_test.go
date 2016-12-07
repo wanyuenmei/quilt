@@ -21,7 +21,7 @@ func TestEngine(t *testing.T) {
 	code := pre + `deployment.deploy(baseMachine.asMaster().replicate(2));
 		deployment.deploy(baseMachine.asWorker().replicate(3));`
 
-	UpdatePolicy(conn, prog(t, code))
+	updateStitch(t, conn, prog(t, code))
 	acl, err := selectACL(conn)
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(acl.Admin))
@@ -34,7 +34,7 @@ func TestEngine(t *testing.T) {
 	code = pre + `deployment.deploy(baseMachine.asMaster().replicate(4));
 		deployment.deploy(baseMachine.asWorker().replicate(5));`
 
-	UpdatePolicy(conn, prog(t, code))
+	updateStitch(t, conn, prog(t, code))
 	masters, workers = selectMachines(conn)
 	assert.Equal(t, 4, len(masters))
 	assert.Equal(t, 5, len(workers))
@@ -68,7 +68,7 @@ func TestEngine(t *testing.T) {
 	/* Also verify that masters and workers decrease properly. */
 	code = pre + `deployment.deploy(baseMachine.asMaster());
 		deployment.deploy(baseMachine.asWorker());`
-	UpdatePolicy(conn, prog(t, code))
+	updateStitch(t, conn, prog(t, code))
 
 	masters, workers = selectMachines(conn)
 
@@ -86,7 +86,7 @@ func TestEngine(t *testing.T) {
 	code = pre + `deployment.namespace = "";
 		deployment.deploy(baseMachine.asMaster());
 		deployment.deploy(baseMachine.asWorker());`
-	UpdatePolicy(conn, prog(t, code))
+	updateStitch(t, conn, prog(t, code))
 	masters, workers = selectMachines(conn)
 
 	assert.Equal(t, 1, len(masters))
@@ -101,7 +101,7 @@ func TestEngine(t *testing.T) {
 
 	/* Verify things go to zero. */
 	code = pre + `deployment.deploy(baseMachine.asWorker())`
-	UpdatePolicy(conn, prog(t, code))
+	updateStitch(t, conn, prog(t, code))
 	masters, workers = selectMachines(conn)
 	assert.Zero(t, len(masters))
 	assert.Zero(t, len(workers))
@@ -125,7 +125,7 @@ func TestEngine(t *testing.T) {
 		new Machine({provider: "Vagrant", size: "v.large", role: "Master"}),
 		new Machine({provider: "Amazon", size: "m4.large", role: "Worker"}),
 		new Machine({provider: "Google", size: "g.large", role: "Worker"})]);`
-	UpdatePolicy(conn, prog(t, code))
+	updateStitch(t, conn, prog(t, code))
 	masters, workers = selectMachines(conn)
 	assert.True(t, providersInSlice(masters,
 		db.ProviderSlice{db.Amazon, db.Vagrant}))
@@ -135,7 +135,7 @@ func TestEngine(t *testing.T) {
 	code = `deployment.deploy([
 		new Machine({provider: "Amazon", size: "m4.large", role: "Master"}),
 		new Machine({provider: "Amazon", size: "m4.large", role: "Worker"})]);`
-	UpdatePolicy(conn, prog(t, code))
+	updateStitch(t, conn, prog(t, code))
 	masters, _ = selectMachines(conn)
 	assert.True(t, providersInSlice(masters, db.ProviderSlice{db.Amazon}))
 }
@@ -144,7 +144,7 @@ func TestSort(t *testing.T) {
 	pre := `var baseMachine = new Machine({provider: "Amazon", size: "m4.large"});`
 	conn := db.New()
 
-	UpdatePolicy(conn, prog(t, pre+`
+	updateStitch(t, conn, prog(t, pre+`
 	deployment.deploy(baseMachine.asMaster().replicate(3));
 	deployment.deploy(baseMachine.asWorker().replicate(1));`))
 	conn.Transact(func(view db.Database) error {
@@ -163,7 +163,7 @@ func TestSort(t *testing.T) {
 		return nil
 	})
 
-	UpdatePolicy(conn, prog(t, pre+`
+	updateStitch(t, conn, prog(t, pre+`
 	deployment.deploy(baseMachine.asMaster().replicate(2));
 	deployment.deploy(baseMachine.asWorker().replicate(1));`))
 	conn.Transact(func(view db.Database) error {
@@ -179,7 +179,7 @@ func TestSort(t *testing.T) {
 		return nil
 	})
 
-	UpdatePolicy(conn, prog(t, pre+`
+	updateStitch(t, conn, prog(t, pre+`
 	deployment.deploy(baseMachine.asMaster().replicate(1));
 	deployment.deploy(baseMachine.asWorker().replicate(1));`))
 	conn.Transact(func(view db.Database) error {
@@ -209,7 +209,7 @@ func TestACLs(t *testing.T) {
 	myIP = func() (string, error) {
 		return "5.6.7.8", nil
 	}
-	UpdatePolicy(conn, prog(t, code))
+	updateStitch(t, conn, prog(t, code))
 	acl, err := selectACL(conn)
 	assert.Nil(t, err)
 	assert.Equal(t, []string{"1.2.3.4/32", "5.6.7.8/32"}, acl.Admin)
@@ -217,7 +217,7 @@ func TestACLs(t *testing.T) {
 	myIP = func() (string, error) {
 		return "", errors.New("")
 	}
-	UpdatePolicy(conn, prog(t, code))
+	updateStitch(t, conn, prog(t, code))
 	acl, err = selectACL(conn)
 	assert.Nil(t, err)
 	assert.Equal(t, []string{"1.2.3.4/32"}, acl.Admin)
@@ -252,4 +252,17 @@ func selectACL(conn db.Conn) (acl db.ACL, err error) {
 		return err
 	})
 	return
+}
+
+func updateStitch(t *testing.T, conn db.Conn, stitch stitch.Stitch) {
+	conn.Transact(func(view db.Database) error {
+		cluster, err := view.GetCluster()
+		if err != nil {
+			cluster = view.InsertCluster()
+		}
+		cluster.Spec = stitch.String()
+		view.Commit(cluster)
+		return nil
+	})
+	assert.Nil(t, conn.Transact(updateTxn))
 }

@@ -13,26 +13,30 @@ import (
 var myIP = util.MyIP
 var defaultDiskSize = 32
 
-// UpdatePolicy executes transactions on 'conn' to make it reflect a new policy,
-// 'stitch'.
-func UpdatePolicy(conn db.Conn, stitch stitch.Stitch) {
-	conn.Transact(func(view db.Database) error {
-		clusterTxn(view, stitch)
-		machineTxn(view, stitch)
-		aclTxn(view, stitch)
-		return nil
-	})
+// Run updates the database in response to stitch changes in the cluster table.
+func Run(conn db.Conn) {
+	for range conn.TriggerTick(30, db.ClusterTable, db.MachineTable, db.ACLTable).C {
+		conn.Transact(updateTxn)
+	}
 }
 
-func clusterTxn(view db.Database, stitch stitch.Stitch) {
+func updateTxn(view db.Database) error {
 	cluster, err := view.GetCluster()
 	if err != nil {
-		cluster = view.InsertCluster()
+		return err
+	}
+
+	stitch, err := stitch.FromJSON(cluster.Spec)
+	if err != nil {
+		return err
 	}
 
 	cluster.Namespace = stitch.Namespace
-	cluster.Spec = stitch.String()
 	view.Commit(cluster)
+
+	machineTxn(view, stitch)
+	aclTxn(view, stitch)
+	return nil
 }
 
 func aclTxn(view db.Database, specHandle stitch.Stitch) {

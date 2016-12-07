@@ -12,7 +12,6 @@ import (
 	"github.com/NetSys/quilt/api"
 	"github.com/NetSys/quilt/api/pb"
 	"github.com/NetSys/quilt/db"
-	"github.com/NetSys/quilt/engine"
 	"github.com/NetSys/quilt/minion/ip"
 	"github.com/NetSys/quilt/stitch"
 
@@ -107,6 +106,16 @@ func (s server) Deploy(cts context.Context, deployReq *pb.DeployRequest) (
 			"machines", ip.MaxMinionCount)
 	}
 
-	engine.UpdatePolicy(s.dbConn, stitch)
-	return &pb.DeployReply{}, nil
+	err = s.dbConn.Transact(func(view db.Database) error {
+		cluster, err := view.GetCluster()
+		if err != nil {
+			cluster = view.InsertCluster()
+		}
+
+		cluster.Spec = stitch.String()
+		view.Commit(cluster)
+		return nil
+	})
+
+	return &pb.DeployReply{}, err
 }

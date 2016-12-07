@@ -7,6 +7,8 @@ import (
 
 	"github.com/NetSys/quilt/api/pb"
 	"github.com/NetSys/quilt/db"
+	"github.com/NetSys/quilt/stitch"
+	"github.com/stretchr/testify/assert"
 )
 
 func checkQuery(t *testing.T, s server, table db.TableType, exp string) {
@@ -111,14 +113,19 @@ func TestDeploy(t *testing.T) {
 		return
 	}
 
-	var machines []db.Machine
+	var spec string
 	conn.Transact(func(view db.Database) error {
-		machines = view.SelectFromMachine(nil)
+		clst, err := view.GetCluster()
+		assert.NoError(t, err)
+		spec = clst.Spec
 		return nil
 	})
 
-	if len(machines) != 2 {
-		t.Errorf("Two machines should have been created by the deployment, "+
-			"but we found: %v\n", machines)
-	}
+	exp, err := stitch.FromJSON(createMachineDeployment)
+	assert.NoError(t, err)
+
+	actual, err := stitch.FromJSON(spec)
+	assert.NoError(t, err)
+
+	assert.Equal(t, exp, actual)
 }
