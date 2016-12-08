@@ -172,39 +172,6 @@ func TestMakeIPRule(t *testing.T) {
 	}
 }
 
-func TestGenerateCurrentRoutes(t *testing.T) {
-	oldIPExecVerbose := ipExecVerbose
-	defer func() { ipExecVerbose = oldIPExecVerbose }()
-	ipExecVerbose = func(namespace, format string, args ...interface{}) (
-		stdout, stderr []byte, err error) {
-		return []byte(routes()), nil, nil
-	}
-	actual, _ := generateCurrentRoutes("")
-
-	exp := routeSlice{
-		{
-			ip:        "10.0.2.0/24",
-			dev:       "eth0",
-			isDefault: false,
-		},
-		{
-			ip:        "192.168.162.0/24",
-			dev:       "eth1",
-			isDefault: false,
-		},
-		{
-			ip:        "10.0.2.2",
-			dev:       "eth0",
-			isDefault: true,
-		},
-	}
-
-	if !(reflect.DeepEqual(actual, exp)) {
-		t.Errorf("Generated wrong routes.\nExpected:\n%+v\n\nGot:\n%+v\n",
-			exp, actual)
-	}
-}
-
 func TestGenerateCurrentNatRules(t *testing.T) {
 	oldShVerbose := shVerbose
 	defer func() { shVerbose = oldShVerbose }()

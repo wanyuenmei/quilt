@@ -45,15 +45,6 @@ type nsInfo struct {
 
 type nsInfoSlice []nsInfo
 
-// This represents a route in the routing table
-type route struct {
-	ip        string
-	dev       string
-	isDefault bool
-}
-
-type routeSlice []route
-
 // This represents a rule in the iptables
 type ipRule struct {
 	cmd   string
@@ -94,7 +85,6 @@ type OFRuleSlice []OFRule
 //          quilt-int is the containers' default gateway.
 //        * Set up NAT for packets coming from the 10/8 subnet and leaving on eth0.
 //    - On each container:
-//        * Make eth0 the route to the 10/8 subnet.
 //        * Make the quilt-int device on the host the default gateway (this is the LOCAL
 //          port on the quilt-int bridge).
 //        * Setup /etc/resolv.conf with the same nameservers as the host.
@@ -172,7 +162,6 @@ func runWorker(conn db.Conn, dk docker.Client) {
 		}
 
 		updateContainerIPs(containers, labels)
-		updateRoutes(containers)
 
 		wg.Wait()
 		updateLoopback(containers)
@@ -606,78 +595,6 @@ func updateContainers(in chan db.Container, labelIP map[string]string) {
 			}
 		}
 	}
-}
-
-func updateRoutes(containers []db.Container) {
-	targetRoutes := routeSlice{
-		{
-			ip:        "10.0.0.0/8",
-			dev:       innerVeth,
-			isDefault: false,
-		},
-		{
-			ip:        ip.GatewayIP.String(),
-			dev:       innerVeth,
-			isDefault: true,
-		},
-	}
-
-	for _, dbc := range containers {
-		ns := networkNS(dbc.DockerID)
-
-		currentRoutes, err := generateCurrentRoutes(ns)
-		if err != nil {
-			log.WithError(err).Error("failed to get current ip routes")
-			continue
-		}
-
-		_, routesDel, routesAdd := join.HashJoin(currentRoutes, targetRoutes,
-			nil, nil)
-
-		for _, l := range routesDel {
-			if err := deleteRoute(ns, l.(route)); err != nil {
-				log.WithError(err).Error("error deleting route")
-			}
-		}
-
-		for _, r := range routesAdd {
-			if err := addRoute(ns, r.(route)); err != nil {
-				log.WithError(err).Error("error adding route")
-			}
-		}
-	}
-}
-
-func generateCurrentRoutes(namespace string) (routeSlice, error) {
-	stdout, _, err := ipExecVerbose(namespace, "route show")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get routes in %s: %s",
-			namespaceName(namespace), err)
-	}
-
-	var routes routeSlice
-	routeRE := regexp.MustCompile(
-		"((?:[0-9]{1,3}\\.){3}[0-9]{1,3}/[0-9]{1,2})\\sdev\\" +
-			"s(\\S+)")
-	gwRE := regexp.MustCompile(
-		"default via ((?:[0-9]{1,3}\\.){3}[0-9]{1,3}) dev (\\S+)")
-	for _, r := range routeRE.FindAllSubmatch(stdout, -1) {
-		routes = append(routes, route{
-			ip:        string(r[1]),
-			dev:       string(r[2]),
-			isDefault: false,
-		})
-	}
-
-	for _, r := range gwRE.FindAllSubmatch(stdout, -1) {
-		routes = append(routes, route{
-			ip:        string(r[1]),
-			dev:       string(r[2]),
-			isDefault: true,
-		})
-	}
-
-	return routes, nil
 }
 
 // Sets up the OpenFlow tables to get packets from containers into the OVN controlled
@@ -1292,40 +1209,6 @@ func getPublicInterface() (string, error) {
 	return strings.TrimSpace(string(matches[1])), nil
 }
 
-// The addRoute function adds a new route to the given namespace.
-func addRoute(namespace string, r route) error {
-	var command string
-	if r.isDefault {
-		command = fmt.Sprintf("route add default via %s", r.ip)
-	} else {
-		command = fmt.Sprintf("route add %s via %s", r.ip, r.dev)
-	}
-
-	_, _, err := ipExecVerbose(namespace, command)
-	if err != nil {
-		return fmt.Errorf("failed to add route %s in %s: %s",
-			r.ip, namespaceName(namespace), err)
-	}
-	return nil
-}
-
-// deleteRoute adds route to the routing table in namespace.
-func deleteRoute(namespace string, r route) error {
-	var command string
-	if r.isDefault {
-		command = fmt.Sprintf("route del default via %s", r.ip)
-	} else {
-		command = fmt.Sprintf("route delete %s via %s", r.ip, r.dev)
-	}
-
-	_, _, err := ipExecVerbose(namespace, command)
-	if err != nil {
-		return fmt.Errorf("failed to delete route %s in %s: %s",
-			r.ip, namespaceName(namespace), err)
-	}
-	return nil
-}
-
 func addOrDelFlows(flows []interface{}, add bool) error {
 	args := []string{"add-flows", quiltBridge, "-"}
 	if !add {
@@ -1432,14 +1315,6 @@ func (iprs ipRuleSlice) Get(ii int) interface{} {
 
 func (iprs ipRuleSlice) Len() int {
 	return len(iprs)
-}
-
-func (rs routeSlice) Get(ii int) interface{} {
-	return rs[ii]
-}
-
-func (rs routeSlice) Len() int {
-	return len(rs)
 }
 
 // Get returns the value contained at the given index
