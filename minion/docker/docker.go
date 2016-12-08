@@ -50,7 +50,6 @@ type Client struct {
 type RunOptions struct {
 	Name   string
 	Image  string
-	IP     string
 	Args   []string
 	Labels map[string]string
 	Env    map[string]string
@@ -97,28 +96,19 @@ func (dk Client) Run(opts RunOptions) (string, error) {
 		env[k+"="+v] = struct{}{}
 	}
 
-	hc := dkc.HostConfig{
+	hc := &dkc.HostConfig{
 		NetworkMode: opts.NetworkMode,
 		PidMode:     opts.PidMode,
 		Privileged:  opts.Privileged,
 		VolumesFrom: opts.VolumesFrom,
 	}
 
-	var nc *dkc.NetworkingConfig
-	if opts.IP != "" {
-		nc = &dkc.NetworkingConfig{
-			EndpointsConfig: map[string]*dkc.EndpointConfig{
-				opts.NetworkMode: {IPAddress: opts.IP},
-			},
-		}
-	}
-
-	id, err := dk.create(opts.Name, opts.Image, opts.Args, opts.Labels, env, &hc, nc)
+	id, err := dk.create(opts.Name, opts.Image, opts.Args, opts.Labels, env, hc, nil)
 	if err != nil {
 		return "", err
 	}
 
-	if err = dk.StartContainer(id, &hc); err != nil {
+	if err = dk.StartContainer(id, hc); err != nil {
 		dk.RemoveID(id) // Remove the container to avoid a zombie.
 		return "", err
 	}

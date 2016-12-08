@@ -84,11 +84,9 @@ func syncWorker(dbcs []db.Container, dkcs []docker.Container, subnet net.IPNet) 
 		toKill = append(toKill, i.(docker.Container))
 	}
 
-	pool := ip.NewPool(subnet.IP, subnet.Mask)
 	for _, pair := range pairs {
 		dbc := pair.L.(db.Container)
 		dkc := pair.R.(docker.Container)
-		pool.AddIP(dkc.IP)
 
 		if dbc.DockerID != dkc.ID {
 			dbc.DockerID = dkc.ID
@@ -102,13 +100,6 @@ func syncWorker(dbcs []db.Container, dkcs []docker.Container, subnet net.IPNet) 
 
 	for _, i := range dbci {
 		dbc := i.(db.Container)
-		ip, err := pool.Allocate()
-		if err != nil {
-			log.WithError(err).Errorf("Failed to allocate IP "+
-				"for container: %v", dbc)
-			continue
-		}
-		dbc.IP = ip.String()
 		toBoot = append(toBoot, dbc)
 	}
 
@@ -143,7 +134,6 @@ func dockerRun(dk docker.Client, in chan interface{}) {
 			Image:       dbc.Image,
 			Args:        dbc.Command,
 			Env:         dbc.Env,
-			IP:          dbc.IP,
 			Labels:      map[string]string{labelKey: labelValue},
 			NetworkMode: plugin.NetworkName,
 		})
