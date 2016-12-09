@@ -37,6 +37,9 @@ var (
 	// MaxMinionCount is the largest number of minions that can exist, based
 	// on the number of available subnets
 	MaxMinionCount = int(math.Pow(2, float64(minionMaskBits-quiltMaskBits))+0.5) - 1
+
+	// GatewayIP is the address of the border router in the logical network.
+	GatewayIP = net.IPv4(10, 0, 0, 1)
 )
 
 // Pool represents a set of IP addresses that can be given out to requestors.

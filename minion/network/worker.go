@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	"net"
 	"os"
 	"os/exec"
 	"regexp"
@@ -17,6 +18,7 @@ import (
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/join"
 	"github.com/NetSys/quilt/minion/docker"
+	"github.com/NetSys/quilt/minion/ip"
 	"github.com/NetSys/quilt/minion/ovsdb"
 	"github.com/NetSys/quilt/stitch"
 	"github.com/NetSys/quilt/util"
@@ -505,7 +507,8 @@ func updateDefaultGw(odb ovsdb.Client) {
 		return
 	}
 
-	targetIPs := []string{GatewayIP + "/8"}
+	gwNet := &net.IPNet{IP: ip.GatewayIP, Mask: ip.QuiltMask}
+	targetIPs := []string{gwNet.String()}
 	if err := updateIPs("", quiltBridge, currIPs, targetIPs); err != nil {
 		log.WithError(err).Errorf("failed to update IPs")
 	}
@@ -613,7 +616,7 @@ func updateRoutes(containers []db.Container) {
 			isDefault: false,
 		},
 		{
-			ip:        GatewayIP,
+			ip:        ip.GatewayIP.String(),
 			dev:       innerVeth,
 			isDefault: true,
 		},

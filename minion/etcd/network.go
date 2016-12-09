@@ -11,7 +11,6 @@ import (
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/join"
 	"github.com/NetSys/quilt/minion/ip"
-	"github.com/NetSys/quilt/minion/network"
 	"github.com/NetSys/quilt/util"
 
 	log "github.com/Sirupsen/logrus"
@@ -490,7 +489,7 @@ func syncIPs(ipMap map[string]string, prefixIP net.IP, mask net.IPMask) {
 		}
 	}
 
-	pool.AddIP(network.GatewayIP)
+	pool.AddIP(ip.GatewayIP.String())
 	for _, k := range unassigned {
 		ip, err := pool.Allocate()
 		if err != nil {

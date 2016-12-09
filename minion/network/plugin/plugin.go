@@ -116,10 +116,10 @@ func (d driver) Join(req *dnet.JoinRequest) (*dnet.JoinResponse, error) {
 
 	resp := &dnet.JoinResponse{}
 	resp.InterfaceName = dnet.InterfaceName{SrcName: tempPeer, DstPrefix: innerVeth}
-	resp.Gateway = network.GatewayIP
+	resp.Gateway = ip.GatewayIP.String()
 	resp.StaticRoutes = []*dnet.StaticRoute{
 		{
-			Destination: network.GatewayIP + "/32",
+			Destination: ip.GatewayIP.String() + "/32",
 			RouteType:   1,
 		},
 	}
