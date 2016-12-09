@@ -13,7 +13,7 @@ import (
 	"github.com/NetSys/quilt/api"
 	"github.com/NetSys/quilt/api/pb"
 	"github.com/NetSys/quilt/db"
-	"github.com/NetSys/quilt/minion/ip"
+	"github.com/NetSys/quilt/minion/ipdef"
 	"github.com/NetSys/quilt/stitch"
 
 	"golang.org/x/net/context"
@@ -104,9 +104,9 @@ func (s server) Deploy(cts context.Context, deployReq *pb.DeployRequest) (
 		return &pb.DeployReply{}, err
 	}
 
-	if len(stitch.Machines) > ip.MaxMinionCount {
+	if len(stitch.Machines) > ipdef.MaxMinionCount {
 		return &pb.DeployReply{}, fmt.Errorf("cannot boot more than %d "+
-			"machines", ip.MaxMinionCount)
+			"machines", ipdef.MaxMinionCount)
 	}
 
 	err = s.dbConn.Transact(func(view db.Database) error {

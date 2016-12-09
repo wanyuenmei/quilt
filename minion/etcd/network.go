@@ -1,7 +1,9 @@
 package etcd
 
 import (
+	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"net"
 	"path"
 	"sort"
@@ -10,7 +12,7 @@ import (
 
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/join"
-	"github.com/NetSys/quilt/minion/ip"
+	"github.com/NetSys/quilt/minion/ipdef"
 	"github.com/NetSys/quilt/util"
 
 	log "github.com/Sirupsen/logrus"
@@ -295,7 +297,7 @@ func updateEtcdLabel(s Store, etcdData storeData, containers []db.Container) (st
 
 	// Etcd is the source of truth for IPs. If the label exists in both etcd and the
 	// db and it is a multihost label, then assign it the IP that etcd has.
-	// Otherwise, it stays unassigned and syncIPs will take care of it.
+	// Otherwise, it stays unassigned and syncLabelIPs will take care of it.
 	for id := range newMultiHosts {
 		if ip, ok := etcdData.multiHost[id]; ok {
 			newMultiHosts[id] = ip
@@ -304,7 +306,7 @@ func updateEtcdLabel(s Store, etcdData storeData, containers []db.Container) (st
 
 	// No need to sync the SingleHost IPs, since they get their IPs from the dockerIP
 	// map, which was already synced in updateEtcdDocker
-	syncIPs(newMultiHosts, ip.LabelPrefix, ip.SubMask)
+	syncLabelIPs(newMultiHosts)
 
 	if util.StrStrMapEqual(newMultiHosts, etcdData.multiHost) {
 		return etcdData, nil
@@ -324,7 +326,7 @@ func updateLeaderDBC(view db.Database, dbcs []db.Container,
 
 	for _, dbc := range dbcs {
 		ipVal := ipMap[strconv.Itoa(dbc.StitchID)]
-		mac := ip.ToMac(ipVal)
+		mac := ipdef.ToMac(ipVal)
 		if dbc.IP != ipVal || dbc.Mac != mac {
 			dbc.IP = ipVal
 			dbc.Mac = mac
@@ -478,28 +480,51 @@ func updateDBLabels(view db.Database, etcdData storeData, ipMap map[string]strin
 	}
 }
 
-// syncIPs takes a map of IDs to IPs and creates an IP address for every entry that's
-// missing one.
-func syncIPs(ipMap map[string]string, prefixIP net.IP, mask net.IPMask) {
+// syncLabelIPs takes a map of IDs to IPs and creates an IP address for every entry
+// that's missing one.
+func syncLabelIPs(ipMap map[string]string) {
 	var unassigned []string
-	pool := ip.NewPool(prefixIP, mask)
+	ipSet := map[string]struct{}{ipdef.GatewayIP.String(): {}}
 	for k, ipString := range ipMap {
-		if err := pool.AddIP(ipString); err != nil {
+		_, duplicate := ipSet[ipString]
+		if duplicate || !ipdef.LabelSubnet.Contains(net.ParseIP(ipString)) {
 			unassigned = append(unassigned, k)
+			continue
 		}
+		ipSet[ipString] = struct{}{}
 	}
 
-	pool.AddIP(ip.GatewayIP.String())
 	for _, k := range unassigned {
-		ip, err := pool.Allocate()
+		ip, err := allocateIP(ipSet, ipdef.LabelSubnet)
 		if err != nil {
 			log.WithError(err).Errorf("Failed to allocate IP for %s.", k)
 			ipMap[k] = ""
 			continue
 		}
 
-		ipMap[k] = ip.String()
+		ipMap[k] = ip
 	}
+}
+
+func allocateIP(ipSet map[string]struct{}, subnet net.IPNet) (string, error) {
+	prefix := binary.BigEndian.Uint32(subnet.IP.To4())
+	mask := binary.BigEndian.Uint32(subnet.Mask)
+
+	randStart := rand32() & ^mask
+	for offset := uint32(0); offset <= ^mask; offset++ {
+
+		randIP32 := ((randStart + offset) & ^mask) | (prefix & mask)
+
+		randIP := net.IP(make([]byte, 4))
+		binary.BigEndian.PutUint32(randIP, randIP32)
+		randIPStr := randIP.String()
+
+		if _, ok := ipSet[randIPStr]; !ok {
+			ipSet[randIPStr] = struct{}{}
+			return randIPStr, nil
+		}
+	}
+	return "", errors.New("IP pool exhausted")
 }
 
 func containerJoinScore(left, right storeContainer) int {

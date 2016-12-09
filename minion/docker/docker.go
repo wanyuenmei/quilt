@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/NetSys/quilt/minion/ip"
+	"github.com/NetSys/quilt/minion/ipdef"
 	"github.com/NetSys/quilt/util"
 
 	log "github.com/Sirupsen/logrus"
@@ -120,15 +120,14 @@ func (dk Client) Run(opts RunOptions) (string, error) {
 // ConfigureNetwork makes a request to docker to create a network running on driver with
 // the given subnet.
 func (dk Client) ConfigureNetwork(driver string, subnet net.IPNet) error {
-	quiltNet := net.IPNet{IP: ip.QuiltPrefix, Mask: ip.QuiltMask}
 	_, err := dk.CreateNetwork(dkc.CreateNetworkOptions{
 		Name:   driver,
 		Driver: driver,
 		IPAM: dkc.IPAMOptions{
 			Config: []dkc.IPAMConfig{{
-				Subnet:  quiltNet.String(),
+				Subnet:  ipdef.QuiltSubnet.String(),
 				IPRange: subnet.String(),
-				Gateway: ip.GatewayIP.String(),
+				Gateway: ipdef.GatewayIP.String(),
 			}},
 		},
 	})

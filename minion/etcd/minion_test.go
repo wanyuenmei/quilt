@@ -11,8 +11,9 @@ import (
 	"time"
 
 	"github.com/NetSys/quilt/db"
-	"github.com/NetSys/quilt/minion/ip"
+	"github.com/NetSys/quilt/minion/ipdef"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestWriteMinion(t *testing.T) {
@@ -130,23 +131,18 @@ func TestFilter(t *testing.T) {
 // generate enough unique subnets by generating 3500 out of the possible 4095
 func TestGenerateSubnet(t *testing.T) {
 	store := newTestMock()
-	subnetAttempts = 5000 // big so we don't error unless something is wrong
-	defer func() {
-		subnetAttempts = 1000
-	}()
-	minionMaskBits, _ := ip.SubMask.Size()
+	minionMaskBits, _ := ipdef.SubMask.Size()
 	emptyBits := uint32(0xffffffff >> uint(minionMaskBits))
 	for i := 0; i < 3500; i++ {
-		sub, err := generateSubnet(store, db.Minion{PrivateIP: "10.1.0.1"})
-		assert.Nil(t, err)
-		subnet := sub.IP
+		subnet, err := generateSubnet(store, db.Minion{PrivateIP: "10.1.0.1"})
+		require.Nil(t, err)
 
-		assert.False(t, subnet.Equal(ip.LabelPrefix))
-		assert.True(t, subnet.Mask(ip.QuiltMask).Equal(ip.QuiltPrefix))
-		assert.True(t, subnet.Mask(ip.SubMask).Equal(subnet))
+		require.True(t, ipdef.QuiltSubnet.Contains(subnet.IP))
+		require.NotEqual(t, subnet.IP, ipdef.LabelSubnet.IP)
+		require.Equal(t, subnet.Mask, ipdef.SubMask)
 
-		subnetInt := binary.BigEndian.Uint32(subnet.To4())
-		assert.Zero(t, subnetInt&emptyBits)
+		subnetInt := binary.BigEndian.Uint32(subnet.IP.To4())
+		require.Zero(t, subnetInt&emptyBits)
 	}
 }
 
@@ -160,15 +156,15 @@ func TestUpdateSubnet(t *testing.T) {
 	}()
 
 	nextRand := uint32(0)
-	subnetStart, _ := ip.SubMask.Size()
-	ip.Rand32 = func() uint32 {
+	subnetStart, _ := ipdef.SubMask.Size()
+	rand32 = func() uint32 {
 		ret := nextRand
 		nextRand++
 		return ret << (32 - uint(subnetStart)) // increment inside the subnet
 	}
 
 	defer func() {
-		ip.Rand32 = rand.Uint32
+		rand32 = rand.Uint32
 	}()
 
 	sleep = func(sleepTime time.Duration) {}

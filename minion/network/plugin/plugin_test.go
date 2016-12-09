@@ -5,7 +5,7 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/NetSys/quilt/minion/ip"
+	"github.com/NetSys/quilt/minion/ipdef"
 	"github.com/NetSys/quilt/minion/network"
 	"github.com/stretchr/testify/assert"
 
@@ -93,7 +93,7 @@ func TestCreateEndpoint(t *testing.T) {
 	req.Interface.Address = "10.1.0.1"
 	req.Interface.MacAddress = ""
 	expResp := dnet.EndpointInterface{
-		MacAddress: ip.ToMac("10.1.0.1"),
+		MacAddress: ipdef.ToMac("10.1.0.1"),
 	}
 	resp, err := d.CreateEndpoint(req)
 	assert.Nil(t, err)
@@ -101,7 +101,7 @@ func TestCreateEndpoint(t *testing.T) {
 
 	req.EndpointID = one
 	req.Interface.Address = "10.1.0.2"
-	expResp.MacAddress = ip.ToMac("10.1.0.2")
+	expResp.MacAddress = ipdef.ToMac("10.1.0.2")
 	resp, err = d.CreateEndpoint(req)
 	assert.Nil(t, err)
 	assert.Equal(t, expResp, *resp.Interface)
@@ -130,13 +130,13 @@ func TestEndpointOperInfo(t *testing.T) {
 	defer teardown()
 
 	num := uint32(1)
-	ip.Rand32 = func() uint32 {
+	rand32 = func() uint32 {
 		toRet := num
 		num++
 		return toRet
 	}
 	defer func() {
-		ip.Rand32 = rand.Uint32
+		rand32 = rand.Uint32
 	}()
 
 	d := driver{}
@@ -155,13 +155,13 @@ func TestJoin(t *testing.T) {
 	defer teardown()
 
 	num := uint32(1)
-	ip.Rand32 = func() uint32 {
+	rand32 = func() uint32 {
 		toRet := num
 		num++
 		return toRet
 	}
 	defer func() {
-		ip.Rand32 = rand.Uint32
+		rand32 = rand.Uint32
 	}()
 
 	d := driver{}
@@ -183,13 +183,13 @@ func TestLeave(t *testing.T) {
 	defer teardown()
 
 	num := uint32(1)
-	ip.Rand32 = func() uint32 {
+	rand32 = func() uint32 {
 		toRet := num
 		num++
 		return toRet
 	}
 	defer func() {
-		ip.Rand32 = rand.Uint32
+		rand32 = rand.Uint32
 	}()
 
 	d := driver{}

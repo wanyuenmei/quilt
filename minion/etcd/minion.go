@@ -1,15 +1,17 @@
 package etcd
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"math/rand"
 	"net"
 	"path"
 	"time"
 
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/join"
-	"github.com/NetSys/quilt/minion/ip"
+	"github.com/NetSys/quilt/minion/ipdef"
 	"github.com/NetSys/quilt/util"
 
 	log "github.com/Sirupsen/logrus"
@@ -26,9 +28,6 @@ var (
 	subnetAttempts = 1000
 	subnetTTL      = 5 * time.Minute
 	sleep          = time.Sleep
-
-	// The zero subnet, used as a placeholder on error conditions.
-	_, zero, _ = net.ParseCIDR("0.0.0.0/0")
 )
 
 func runMinionSync(conn db.Conn, store Store) {
@@ -178,31 +177,25 @@ func writeMinion(conn db.Conn, store Store) {
 func generateSubnet(store Store, minion db.Minion) (net.IPNet, error) {
 	for i := 0; i < subnetAttempts; i++ {
 		subnet := randomMinionSubnet()
-		_, ipnet, err := net.ParseCIDR(subnet + ip.MinionCIDRSuffix)
-		if err != nil {
-			panic("generated invalid subnet")
-		}
-
-		err = store.Create(subnetKey(subnet), minion.PrivateIP, subnetTTL)
+		err := store.Create(subnetKey(subnet), minion.PrivateIP, subnetTTL)
 		if err == nil {
-			return *ipnet, nil
+			return subnet, nil
 		}
 		log.WithError(err).WithField("subnet",
 			subnet).Debug("Subnet taken, trying again.")
 	}
 
-	return *zero, errors.New("failed to allocate subnet")
+	return net.IPNet{}, errors.New("failed to allocate subnet")
 }
 
 func updateSubnet(conn db.Conn, store Store, minion db.Minion) db.Minion {
 	if minion.Subnet != "" {
-		prefix, _, err := net.ParseCIDR(minion.Subnet)
+		_, subnet, err := net.ParseCIDR(minion.Subnet)
 		if err != nil {
 			panic("Invalid minion subnet: " + err.Error())
 		}
 
-		err = store.Refresh(subnetKey(prefix.String()), minion.PrivateIP,
-			subnetTTL)
+		err = store.Refresh(subnetKey(*subnet), minion.PrivateIP, subnetTTL)
 		if err == nil {
 			return minion
 		}
@@ -253,21 +246,25 @@ func syncSubnet(conn db.Conn, store Store, minion db.Minion) {
 	}
 }
 
-func randomMinionSubnet() string {
-	submask := ip.ToInt(net.IP(ip.SubMask))
-	quiltmask := ip.ToInt(net.IP(ip.QuiltMask))
+func randomMinionSubnet() net.IPNet {
+	submask := binary.BigEndian.Uint32(ipdef.SubMask)
+	quiltmask := binary.BigEndian.Uint32(ipdef.QuiltSubnet.Mask)
 	subnetBits := submask ^ quiltmask
 
 	// Reserve the 0 subnet for labels
 	randomSubnet := uint32(0)
 	for randomSubnet == 0 {
-		randomSubnet = ip.Rand32() & subnetBits
+		randomSubnet = rand32() & subnetBits
 	}
 
-	subnet := ip.ToInt(ip.QuiltPrefix) | randomSubnet
-	return ip.FromInt(subnet).String()
+	ipNet := net.IPNet{IP: make([]byte, 4), Mask: ipdef.SubMask}
+	ip32 := binary.BigEndian.Uint32(ipdef.QuiltSubnet.IP) | randomSubnet
+	binary.BigEndian.PutUint32(ipNet.IP, ip32)
+	return ipNet
 }
 
-func subnetKey(subnet string) string {
-	return path.Join(subnetStore, subnet)
+func subnetKey(subnet net.IPNet) string {
+	return path.Join(subnetStore, subnet.IP.String())
 }
+
+var rand32 = rand.Uint32

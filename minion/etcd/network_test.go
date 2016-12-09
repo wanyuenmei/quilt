@@ -10,10 +10,10 @@ import (
 	"testing"
 
 	"github.com/NetSys/quilt/db"
-	"github.com/NetSys/quilt/minion/ip"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUpdateEtcdContainers(t *testing.T) {
@@ -177,14 +177,14 @@ func TestUpdateEtcdLabel(t *testing.T) {
 	*store.writes = 0
 	etcdData, _ = readEtcd(store)
 	nextRand := uint32(0)
-	ip.Rand32 = func() uint32 {
+	rand32 = func() uint32 {
 		ret := nextRand
 		nextRand++
 		return ret
 	}
 
 	defer func() {
-		ip.Rand32 = rand.Uint32
+		rand32 = rand.Uint32
 	}()
 
 	etcdData, _ = updateEtcdLabel(store, etcdData, containers)
@@ -393,17 +393,15 @@ func testUpdateDBLabels(t *testing.T, view db.Database) {
 }
 
 func TestSyncIPs(t *testing.T) {
-	prefix := net.IPv4(10, 0, 0, 0)
-
 	nextRand := uint32(0)
-	ip.Rand32 = func() uint32 {
+	rand32 = func() uint32 {
 		ret := nextRand
 		nextRand++
 		return ret
 	}
 
 	defer func() {
-		ip.Rand32 = rand.Uint32
+		rand32 = rand.Uint32
 	}()
 
 	ipMap := map[string]string{
@@ -412,8 +410,7 @@ func TestSyncIPs(t *testing.T) {
 		"c": "",
 	}
 
-	mask := net.CIDRMask(20, 32)
-	syncIPs(ipMap, prefix, mask)
+	syncLabelIPs(ipMap)
 
 	// 10.0.0.1 is reserved for the default gateway
 	exp := sliceToSet([]string{"10.0.0.0", "10.0.0.2", "10.0.0.3"})
@@ -426,25 +423,56 @@ func TestSyncIPs(t *testing.T) {
 
 	ipMap["d"] = "junk"
 
-	syncIPs(ipMap, prefix, mask)
+	syncLabelIPs(ipMap)
 
 	aIP := ipMap["d"]
 	expected := "10.0.0.4"
 	assert.Equal(t, expected, aIP)
 
 	// Force collisions
-	ip.Rand32 = func() uint32 {
+	rand32 = func() uint32 {
 		return 4
 	}
 
-	ipMap["a"] = "10.0.0.0"
-	ipMap["b"] = "10.0.0.2"
-	ipMap["c"] = "10.0.0.3"
+	ipMap["a"] = "junk"
+	syncLabelIPs(ipMap)
+	assert.NotEqual(t, "", ipMap["a"])
+
 	ipMap["e"] = "junk"
-
-	syncIPs(ipMap, prefix, net.CIDRMask(30, 32)) // only 3 addresses in this mask
-
+	syncLabelIPs(ipMap)
 	assert.Empty(t, "", ipMap["e"])
+}
+
+func TestAllocate(t *testing.T) {
+	subnet := net.IPNet{
+		IP:   net.IPv4(0xab, 0xcd, 0xe0, 0x00),
+		Mask: net.CIDRMask(20, 32),
+	}
+	conflicts := map[string]struct{}{}
+	ipSet := map[string]struct{}{}
+
+	// Only 4k IPs, in 0xfffff000. Guaranteed a collision
+	for i := 0; i < 5000; i++ {
+		ip, err := allocateIP(ipSet, subnet)
+		if err != nil {
+			continue
+		}
+
+		if _, ok := conflicts[ip]; ok {
+			t.Fatalf("IP Double allocation: 0x%x", ip)
+		}
+
+		require.True(t, subnet.Contains(net.ParseIP(ip)),
+			fmt.Sprintf("\"%s\" is not in %s", ip, subnet))
+		conflicts[ip] = struct{}{}
+	}
+
+	assert.Equal(t, len(conflicts), len(ipSet))
+	if len(conflicts) < 2500 || len(conflicts) > 4096 {
+		// If the code's working, this is possible but *extremely* unlikely.
+		// Probably a bug.
+		t.Errorf("Too few conflicts: %d", len(conflicts))
+	}
 }
 
 func sliceToSet(slice []string) map[string]struct{} {

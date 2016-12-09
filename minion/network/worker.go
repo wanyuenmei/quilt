@@ -18,7 +18,7 @@ import (
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/join"
 	"github.com/NetSys/quilt/minion/docker"
-	"github.com/NetSys/quilt/minion/ip"
+	"github.com/NetSys/quilt/minion/ipdef"
 	"github.com/NetSys/quilt/minion/ovsdb"
 	"github.com/NetSys/quilt/stitch"
 	"github.com/NetSys/quilt/util"
@@ -459,7 +459,7 @@ func updateDefaultGw(odb ovsdb.Client) {
 		return
 	}
 
-	gwNet := &net.IPNet{IP: ip.GatewayIP, Mask: ip.QuiltMask}
+	gwNet := &net.IPNet{IP: ipdef.GatewayIP, Mask: ipdef.QuiltSubnet.Mask}
 	targetIPs := []string{gwNet.String()}
 	if err := updateIPs("", quiltBridge, currIPs, targetIPs); err != nil {
 		log.WithError(err).Errorf("failed to update IPs")
@@ -681,7 +681,8 @@ func generateTargetOpenFlow(odb ovsdb.Client, containers []db.Container,
 		// LOCAL is the default quilt-int port created with the bridge.
 		egressRule := fmt.Sprintf("table=0 priority=%d,in_port=%d,",
 			5000, ofVeth) +
-			"%s,%s," + fmt.Sprintf("nw_dst=%s actions=LOCAL", ip.GatewayIP)
+			"%s,%s," + fmt.Sprintf("nw_dst=%s actions=LOCAL",
+			ipdef.GatewayIP)
 		ingressRule := fmt.Sprintf("table=0 priority=%d,in_port=LOCAL,", 5000) +
 			"%s,%s," + fmt.Sprintf("dl_dst=%s actions=output:%d",
 			dbcMac, ofVeth)
@@ -717,7 +718,7 @@ func generateTargetOpenFlow(odb ovsdb.Client, containers []db.Container,
 				fmt.Sprintf(
 					"table=0 priority=%d,icmp,in_port=%d,nw_dst=%s"+
 						" actions=LOCAL",
-					5000, ofVeth, ip.GatewayIP))
+					5000, ofVeth, ipdef.GatewayIP))
 			rules = append(rules,
 				fmt.Sprintf(
 					"table=0 priority=%d,icmp,in_port=LOCAL,"+

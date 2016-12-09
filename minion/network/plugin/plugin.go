@@ -3,11 +3,12 @@ package plugin
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/NetSys/quilt/minion/ip"
+	"github.com/NetSys/quilt/minion/ipdef"
 	"github.com/NetSys/quilt/minion/network"
 
 	dnet "github.com/docker/go-plugins-helpers/network"
@@ -80,7 +81,7 @@ func (d driver) CreateEndpoint(req *dnet.CreateEndpointRequest) (
 
 	resp := &dnet.CreateEndpointResponse{
 		Interface: &dnet.EndpointInterface{
-			MacAddress: ip.ToMac(addr),
+			MacAddress: ipdef.ToMac(addr),
 		},
 	}
 	return resp, nil
@@ -116,7 +117,7 @@ func (d driver) Join(req *dnet.JoinRequest) (*dnet.JoinResponse, error) {
 
 	resp := &dnet.JoinResponse{}
 	resp.InterfaceName = dnet.InterfaceName{SrcName: tempPeer, DstPrefix: innerVeth}
-	resp.Gateway = ip.GatewayIP.String()
+	resp.Gateway = ipdef.GatewayIP.String()
 	return resp, nil
 }
 
@@ -199,3 +200,5 @@ func endpointExists(eid string) (bool, error) {
 	_, name := network.VethPairNames(eid)
 	return network.LinkExists("", name)
 }
+
+var rand32 = rand.Uint32
