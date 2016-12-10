@@ -95,6 +95,6 @@ func (rCmd *Run) Run() int {
 		return 1
 	}
 
-	fmt.Println("Successfully started run.")
+	log.Debug("Successfully started run")
 	return 0
 }

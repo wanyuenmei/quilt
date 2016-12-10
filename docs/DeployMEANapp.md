@@ -112,7 +112,6 @@ and
 
 ```
 $ quilt run specs/mean/example.js
-Successfully started run.
 ```
 
 The VMs are fully booted when it says `Connected` in the daemon log. You can get
