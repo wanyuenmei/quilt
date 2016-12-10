@@ -1041,30 +1041,6 @@ func generateEtcHosts(dbc db.Container, labels map[string]db.Label,
 	return strings.Join(hosts, "\n") + "\n"
 }
 
-func namespaceExists(namespace string) (bool, error) {
-	nsFullPath := fmt.Sprintf("%s/%s", nsPath, namespace)
-	file, err := os.Lstat(nsFullPath)
-	if os.IsNotExist(err) {
-		return false, nil
-	} else if err != nil {
-		return false, fmt.Errorf("error finding file %s: %s", nsFullPath, err)
-	}
-
-	if file.Mode()&os.ModeSymlink != os.ModeSymlink {
-		return false, nil
-	}
-
-	if dst, err := os.Readlink(nsFullPath); os.IsNotExist(err) {
-		return false, nil
-	} else if err != nil {
-		return false, fmt.Errorf("error finding destination of symlink %s: %s",
-			nsFullPath, err)
-	} else if dst == fmt.Sprintf("/hostproc/%s/ns/net", namespace) {
-		return true, nil
-	}
-	return false, nil
-}
-
 func networkNS(id string) string {
 	return fmt.Sprintf("%s_ns", id[0:13])
 }
