@@ -59,6 +59,7 @@ initialize_minion() {
 	-v /proc:/hostproc:ro -v /var/run/netns:/var/run/netns:rw \
 	-v /run/docker:/run/docker:rw {{.QuiltImage}} \
 	quilt minion
+	Restart=on-failure
 
 	[Install]
 	WantedBy=multi-user.target
