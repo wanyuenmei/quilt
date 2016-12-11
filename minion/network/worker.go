@@ -79,8 +79,7 @@ type OFRuleSlice []OFRule
 //
 // To connect to the public internet, we do the following setup:
 //    - On the host:
-//        * Bring up the quilt-int device and assign it the IP address 10.0.0.1/8, and
-//          the corresponding MAC address.
+//        * Bring up the quilt-int device and assign it the IP address 10.0.0.1/8.
 //          quilt-int is the containers' default gateway.
 //        * Set up NAT for packets coming from the 10/8 subnet and leaving on eth0.
 //    - On each container:
@@ -460,18 +459,6 @@ func modPort(odb ovsdb.Client, current ovsdb.Interface, target ovsdb.Interface) 
 }
 
 func updateDefaultGw(odb ovsdb.Client) {
-	currMac, err := getMac("", quiltBridge)
-	if err != nil {
-		log.WithError(err).Errorf("failed to get MAC for %s", quiltBridge)
-		return
-	}
-
-	if currMac != gatewayMAC {
-		if err := odb.SetBridgeMac(quiltBridge, gatewayMAC); err != nil {
-			log.WithError(err).Error("failed to set MAC for default gateway")
-		}
-	}
-
 	if err := upLink("", quiltBridge); err != nil {
 		log.WithError(err).Error("failed to up default gateway")
 	}

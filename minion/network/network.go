@@ -23,8 +23,6 @@ const lSwitch = "quilt"
 const quiltBridge = "quilt-int"
 const ovnBridge = "br-int"
 
-const gatewayMAC = "02:00:0a:00:00:01"
-
 type dbport struct {
 	bridge string
 	ip     string
