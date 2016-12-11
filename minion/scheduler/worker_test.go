@@ -7,6 +7,7 @@ import (
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/minion/docker"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -34,33 +35,22 @@ func TestRunWorker(t *testing.T) {
 	// Wrong Minion IP, should do nothing.
 	runWorker(conn, dk, "1.2.3.5", *subnet)
 	dkcs, err := dk.List(nil)
-	if err != nil {
-		t.Errorf("Unexpected err %v", err)
-	}
-	if len(dkcs) > 0 {
-		t.Error(spew.Sprintf("Unexpected containers: %v", dkcs))
-	}
+	assert.NoError(t, err)
+	assert.Len(t, dkcs, 0)
 
 	// Run with a list error, should do nothing.
 	md.ListError = true
 	runWorker(conn, dk, "1.2.3.4", *subnet)
 	md.ListError = false
 	dkcs, err = dk.List(nil)
-	if err != nil {
-		t.Errorf("Unexpected err %v", err)
-	}
-	if len(dkcs) > 0 {
-		t.Error(spew.Sprintf("Unexpected containers: %v", dkcs))
-	}
+	assert.NoError(t, err)
+	assert.Len(t, dkcs, 0)
 
 	runWorker(conn, dk, "1.2.3.4", *subnet)
 	dkcs, err = dk.List(nil)
-	if err != nil {
-		t.Errorf("Unexpected err %v", err)
-	}
-	if len(dkcs) != 1 || dkcs[0].Image != "Image" {
-		t.Error(spew.Sprintf("Unexpected containers: %v", dkcs))
-	}
+	assert.NoError(t, err)
+	assert.Len(t, dkcs, 1)
+	assert.Equal(t, "Image", dkcs[0].Image)
 }
 
 func runSync(dk docker.Client, dbcs []db.Container,
@@ -88,25 +78,19 @@ func TestSyncWorker(t *testing.T) {
 	md.StartError = true
 	changed := runSync(dk, dbcs, nil, *subnet)
 	md.StartError = false
-	if len(changed) > 0 {
-		t.Error(spew.Sprintf("Expected no changed to to an error\n%v", changed))
-	}
+	assert.Len(t, changed, 0)
 
 	runSync(dk, dbcs, nil, *subnet)
 	dkcs, err := dk.List(nil)
 	changed, _, _ = syncWorker(dbcs, dkcs, *subnet)
-	if err != nil {
-		t.Errorf("Unexpected err %v", err)
-	}
+	assert.NoError(t, err)
 
 	if changed[0].DockerID != dkcs[0].ID {
 		t.Error(spew.Sprintf("Incorrect DockerID: %v", changed))
 	}
 
 	dbcs[0].DockerID = dkcs[0].ID
-	if !eq(changed, dbcs) {
-		t.Error(expLog("Changed DB Containers", changed, dbcs))
-	}
+	assert.Equal(t, dbcs, changed)
 
 	dkcsDB := []db.Container{
 		{
@@ -117,52 +101,34 @@ func TestSyncWorker(t *testing.T) {
 			Env:      dkcs[0].Env,
 		},
 	}
-	if !eq(dkcsDB, dbcs) {
-		t.Error(expLog("Incorrect docker.List()", dkcsDB, dbcs))
-	}
+	assert.Equal(t, dkcsDB, dbcs)
 
 	dbcs[0].DockerID = ""
 	changed = runSync(dk, dbcs, dkcs, *subnet)
 
 	newDkcs, err := dk.List(nil)
-	if err != nil {
-		t.Errorf("Unexpected err %v", err)
-	}
-	if !eq(newDkcs, dkcs) {
-		t.Error(expLog("Unexpected container change", newDkcs, dkcs))
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, dkcs, newDkcs)
 
 	dbcs[0].DockerID = dkcs[0].ID
-	if !eq(changed, dbcs) {
-		t.Error(expLog("Incorrect DB Containers", changed, dbcs))
-	}
+	assert.Equal(t, dbcs, changed)
 
 	// Atempt a failed remove
 	md.RemoveError = true
 	changed = runSync(dk, nil, dkcs, *subnet)
 	md.RemoveError = false
-	if len(changed) > 0 {
-		t.Error(spew.Sprintf("Expected no changed to to an error\n%v", changed))
-	}
+	assert.Len(t, changed, 0)
+
 	newDkcs, err = dk.List(nil)
-	if err != nil {
-		t.Errorf("Unexpected err %v", err)
-	}
-	if !eq(newDkcs, dkcs) {
-		t.Error(expLog("Unexpected container change", newDkcs, dkcs))
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, dkcs, newDkcs)
 
 	changed = runSync(dk, nil, dkcs, *subnet)
-	if len(changed) > 0 {
-		t.Error(spew.Sprintf("Expected no changed to to an error\n%v", changed))
-	}
+	assert.Len(t, changed, 0)
+
 	dkcs, err = dk.List(nil)
-	if err != nil {
-		t.Errorf("Unexpected err %v", err)
-	}
-	if len(dkcs) > 0 {
-		t.Error(expLog("Unexpected containers", dkcs, nil))
-	}
+	assert.NoError(t, err)
+	assert.Len(t, dkcs, 0)
 }
 
 func TestSyncJoinScore(t *testing.T) {
@@ -182,39 +148,25 @@ func TestSyncJoinScore(t *testing.T) {
 	}
 
 	score := syncJoinScore(dbc, dkc)
-	if score != 0 {
-		t.Errorf("Unexpected score %d", score)
-	}
+	assert.Zero(t, score)
 
 	dbc.Image = "Image1"
 	score = syncJoinScore(dbc, dkc)
-	if score != -1 {
-		t.Errorf("Unexpected score %d", score)
-	}
-	dbc.Image = dkc.Image
+	assert.Equal(t, -1, score)
 
+	dbc.Image = dkc.Image
 	dbc.Command = []string{"wrong"}
 	score = syncJoinScore(dbc, dkc)
-	if score != -1 {
-		t.Errorf("Unexpected score %d", score)
-	}
-	dbc.Command = dkc.Args
+	assert.Equal(t, -1, score)
 
+	dbc.Command = dkc.Args
 	dbc.Env = map[string]string{"a": "wrong"}
 	score = syncJoinScore(dbc, dkc)
-	if score != -1 {
-		t.Errorf("Unexpected score %d", score)
-	}
+	assert.Equal(t, -1, score)
 	dbc.Env = dkc.Env
 
 	dbc.DockerID = "2"
 	score = syncJoinScore(dbc, dkc)
-	if score != 1 {
-		t.Errorf("Unexpected score %d", score)
-	}
+	assert.Equal(t, 1, score)
 	dbc.DockerID = dkc.ID
-}
-
-func expLog(msg string, got, exp interface{}) string {
-	return spew.Sprintf("%s\nGot: %s\nExp: %s\n", msg, got, exp)
 }
