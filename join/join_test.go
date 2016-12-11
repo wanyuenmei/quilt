@@ -2,10 +2,9 @@ package join
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestJoin(t *testing.T) {
@@ -14,26 +13,14 @@ func TestJoin(t *testing.T) {
 	}
 
 	pairs, left, right := Join([]int{10, 11, 12}, []int{10, 11, 12}, score)
-	if len(left) > 0 {
-		t.Errorf("Unexpected lefts: %s", left)
-	}
-	if len(right) > 0 {
-		t.Errorf("Unexpected rights: %s", right)
-	}
-	if !eq(pairs, []Pair{{10, 10}, {11, 11}, {12, 12}}) {
-		t.Error(spew.Sprintf("Unexpected pairs: %s", pairs))
-	}
+	assert.Zero(t, len(left))
+	assert.Zero(t, len(right))
+	assert.Equal(t, []Pair{{10, 10}, {11, 11}, {12, 12}}, pairs)
 
 	pairs, left, right = Join([]int{10, 11, 12}, []int{13, 1, 2}, score)
-	if !eq(left, []interface{}{12}) {
-		t.Error(spew.Sprintf("Unexpected left: %s", left))
-	}
-	if !eq(right, []interface{}{13}) {
-		t.Error(spew.Sprintf("Unexpected right %s", right))
-	}
-	if !eq(pairs, []Pair{{10, 2}, {11, 1}}) {
-		t.Error(spew.Sprintf("Unexpected pairs: %s", pairs))
-	}
+	assert.Equal(t, []interface{}{12}, left)
+	assert.Equal(t, []interface{}{13}, right)
+	assert.Equal(t, []Pair{{10, 2}, {11, 1}}, pairs)
 }
 
 type JoinList []interface{}
@@ -58,27 +45,15 @@ func TestHashJoin(t *testing.T) {
 	}
 	pairs, left, right := HashJoin(JoinList{10, 11, 12},
 		JoinList{10, 11, 12}, keyFunc, keyFunc)
-	if len(left) > 0 {
-		t.Errorf("Unexpected lefts: %s", left)
-	}
-	if len(right) > 0 {
-		t.Errorf("Unexpected rights: %s", right)
-	}
-	if !eq(pairs, []Pair{{10, 10}, {11, 11}, {12, 12}}) {
-		t.Error(spew.Sprintf("Unexpected pairs: %s", pairs))
-	}
+	assert.Len(t, left, 0)
+	assert.Len(t, right, 0)
+	assert.Equal(t, []Pair{{10, 10}, {11, 11}, {12, 12}}, pairs)
 
 	pairs, left, right = HashJoin(JoinList{10, 11, 12},
 		JoinList{13, 11, 2}, keyFunc, keyFunc)
-	if len(left) != 2 {
-		t.Error(spew.Sprintf("Unexpected left: %s", left))
-	}
-	if len(right) != 2 {
-		t.Error(spew.Sprintf("Unexpected right %s", right))
-	}
-	if !eq(pairs, []Pair{{11, 11}}) {
-		t.Error(spew.Sprintf("Unexpected pairs: %s", pairs))
-	}
+	assert.Len(t, left, 2)
+	assert.Len(t, right, 2)
+	assert.Equal(t, []Pair{{11, 11}}, pairs)
 }
 
 func TestHashJoinNilKeyFunc(t *testing.T) {
@@ -87,27 +62,15 @@ func TestHashJoinNilKeyFunc(t *testing.T) {
 	}
 	pairs, left, right := HashJoin(JoinList{10, 11, 12},
 		JoinList{10, 11, 12}, nil, keyFunc)
-	if len(left) > 0 {
-		t.Errorf("Unexpected lefts: %s", left)
-	}
-	if len(right) > 0 {
-		t.Errorf("Unexpected rights: %s", right)
-	}
-	if !eq(pairs, []Pair{{10, 10}, {11, 11}, {12, 12}}) {
-		t.Error(spew.Sprintf("Unexpected pairs: %s", pairs))
-	}
+	assert.Len(t, left, 0)
+	assert.Len(t, right, 0)
+	assert.Equal(t, []Pair{{10, 10}, {11, 11}, {12, 12}}, pairs)
 
 	pairs, left, right = HashJoin(JoinList{10, 11, 12},
 		JoinList{13, 11, 2}, keyFunc, nil)
-	if len(left) != 2 {
-		t.Error(spew.Sprintf("Unexpected left: %s", left))
-	}
-	if len(right) != 2 {
-		t.Error(spew.Sprintf("Unexpected right %s", right))
-	}
-	if !eq(pairs, []Pair{{11, 11}}) {
-		t.Error(spew.Sprintf("Unexpected pairs: %s", pairs))
-	}
+	assert.Len(t, left, 2)
+	assert.Len(t, right, 2)
+	assert.Equal(t, []Pair{{11, 11}}, pairs)
 }
 
 func TestHashJoinUnHashableKey(t *testing.T) {
@@ -133,8 +96,4 @@ func ExampleJoin() {
 
 	fmt.Println(pairs, lonelyLefts, lonelyRights)
 	// Output: [{a 0} {bc 2}] [def] [4]
-}
-
-func eq(a, b interface{}) bool {
-	return reflect.DeepEqual(a, b)
 }
