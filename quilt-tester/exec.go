@@ -23,7 +23,7 @@ var sleep = time.Sleep
 // runSpecUntilConnected runs the given spec, and blocks until either all
 // machines have connected back to the daemon, or 500 seconds have passed.
 func runSpecUntilConnected(spec string) (string, string, error) {
-	cmd := exec.Command("quilt", "run", spec)
+	cmd := exec.Command("quilt", "run", "-f", spec)
 	stdout, stderr, err := execCmd(cmd, "INFRA")
 	if err != nil {
 		return stdout, stderr, err
@@ -80,7 +80,7 @@ func downloadSpecs(importPath string) (string, string, error) {
 // runSpec runs the given spec. Note that it does not block on the connection
 // status of the machines.
 func runSpec(spec string) (string, string, error) {
-	cmd := exec.Command("quilt", "run", spec)
+	cmd := exec.Command("quilt", "run", "-f", spec)
 	return execCmd(cmd, "RUN")
 }
 
