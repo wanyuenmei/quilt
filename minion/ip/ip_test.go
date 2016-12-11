@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
-	"reflect"
 	"strconv"
 	"testing"
 
@@ -120,8 +119,4 @@ func sliceToSet(slice []string) map[string]struct{} {
 		res[s] = struct{}{}
 	}
 	return res
-}
-
-func eq(a, b interface{}) bool {
-	return reflect.DeepEqual(a, b)
 }

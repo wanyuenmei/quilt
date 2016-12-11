@@ -462,7 +462,3 @@ func validateImage(image string) {
 		panic("Bad Image")
 	}
 }
-
-func eq(a1, a2 interface{}) bool {
-	return reflect.DeepEqual(a1, a2)
-}
