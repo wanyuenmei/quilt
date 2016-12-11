@@ -398,15 +398,23 @@ func updatePorts(odb ovsdb.Client, containers []db.Container) {
 		}
 	}
 	for _, r := range rights {
-		if err := addPort(odb, r.(ovsdb.Interface)); err != nil {
-			log.WithError(err).Error("failed to add openflow port")
-			continue
+		iface := r.(ovsdb.Interface)
+		if err := odb.CreateInterface(iface.Bridge, iface.Name); err != nil {
+			log.WithError(err).Warning("error creating openflow port")
+		}
+		if err := odb.ModifyInterface(iface); err != nil {
+			log.WithError(err).Error("error changing openflow port")
 		}
 	}
 	for _, p := range pairs {
 		l := p.L.(ovsdb.Interface)
 		r := p.R.(ovsdb.Interface)
-		if err := modPort(odb, l, r); err != nil {
+		if l.Type == r.Type && l.Peer == r.Peer &&
+			l.AttachedMAC == r.AttachedMAC && l.IfaceID == r.IfaceID {
+			continue
+		}
+
+		if err := odb.ModifyInterface(r); err != nil {
 			log.WithError(err).Error("failed to modify openflow port")
 			continue
 		}
@@ -438,24 +446,6 @@ func generateTargetPorts(containers []db.Container) ovsdb.InterfaceSlice {
 		})
 	}
 	return configs
-}
-
-func addPort(odb ovsdb.Client, iface ovsdb.Interface) error {
-	if err := odb.CreateInterface(iface.Bridge, iface.Name); err != nil {
-		log.WithError(err).Warning("error creating openflow port")
-	}
-	return odb.ModifyInterface(iface)
-}
-
-func modPort(odb ovsdb.Client, current ovsdb.Interface, target ovsdb.Interface) error {
-	if current.Type != target.Type ||
-		current.Peer != target.Peer ||
-		current.AttachedMAC != target.AttachedMAC ||
-		current.IfaceID != target.IfaceID {
-		return odb.ModifyInterface(target)
-	}
-
-	return nil
 }
 
 func updateDefaultGw(odb ovsdb.Client) {
