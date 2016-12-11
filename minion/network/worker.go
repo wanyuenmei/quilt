@@ -29,7 +29,6 @@ import (
 const (
 	nsPath           string = "/var/run/netns"
 	innerVeth        string = "eth0"
-	loopback         string = "lo"
 	innerMTU         int    = 1400
 	concurrencyLimit int    = 32 // Adjust to change per function goroutine limit
 )
@@ -161,7 +160,6 @@ func runWorker(conn db.Conn, dk docker.Client) {
 		updateContainerIPs(containers, labels)
 
 		wg.Wait()
-		updateLoopback(containers)
 		return nil
 	})
 }
@@ -250,15 +248,6 @@ func addNS(info nsInfo) error {
 			netnsDst, netnsSrc, err)
 	}
 	return nil
-}
-
-func updateLoopback(containers []db.Container) {
-	for _, dbc := range containers {
-		namespace := networkNS(dbc.DockerID)
-		if err := upLink(namespace, loopback); err != nil {
-			log.WithError(err).Error("failed to up loopback device")
-		}
-	}
 }
 
 func updateNAT(publicInterface string, containers []db.Container,
