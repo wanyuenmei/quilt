@@ -170,11 +170,11 @@ func TestSync(t *testing.T) {
 		expectedBoot []bootRequest, expectedStop []string) {
 		clst.runOnce()
 		providerInst := clst.providers[provider].(*fakeProvider)
-		bootResult := providerInst.bootRequests
-		stopResult := providerInst.stopRequests
+
+		assert.Equal(t, expectedBoot, providerInst.bootRequests)
+		assert.Equal(t, expectedStop, providerInst.stopRequests)
+
 		providerInst.clearLogs()
-		assert.Equal(t, expectedBoot, bootResult)
-		assert.Equal(t, expectedStop, stopResult)
 	}
 
 	noBoots := []bootRequest{}
