@@ -122,11 +122,10 @@ func TestPanicBadProvider(t *testing.T) {
 
 func TestSyncDB(t *testing.T) {
 	checkSyncDB := func(cloudMachines []machine.Machine,
-		databaseMachines []db.Machine, expectedBoot,
-		expectedStop []machine.Machine) {
-		_, bootResult, stopResult := syncDB(cloudMachines, databaseMachines)
-		assert.Equal(t, expectedBoot, bootResult)
-		assert.Equal(t, expectedStop, stopResult)
+		databaseMachines []db.Machine, expected syncDBResult) {
+		dbRes := syncDB(cloudMachines, databaseMachines)
+		assert.Equal(t, expected.boot, dbRes.boot)
+		assert.Equal(t, expected.stop, dbRes.stop)
 	}
 
 	var noMachines []machine.Machine
@@ -136,28 +135,34 @@ func TestSyncDB(t *testing.T) {
 	cmLarge := machine.Machine{Provider: FakeAmazon, Size: "m4.large"}
 
 	// Test boot with no size
-	checkSyncDB(noMachines, []db.Machine{dbNoSize}, []machine.Machine{cmNoSize},
-		noMachines)
+	checkSyncDB(noMachines, []db.Machine{dbNoSize}, syncDBResult{
+		boot: []machine.Machine{cmNoSize},
+	})
 
 	// Test boot with size
-	checkSyncDB(noMachines, []db.Machine{dbLarge}, []machine.Machine{cmLarge},
-		noMachines)
+	checkSyncDB(noMachines, []db.Machine{dbLarge}, syncDBResult{
+		boot: []machine.Machine{cmLarge},
+	})
 
 	// Test mixed boot
-	checkSyncDB(noMachines, []db.Machine{dbNoSize, dbLarge}, []machine.Machine{
-		cmNoSize, cmLarge}, noMachines)
+	checkSyncDB(noMachines, []db.Machine{dbNoSize, dbLarge}, syncDBResult{
+		boot: []machine.Machine{cmNoSize, cmLarge},
+	})
 
 	// Test partial boot
 	checkSyncDB([]machine.Machine{cmNoSize}, []db.Machine{dbNoSize, dbLarge},
-		[]machine.Machine{cmLarge}, noMachines)
+		syncDBResult{
+			boot: []machine.Machine{cmLarge}})
 
 	// Test stop
-	checkSyncDB([]machine.Machine{cmNoSize}, []db.Machine{}, noMachines,
-		[]machine.Machine{cmNoSize})
+	checkSyncDB([]machine.Machine{cmNoSize}, []db.Machine{}, syncDBResult{
+		stop: []machine.Machine{cmNoSize},
+	})
 
 	// Test partial stop
-	checkSyncDB([]machine.Machine{cmNoSize, cmLarge}, []db.Machine{}, noMachines,
-		[]machine.Machine{cmNoSize, cmLarge})
+	checkSyncDB([]machine.Machine{cmNoSize, cmLarge}, []db.Machine{}, syncDBResult{
+		stop: []machine.Machine{cmNoSize, cmLarge},
+	})
 }
 
 func TestSync(t *testing.T) {

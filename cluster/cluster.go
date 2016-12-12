@@ -203,9 +203,11 @@ func (clst cluster) join() (joinResult, error) {
 
 		res.machines = view.SelectFromMachine(nil)
 
-		var pairs []join.Pair
-		pairs, res.boot, res.terminate = syncDB(cloudMachines, res.machines)
-		for _, pair := range pairs {
+		dbResult := syncDB(cloudMachines, res.machines)
+		res.boot = dbResult.boot
+		res.terminate = dbResult.stop
+
+		for _, pair := range dbResult.pairs {
 			dbm := pair.L.(db.Machine)
 			m := pair.R.(machine.Machine)
 
@@ -289,8 +291,15 @@ func (clst cluster) syncACLs(adminACLs []string, appACLs []db.PortRange,
 	}
 }
 
-func syncDB(cloudMachines []machine.Machine, dbMachines []db.Machine) (
-	pairs []join.Pair, bootSet []machine.Machine, terminateSet []machine.Machine) {
+type syncDBResult struct {
+	pairs []join.Pair
+	boot  []machine.Machine
+	stop  []machine.Machine
+}
+
+func syncDB(cloudMachines []machine.Machine, dbMachines []db.Machine) syncDBResult {
+	ret := syncDBResult{}
+
 	scoreFun := func(left, right interface{}) int {
 		dbm := left.(db.Machine)
 		m := right.(machine.Machine)
@@ -315,16 +324,17 @@ func syncDB(cloudMachines []machine.Machine, dbMachines []db.Machine) (
 		}
 	}
 
-	pairs, dbmIface, cmIface := join.Join(dbMachines, cloudMachines, scoreFun)
+	var dbmIface, cmIface []interface{}
+	ret.pairs, dbmIface, cmIface = join.Join(dbMachines, cloudMachines, scoreFun)
 
 	for _, cm := range cmIface {
 		m := cm.(machine.Machine)
-		terminateSet = append(terminateSet, m)
+		ret.stop = append(ret.stop, m)
 	}
 
 	for _, dbm := range dbmIface {
 		m := dbm.(db.Machine)
-		bootSet = append(bootSet, machine.Machine{
+		ret.boot = append(ret.boot, machine.Machine{
 			Size:     m.Size,
 			Provider: m.Provider,
 			Region:   m.Region,
@@ -332,7 +342,7 @@ func syncDB(cloudMachines []machine.Machine, dbMachines []db.Machine) (
 			SSHKeys:  m.SSHKeys})
 	}
 
-	return pairs, bootSet, terminateSet
+	return ret
 }
 
 func (clst cluster) get() ([]machine.Machine, error) {
