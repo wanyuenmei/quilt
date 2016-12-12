@@ -621,11 +621,6 @@ func generateCurrentOpenFlow() (OFRuleSlice, error) {
 func generateTargetOpenFlow(odb ovsdb.Client, containers []db.Container,
 	labels []db.Label, connections []db.Connection) (OFRuleSlice, error) {
 
-	dflGatewayMAC, err := getMac("", quiltBridge)
-	if err != nil {
-		log.WithError(err).Error("failed to get MAC of default gateway.")
-	}
-
 	ifaces, err := odb.ListInterfaces()
 	if err != nil {
 		return nil, err
@@ -686,7 +681,7 @@ func generateTargetOpenFlow(odb ovsdb.Client, containers []db.Container,
 		// LOCAL is the default quilt-int port created with the bridge.
 		egressRule := fmt.Sprintf("table=0 priority=%d,in_port=%d,",
 			5000, ofVeth) +
-			"%s,%s," + fmt.Sprintf("dl_dst=%s actions=LOCAL", dflGatewayMAC)
+			"%s,%s," + fmt.Sprintf("nw_dst=%s actions=LOCAL", ip.GatewayIP)
 		ingressRule := fmt.Sprintf("table=0 priority=%d,in_port=LOCAL,", 5000) +
 			"%s,%s," + fmt.Sprintf("dl_dst=%s actions=output:%d",
 			dbcMac, ofVeth)
@@ -720,9 +715,9 @@ func generateTargetOpenFlow(odb ovsdb.Client, containers []db.Container,
 			// Allow ICMP
 			rules = append(rules,
 				fmt.Sprintf(
-					"table=0 priority=%d,icmp,in_port=%d,dl_dst=%s"+
+					"table=0 priority=%d,icmp,in_port=%d,nw_dst=%s"+
 						" actions=LOCAL",
-					5000, ofVeth, dflGatewayMAC))
+					5000, ofVeth, ip.GatewayIP))
 			rules = append(rules,
 				fmt.Sprintf(
 					"table=0 priority=%d,icmp,in_port=LOCAL,"+

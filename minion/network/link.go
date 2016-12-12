@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
-	"strings"
 )
 
 // DelVeth deletes a virtual ethernet interface.
@@ -69,31 +68,6 @@ func linkDelete(namespace, name string) error {
 			name, namespaceName(namespace), err)
 	}
 	return nil
-}
-
-// Query the link for information
-// Interprets the empty string as the "root" namespace
-func linkQuery(namespace, name, query string) (string, error) {
-	// The output for `ip link show` gives a field name followed
-	// by the value. We take advantage of this fact while parsing.
-
-	var cmd string
-
-	stdout, _, err := ipExecVerbose(namespace, "link show %s", name)
-	if err != nil {
-		return "", fmt.Errorf("query command failed: %s: %s", cmd, err)
-	}
-
-	splitStr := strings.Fields(string(stdout))
-	for i := 0; i < len(splitStr)-1; i++ {
-		if splitStr[i] == query {
-			return splitStr[i+1], nil
-		}
-	}
-
-	err = fmt.Errorf("could not find link %s in %s",
-		name, namespaceName(namespace))
-	return "", err
 }
 
 // Lists all veths in the root namespace
@@ -159,10 +133,6 @@ func delIP(namespace, ip, dev string) error {
 			ip, namespaceName(namespace), err)
 	}
 	return nil
-}
-
-func getMac(namespace, dev string) (string, error) {
-	return linkQuery(namespace, dev, "link/ether")
 }
 
 func upLink(namespace, dev string) error {
