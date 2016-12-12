@@ -31,7 +31,7 @@ const (
 	innerVeth        string = "eth0"
 	loopback         string = "lo"
 	innerMTU         int    = 1400
-	concurrencyLimit int    = 1 // Adjust to change per function goroutine limit
+	concurrencyLimit int    = 32 // Adjust to change per function goroutine limit
 )
 
 // The machine's public interface.
@@ -131,14 +131,12 @@ func runWorker(conn db.Conn, dk docker.Client) {
 		var wg sync.WaitGroup
 		wg.Add(2)
 
-		// XXX: Should be a go routine.
-		func() {
+		go func() {
 			updateEtcHosts(dk, containers, labels, connections)
 			wg.Done()
 		}()
 
-		// XXX: Should be a go routine.
-		func() {
+		go func() {
 			updateNameservers(dk, containers)
 			wg.Done()
 		}()
@@ -152,8 +150,7 @@ func runWorker(conn db.Conn, dk docker.Client) {
 		if exists, err := LinkExists("", quiltBridge); exists {
 			updateDefaultGw(odb)
 			wg.Add(1)
-			// XXX: Should be a go routine.
-			func() {
+			go func() {
 				updateOpenFlow(odb, containers, labels, connections)
 				wg.Done()
 			}()
