@@ -165,15 +165,6 @@ func getMac(namespace, dev string) (string, error) {
 	return linkQuery(namespace, dev, "link/ether")
 }
 
-func setMac(namespace, dev, mac string) error {
-	err := ipExec(namespace, "link set dev %s address %s", dev, mac)
-	if err != nil {
-		return fmt.Errorf("failed to set mac %s for %s in %s: %s",
-			mac, dev, namespaceName(namespace), err)
-	}
-	return nil
-}
-
 func upLink(namespace, dev string) error {
 	up, err := linkIsUp(namespace, dev)
 	if up || err != nil {
