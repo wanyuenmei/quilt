@@ -333,7 +333,10 @@ func TestUpdateCluster(t *testing.T) {
 	assert.True(t, oldAmzn == amzn)
 
 	assert.Empty(t, amzn.stopRequests)
-	assert.Equal(t, []bootRequest{{"size1", amazonCloudConfig}}, amzn.bootRequests)
+	assert.Equal(t, []bootRequest{{
+		size:        "size1",
+		cloudConfig: amazonCloudConfig,
+	}}, amzn.bootRequests)
 	assert.Equal(t, "ns1", amzn.namespace)
 	amzn.clearLogs()
 
@@ -360,7 +363,10 @@ func TestUpdateCluster(t *testing.T) {
 	assert.Empty(t, oldAmzn.stopRequests)
 
 	assert.Equal(t, "ns2", amzn.namespace)
-	assert.Equal(t, []bootRequest{{"size2", amazonCloudConfig}}, amzn.bootRequests)
+	assert.Equal(t, []bootRequest{{
+		size:        "size2",
+		cloudConfig: amazonCloudConfig,
+	}}, amzn.bootRequests)
 	assert.Empty(t, amzn.stopRequests)
 }
 
