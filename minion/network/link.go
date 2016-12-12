@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
-	"strconv"
 	"strings"
 )
 
@@ -41,18 +40,6 @@ var AddVeth = func(endpointID string) (string, error) {
 	}
 
 	return tmpPeer, nil
-}
-
-func getLinkMTU(namespace, name string) (int, error) {
-	res, err := linkQuery(namespace, name, "mtu")
-	if err != nil {
-		return 0, err
-	}
-	mtu, err := strconv.Atoi(res)
-	if err != nil {
-		return 0, err
-	}
-	return mtu, nil
 }
 
 // LinkExists reports whether or not the virtual link exists.
