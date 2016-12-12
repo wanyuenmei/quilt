@@ -90,18 +90,18 @@ func TestCreateEndpoint(t *testing.T) {
 	_, err = d.CreateEndpoint(req)
 	assert.NotNil(t, err)
 
-	req.Interface.Address = "10.1.0.1"
+	req.Interface.Address = "10.1.0.1/8"
 	req.Interface.MacAddress = ""
 	expResp := dnet.EndpointInterface{
-		MacAddress: ipdef.ToMac("10.1.0.1"),
+		MacAddress: ipdef.IPStrToMac("10.1.0.1"),
 	}
 	resp, err := d.CreateEndpoint(req)
 	assert.Nil(t, err)
 	assert.Equal(t, expResp, *resp.Interface)
 
 	req.EndpointID = one
-	req.Interface.Address = "10.1.0.2"
-	expResp.MacAddress = ipdef.ToMac("10.1.0.2")
+	req.Interface.Address = "10.1.0.2/8"
+	expResp.MacAddress = ipdef.IPStrToMac("10.1.0.2")
 	resp, err = d.CreateEndpoint(req)
 	assert.Nil(t, err)
 	assert.Equal(t, expResp, *resp.Interface)

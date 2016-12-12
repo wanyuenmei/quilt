@@ -15,6 +15,6 @@ func TestToMac(t *testing.T) {
 			rand.Intn(256), rand.Intn(256)
 		addr := net.IPv4(byte(a), byte(b), byte(c), byte(d))
 		exp := fmt.Sprintf("02:00:%02x:%02x:%02x:%02x", a, b, c, d)
-		assert.Equal(t, exp, ToMac(addr.String()))
+		assert.Equal(t, exp, IPStrToMac(addr.String()))
 	}
 }

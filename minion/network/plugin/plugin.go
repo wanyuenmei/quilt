@@ -1,9 +1,9 @@
 package plugin
 
 import (
-	"errors"
 	"fmt"
 	"math/rand"
+	"net"
 	"os"
 	"path/filepath"
 	"time"
@@ -65,9 +65,9 @@ func (d driver) GetCapabilities() (*dnet.CapabilitiesResponse, error) {
 func (d driver) CreateEndpoint(req *dnet.CreateEndpointRequest) (
 	*dnet.CreateEndpointResponse, error) {
 
-	addr := req.Interface.Address
-	if addr == "" {
-		return nil, errors.New("no IP address provided")
+	addr, _, err := net.ParseCIDR(req.Interface.Address)
+	if err != nil {
+		return nil, fmt.Errorf("invalid IP: %s", req.Interface.Address)
 	}
 
 	mac := req.Interface.MacAddress
@@ -81,7 +81,7 @@ func (d driver) CreateEndpoint(req *dnet.CreateEndpointRequest) (
 
 	resp := &dnet.CreateEndpointResponse{
 		Interface: &dnet.EndpointInterface{
-			MacAddress: ipdef.ToMac(addr),
+			MacAddress: ipdef.IPToMac(addr),
 		},
 	}
 	return resp, nil

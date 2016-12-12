@@ -30,6 +30,7 @@ type Container struct {
 	Name   string
 	Image  string
 	IP     string
+	Mac    string
 	Path   string
 	Args   []string
 	Pid    int
@@ -273,6 +274,7 @@ func (dk Client) Get(id string) (Container, error) {
 		Name:   dkc.Name,
 		ID:     dkc.ID,
 		IP:     dkc.NetworkSettings.IPAddress,
+		Mac:    dkc.NetworkSettings.MacAddress,
 		EID:    dkc.NetworkSettings.EndpointID,
 		Image:  dkc.Config.Image,
 		Path:   dkc.Path,
@@ -286,6 +288,7 @@ func (dk Client) Get(id string) (Container, error) {
 	if len(networks) == 1 {
 		config := dkc.NetworkSettings.Networks[networks[0]]
 		c.IP = config.IPAddress
+		c.Mac = config.MacAddress
 		c.EID = config.EndpointID
 	} else if len(networks) > 1 {
 		log.Warnf("Multiple networks for container: %s", dkc.ID)

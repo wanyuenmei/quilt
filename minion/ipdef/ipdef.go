@@ -31,13 +31,17 @@ var (
 	GatewayIP = net.IPv4(10, 0, 0, 1).To4()
 )
 
-// ToMac converts the given IP address string into an internal MAC address.
-func ToMac(ipStr string) string {
+// IPStrToMac converts the given IP address string into a MAC address.
+func IPStrToMac(ipStr string) string {
 	parsedIP := net.ParseIP(ipStr)
 	if parsedIP == nil {
 		return ""
 	}
+	return IPToMac(parsedIP)
+}
 
-	ip := parsedIP.To4()
+// IPToMac converts the given IP address into a MAC address.
+func IPToMac(ip net.IP) string {
+	ip = ip.To4()
 	return fmt.Sprintf("02:00:%02x:%02x:%02x:%02x", ip[0], ip[1], ip[2], ip[3])
 }

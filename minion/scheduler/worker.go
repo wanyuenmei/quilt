@@ -7,7 +7,6 @@ import (
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/join"
 	"github.com/NetSys/quilt/minion/docker"
-	"github.com/NetSys/quilt/minion/ipdef"
 	"github.com/NetSys/quilt/minion/network/plugin"
 	"github.com/NetSys/quilt/util"
 	log "github.com/Sirupsen/logrus"
@@ -92,7 +91,7 @@ func syncWorker(dbcs []db.Container, dkcs []docker.Container, subnet net.IPNet) 
 			dbc.DockerID = dkc.ID
 			dbc.Pid = dkc.Pid
 			dbc.IP = dkc.IP
-			dbc.Mac = ipdef.ToMac(dkc.IP)
+			dbc.Mac = dkc.Mac
 			dbc.EndpointID = dkc.EID
 			changed = append(changed, dbc)
 		}
