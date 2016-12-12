@@ -14,15 +14,9 @@ import (
 func checkQuery(t *testing.T, s server, table db.TableType, exp string) {
 	reply, err := s.Query(context.Background(),
 		&pb.DBQuery{Table: string(table)})
-	if err != nil {
-		t.Errorf("Unexpected error: %s\n", err.Error())
-		return
-	}
 
-	if exp != reply.TableContents {
-		t.Errorf(`Bad query response: expected "%s", got "%s".`,
-			exp, reply.TableContents)
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, exp, reply.TableContents, "Wrong query response")
 }
 
 func TestMachineResponse(t *testing.T) {
@@ -79,16 +73,7 @@ func TestBadDeployment(t *testing.T) {
 	_, err := s.Deploy(context.Background(),
 		&pb.DeployRequest{Deployment: badDeployment})
 
-	if err == nil {
-		t.Error("Expected error from bad deployment.")
-		return
-	}
-
-	expErr := "unexpected end of JSON input"
-	if err.Error() != expErr {
-		t.Errorf("Expected deployment error %s, but got %s\n",
-			expErr, err.Error())
-	}
+	assert.EqualError(t, err, "unexpected end of JSON input")
 }
 
 func TestDeploy(t *testing.T) {
@@ -108,10 +93,7 @@ func TestDeploy(t *testing.T) {
 	_, err := s.Deploy(context.Background(),
 		&pb.DeployRequest{Deployment: createMachineDeployment})
 
-	if err != nil {
-		t.Errorf("Unexpected error when deploying stitch: %s\n", err.Error())
-		return
-	}
+	assert.NoError(t, err)
 
 	var spec string
 	conn.Transact(func(view db.Database) error {
