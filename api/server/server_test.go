@@ -111,3 +111,42 @@ func TestDeploy(t *testing.T) {
 
 	assert.Equal(t, exp, actual)
 }
+
+func TestVagrantDeployment(t *testing.T) {
+	conn := db.New()
+	s := server{dbConn: conn}
+
+	vagrantDeployment := `
+	{"Machines":[
+		{"Provider":"Vagrant",
+		"Role":"Master",
+		"Size":"m4.large"
+	}, {"Provider":"Vagrant",
+		"Role":"Worker",
+		"Size":"m4.large"
+	}]}`
+	vagrantErrMsg := "The Vagrant provider is in development." +
+		" The stitch will continue to run, but" +
+		" probably won't work correctly."
+
+	_, err := s.Deploy(context.Background(),
+		&pb.DeployRequest{Deployment: vagrantDeployment})
+
+	assert.Error(t, err, vagrantErrMsg)
+
+	var spec string
+	conn.Transact(func(view db.Database) error {
+		clst, err := view.GetCluster()
+		assert.NoError(t, err)
+		spec = clst.Spec
+		return nil
+	})
+
+	exp, err := stitch.FromJSON(vagrantDeployment)
+	assert.NoError(t, err)
+
+	actual, err := stitch.FromJSON(spec)
+	assert.NoError(t, err)
+
+	assert.Equal(t, exp, actual)
+}

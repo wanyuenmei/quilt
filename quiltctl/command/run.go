@@ -134,7 +134,7 @@ func (rCmd *Run) Run() int {
 
 	err = c.Deploy(deployment)
 	if err != nil {
-		log.WithError(err).Error("Unable to start run.")
+		log.WithError(err).Error("Error while starting run.")
 		return 1
 	}
 

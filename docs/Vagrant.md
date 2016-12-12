@@ -1,4 +1,6 @@
 # Vagrant
+NOTE: The Vagrant backend is not yet finished. Please use a different
+provider.
 
 The Vagrant backend allows Quilt to operate local virtual machines in a Quilt
 cluster, just as if they were running in a cloud provider.  This can be quite

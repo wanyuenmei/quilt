@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -118,6 +119,19 @@ func (s server) Deploy(cts context.Context, deployReq *pb.DeployRequest) (
 		view.Commit(cluster)
 		return nil
 	})
+	if err != nil {
+		return &pb.DeployReply{}, err
+	}
 
-	return &pb.DeployReply{}, err
+	// XXX: Remove this error when the Vagrant provider is done.
+	for _, machine := range stitch.Machines {
+		if machine.Provider == db.Vagrant {
+			err = errors.New("The Vagrant provider is in development." +
+				" The stitch will continue to run, but" +
+				" probably won't work correctly.")
+			return &pb.DeployReply{}, err
+		}
+	}
+
+	return &pb.DeployReply{}, nil
 }
