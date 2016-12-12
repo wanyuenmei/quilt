@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
-	"os"
+	"net"
 	"os/exec"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -23,6 +24,8 @@ import (
 	"github.com/NetSys/quilt/util"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/vishvananda/netlink"
+	"github.com/vishvananda/netns"
 )
 
 const (
@@ -33,14 +36,6 @@ const (
 
 // The machine's public interface.
 var publicInterface string
-
-// This represents a network namespace
-type nsInfo struct {
-	ns  string
-	pid int
-}
-
-type nsInfoSlice []nsInfo
 
 // This represents a rule in the iptables
 type ipRule struct {
@@ -141,7 +136,6 @@ func runWorker(conn db.Conn, dk docker.Client) {
 			wg.Done()
 		}()
 
-		updateNamespaces(containers)
 		if publicInterface != "" {
 			updateNAT(publicInterface, containers, connections)
 		}
@@ -158,92 +152,6 @@ func runWorker(conn db.Conn, dk docker.Client) {
 		wg.Wait()
 		return nil
 	})
-}
-
-// If a namespace in the path is detected as invalid and conflicts with
-// a namespace that should exist, it's removed and replaced.
-func updateNamespaces(containers []db.Container) {
-	// A symbolic link in the netns path is considered a "namespace".
-	// The actual namespace is elsewhere but we link them all into the
-	// canonical location and manage them there.
-	//
-	// We keep all our namespaces in /var/run/netns/
-
-	var targetNamespaces nsInfoSlice
-	for _, dbc := range containers {
-		targetNamespaces = append(targetNamespaces,
-			nsInfo{ns: networkNS(dbc.DockerID), pid: dbc.Pid})
-	}
-	currentNamespaces, err := generateCurrentNamespaces()
-	if err != nil {
-		log.WithError(err).Error("failed to get namespaces")
-		return
-	}
-
-	key := func(val interface{}) interface{} {
-		return val.(nsInfo).ns
-	}
-
-	_, lefts, rights := join.HashJoin(currentNamespaces, targetNamespaces, key, key)
-
-	for _, l := range lefts {
-		if err := delNS(l.(nsInfo)); err != nil {
-			log.WithError(err).Error("error deleting namespace")
-		}
-	}
-
-	for _, r := range rights {
-		if err := addNS(r.(nsInfo)); err != nil {
-			log.WithError(err).Error("error adding namespace")
-		}
-	}
-}
-
-func generateCurrentNamespaces() (nsInfoSlice, error) {
-	files, err := ioutil.ReadDir(nsPath)
-	if err != nil {
-		return nil, err
-	}
-
-	var infos nsInfoSlice
-	for _, file := range files {
-		fi, err := os.Lstat(fmt.Sprintf("%s/%s", nsPath, file.Name()))
-		if err != nil {
-			return nil, err
-		}
-		if fi.Mode()&os.ModeSymlink == os.ModeSymlink {
-			infos = append(infos, nsInfo{ns: file.Name()})
-		}
-	}
-	return infos, nil
-}
-
-func delNS(info nsInfo) error {
-	netnsDst := fmt.Sprintf("%s/%s", nsPath, info.ns)
-	if err := os.Remove(netnsDst); err != nil {
-		return fmt.Errorf("failed to remove namespace %s: %s",
-			netnsDst, err)
-	}
-	return nil
-}
-
-func addNS(info nsInfo) error {
-	netnsSrc := fmt.Sprintf("/hostproc/%d/ns/net", info.pid)
-	netnsDst := fmt.Sprintf("%s/%s", nsPath, info.ns)
-	if _, err := os.Stat(netnsDst); err == nil {
-		if err := os.Remove(netnsDst); err != nil {
-			return fmt.Errorf("failed to remove broken namespace %s: %s",
-				netnsDst, err)
-		}
-	} else if !os.IsNotExist(err) && err != nil {
-		return fmt.Errorf("failed to query namespace %s: %s",
-			netnsDst, err)
-	}
-	if err := os.Symlink(netnsSrc, netnsDst); err != nil {
-		return fmt.Errorf("failed to create namespace %s with source %s: %s",
-			netnsDst, netnsSrc, err)
-	}
-	return nil
 }
 
 func updateNAT(publicInterface string, containers []db.Container,
@@ -445,67 +353,101 @@ func generateTargetPorts(containers []db.Container) ovsdb.InterfaceSlice {
 	return configs
 }
 
-func updateIPs(namespace string, dev string, currIPs []string,
-	targetIPs []string) error {
-
-	_, ipToDel, ipToAdd := join.HashJoin(join.StringSlice(currIPs),
-		join.StringSlice(targetIPs), nil, nil)
-
-	for _, ip := range ipToDel {
-		if err := delIP(namespace, ip.(string), dev); err != nil {
-			return err
-		}
-	}
-
-	for _, ip := range ipToAdd {
-		if err := addIP(namespace, ip.(string), dev); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func updateContainerIPs(containers []db.Container, labels []db.Label) {
+	// XXX: Once we move to official OVN load balancer, containers will no longer
+	// have multiple IP addresses and this function will become redundant.
+	// Therefore, since the code is temporary, we're refraining from unit testing it
+	// for now.  If that changes, tests should be added.
 	labelIP := make(map[string]string)
 	for _, l := range labels {
 		labelIP[l.Label] = l.IP
 	}
+
+	// It's not safe for this go routine to be assigned to a different thread while
+	// we're messing with network namespaces so we lock it to its current one.
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 
 	for _, c := range containers {
 		updateContainerIP(c, labelIP)
 	}
 }
 
-func updateContainerIP(dbc db.Container, labelIP map[string]string) {
-	var err error
-	ns := networkNS(dbc.DockerID)
-	ip := dbc.IP
-
-	currIPs, err := listIP(ns, innerVeth)
+func updateContainerIP(dbc db.Container, labelIPs map[string]string) {
+	ns, err := netns.GetFromPath(fmt.Sprintf("/hostproc/%d/ns/net", dbc.Pid))
 	if err != nil {
-		log.WithError(err).Error("failed to list current ip addresses")
+		log.WithError(err).Warn("Failed to get container namespace")
+		return
+	}
+	defer ns.Close()
+
+	nlh, err := netlink.NewHandleAt(ns)
+	if err != nil {
+		log.WithError(err).Warn("Failed to get netlink handle")
+		return
+	}
+	defer nlh.Delete()
+
+	eth0, err := nlh.LinkByName("eth0")
+	if err != nil {
+		log.WithError(err).Warn("Failed to find eth0")
 		return
 	}
 
-	newIPSet := make(map[string]struct{})
-	newIPSet[ip] = struct{}{}
+	eth0IPs, err := nlh.AddrList(eth0, 0)
+	if err != nil {
+		log.WithError(err).Warn("Failed to list eth0 IP addresses")
+		return
+	}
+
+	var currIPs []string
+	for _, ip := range eth0IPs {
+		currIPs = append(currIPs, ip.String())
+	}
+
+	targetIPs := generateTargetIPs(dbc, labelIPs)
+
+	_, ipToDel, ipToAdd := join.HashJoin(join.StringSlice(currIPs),
+		join.StringSlice(targetIPs), nil, nil)
+
+	dbcIP := net.ParseIP(dbc.IP)
+	for _, ip := range ipToDel {
+		addr, err := netlink.ParseAddr(ip.(string))
+		if err != nil {
+			panic(fmt.Sprintf("Not Reached: %v", err))
+		}
+
+		// Don't delete the container IP.
+		if addr.IP.Equal(dbcIP) {
+			continue
+		}
+
+		nlh.AddrDel(eth0, addr)
+	}
+
+	for _, ip := range ipToAdd {
+		addr, err := netlink.ParseAddr(ip.(string))
+		if err != nil {
+			panic(fmt.Sprintf("Not Reached: %v", err))
+		}
+		nlh.AddrAdd(eth0, addr)
+	}
+}
+
+func generateTargetIPs(dbc db.Container, labelIPs map[string]string) []string {
+	ipSet := map[string]struct{}{}
 	for _, l := range dbc.Labels {
-		newIP := labelIP[l]
-		if newIP != "" {
-			newIPSet[newIP] = struct{}{}
+		if ip := labelIPs[l]; ip != "" {
+			ipSet[ip] = struct{}{}
 		}
 	}
 
-	var newIPs []string
-	for ip := range newIPSet {
-		newIPs = append(newIPs, ip+"/8")
+	var targetIPs []string
+	for ip := range ipSet {
+		targetIPs = append(targetIPs, ip+"/8")
 	}
 
-	if err := updateIPs(ns, innerVeth, currIPs, newIPs); err != nil {
-		log.WithError(err).Error("failed to update IPs")
-		return
-	}
+	return targetIPs
 }
 
 // Sets up the OpenFlow tables to get packets from containers into the OVN controlled
@@ -948,17 +890,8 @@ func generateEtcHosts(dbc db.Container, labels map[string]db.Label,
 	return strings.Join(hosts, "\n") + "\n"
 }
 
-func networkNS(id string) string {
-	return fmt.Sprintf("%s_ns", id[0:13])
-}
-
 func patchPorts(id string) (br, quilt string) {
 	return ipdef.IFName("br_" + id), ipdef.IFName("q_" + id)
-}
-
-func ipExec(namespace, format string, args ...interface{}) error {
-	_, _, err := ipExecVerbose(namespace, format, args...)
-	return err
 }
 
 // Use like the `ip` command
@@ -1004,14 +937,6 @@ var shVerbose = func(format string, args ...interface{}) (
 	}
 
 	return outBuf.Bytes(), errBuf.Bytes(), nil
-}
-
-// For debug messages
-func namespaceName(namespace string) string {
-	if namespace == "" {
-		return "root namespace"
-	}
-	return fmt.Sprintf("%s namespace", namespace)
 }
 
 // makeIPRule takes an ip rule as formatted in the output of `iptables -S`,
@@ -1177,14 +1102,6 @@ func makeOFRule(flowEntry string) (OFRule, error) {
 		actions: strings.Join(allMatches, ","),
 	}
 	return newRule, nil
-}
-
-func (nsis nsInfoSlice) Get(ii int) interface{} {
-	return nsis[ii]
-}
-
-func (nsis nsInfoSlice) Len() int {
-	return len(nsis)
 }
 
 func (iprs ipRuleSlice) Get(ii int) interface{} {
