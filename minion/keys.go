@@ -2,6 +2,7 @@ package minion
 
 import (
 	"os"
+	"time"
 
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/util"
@@ -12,10 +13,20 @@ import (
 const authorizedKeysFile = "/home/quilt/.ssh/authorized_keys"
 
 func syncAuthorizedKeys(conn db.Conn) {
+	waitForMinion(conn)
 	for range conn.TriggerTick(30, db.MinionTable).C {
 		if err := runOnce(conn); err != nil {
 			log.WithError(err).Error("Failed to sync keys")
 		}
+	}
+}
+
+func waitForMinion(conn db.Conn) {
+	for {
+		if _, err := conn.MinionSelf(); err == nil {
+			return
+		}
+		time.Sleep(500 * time.Millisecond)
 	}
 }
 
