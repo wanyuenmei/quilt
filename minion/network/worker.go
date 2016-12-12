@@ -541,6 +541,22 @@ func updateContainers(in chan db.Container, labelIP map[string]string) {
 			log.WithError(err).Error("failed to update IPs")
 			continue
 		}
+
+		currMac, err := getMac(ns, innerVeth)
+		if err != nil {
+			log.WithError(err).Errorf("failed to get MAC for %s in %s",
+				innerVeth, namespaceName(ns))
+			continue
+		}
+
+		if currMac != dbc.Mac {
+			if err := setMac(ns, innerVeth, dbc.Mac); err != nil {
+				log.WithError(err).Errorf(
+					"failed to set MAC for %s in %s",
+					innerVeth, namespaceName(ns))
+				continue
+			}
+		}
 	}
 }
 
