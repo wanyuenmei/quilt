@@ -72,7 +72,6 @@ func (sCmd *Stop) Run() int {
 		return 1
 	}
 
-	fmt.Printf("Successfully began stopping namespace `%s`.\n", sCmd.namespace)
-
+	log.WithField("namespace", sCmd.namespace).Debug("Stopping namespace")
 	return 0
 }
