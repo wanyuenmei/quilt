@@ -684,8 +684,8 @@ func generateTargetOpenFlow(odb ovsdb.Client, containers []db.Container,
 		// LOCAL is the default quilt-int port created with the bridge.
 		egressRule := fmt.Sprintf("table=0 priority=%d,in_port=%d,",
 			5000, ofVeth) +
-			"%s,%s," + fmt.Sprintf("nw_dst=%s actions=LOCAL",
-			ipdef.GatewayIP)
+			"%s,%s," + fmt.Sprintf("dl_dst=%s actions=LOCAL",
+			ipdef.IPToMac(ipdef.GatewayIP))
 		ingressRule := fmt.Sprintf("table=0 priority=%d,in_port=LOCAL,", 5000) +
 			"%s,%s," + fmt.Sprintf("dl_dst=%s actions=output:%d",
 			dbcMac, ofVeth)
@@ -719,9 +719,9 @@ func generateTargetOpenFlow(odb ovsdb.Client, containers []db.Container,
 			// Allow ICMP
 			rules = append(rules,
 				fmt.Sprintf(
-					"table=0 priority=%d,icmp,in_port=%d,nw_dst=%s"+
+					"table=0 priority=%d,icmp,in_port=%d,dl_dst=%s"+
 						" actions=LOCAL",
-					5000, ofVeth, ipdef.GatewayIP))
+					5000, ofVeth, ipdef.IPToMac(ipdef.GatewayIP)))
 			rules = append(rules,
 				fmt.Sprintf(
 					"table=0 priority=%d,icmp,in_port=LOCAL,"+

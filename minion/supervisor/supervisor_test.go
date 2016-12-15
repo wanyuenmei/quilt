@@ -448,6 +448,7 @@ func ovsExecArgs(ip, leader string) []string {
 		fmt.Sprintf("external_ids:system-id=\"%s\"", ip),
 		"--", "add-br", "quilt-int",
 		"--", "set", "bridge", "quilt-int", "fail_mode=secure",
+		"other_config:hwaddr=\"02:00:0a:00:00:01\"",
 	}
 }
 

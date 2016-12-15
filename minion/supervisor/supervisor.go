@@ -8,6 +8,7 @@ import (
 
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/minion/docker"
+	"github.com/NetSys/quilt/minion/ipdef"
 	"github.com/NetSys/quilt/util"
 
 	log "github.com/Sirupsen/logrus"
@@ -149,6 +150,7 @@ func (sv *supervisor) updateWorker(IP string, leaderIP string, etcdIPs []string)
 		return
 	}
 
+	gwMac := ipdef.IPToMac(ipdef.GatewayIP)
 	err := execRun("ovs-vsctl", "set", "Open_vSwitch", ".",
 		fmt.Sprintf("external_ids:ovn-remote=\"tcp:%s:6640\"", leaderIP),
 		fmt.Sprintf("external_ids:ovn-encap-ip=%s", IP),
@@ -156,7 +158,8 @@ func (sv *supervisor) updateWorker(IP string, leaderIP string, etcdIPs []string)
 		fmt.Sprintf("external_ids:api_server=\"http://%s:9000\"", leaderIP),
 		fmt.Sprintf("external_ids:system-id=\"%s\"", IP),
 		"--", "add-br", "quilt-int",
-		"--", "set", "bridge", "quilt-int", "fail_mode=secure")
+		"--", "set", "bridge", "quilt-int", "fail_mode=secure",
+		fmt.Sprintf("other_config:hwaddr=\"%s\"", gwMac))
 	if err != nil {
 		log.WithError(err).Warnf("Failed to exec in %s.", Ovsvswitchd)
 	} else {
