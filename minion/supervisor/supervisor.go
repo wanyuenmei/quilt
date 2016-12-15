@@ -2,6 +2,7 @@ package supervisor
 
 import (
 	"fmt"
+	"net"
 	"os/exec"
 	"reflect"
 	"strings"
@@ -162,14 +163,27 @@ func (sv *supervisor) updateWorker(IP string, leaderIP string, etcdIPs []string)
 		fmt.Sprintf("other_config:hwaddr=\"%s\"", gwMac))
 	if err != nil {
 		log.WithError(err).Warnf("Failed to exec in %s.", Ovsvswitchd)
-	} else {
-		sv.SetInit(true)
+		return
+	}
+
+	err = execRun("ip", "link", "set", "dev", "quilt-int", "up")
+	if err != nil {
+		log.WithError(err).Warnf("Failed to bring up quilt-int")
+		return
+	}
+
+	ip := net.IPNet{IP: ipdef.GatewayIP, Mask: ipdef.QuiltSubnet.Mask}
+	err = execRun("ip", "addr", "add", ip.String(), "dev", "quilt-int")
+	if err != nil {
+		log.WithError(err).Warnf("Failed to set quilt-int IP")
+		return
 	}
 
 	/* The ovn controller doesn't support reconfiguring ovn-remote mid-run.
 	 * So, we need to restart the container when the leader changes. */
 	sv.Remove(Ovncontroller)
 	sv.run(Ovncontroller, "ovn-controller")
+	sv.SetInit(true)
 }
 
 func (sv *supervisor) updateMaster(IP string, etcdIPs []string, leader bool) {

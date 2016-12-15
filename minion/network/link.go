@@ -134,28 +134,3 @@ func delIP(namespace, ip, dev string) error {
 	}
 	return nil
 }
-
-func upLink(namespace, dev string) error {
-	up, err := linkIsUp(namespace, dev)
-	if up || err != nil {
-		return err
-	}
-
-	if err = ipExec(namespace, "link set dev %s up", dev); err != nil {
-		return fmt.Errorf("failed to set %s up in %s: %s",
-			dev, namespaceName(namespace), err)
-	}
-
-	return nil
-}
-
-func linkIsUp(namespace, dev string) (bool, error) {
-	stdout, _, err := ipExecVerbose(namespace, "link show %s", dev)
-	if err != nil {
-		return false, fmt.Errorf("failed to show %s: %s", dev, err)
-	}
-
-	pattern := fmt.Sprintf("^\\d+:\\s%s:\\s<.*,UP.*>.*", dev)
-	stateRE := regexp.MustCompile(pattern)
-	return stateRE.MatchString(string(stdout)), nil
-}

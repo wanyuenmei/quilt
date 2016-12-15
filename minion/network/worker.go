@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
-	"net"
 	"os"
 	"os/exec"
 	"regexp"
@@ -79,8 +78,6 @@ type OFRuleSlice []OFRule
 //
 // To connect to the public internet, we do the following setup:
 //    - On the host:
-//        * Bring up the quilt-int device and assign it the IP address 10.0.0.1/8.
-//          quilt-int is the containers' default gateway.
 //        * Set up NAT for packets coming from the 10/8 subnet and leaving on eth0.
 //    - On each container:
 //        * Make the quilt-int device on the host the default gateway (this is the LOCAL
@@ -150,8 +147,6 @@ func runWorker(conn db.Conn, dk docker.Client) {
 			updateNAT(publicInterface, containers, connections)
 		}
 		updatePorts(odb, containers)
-
-		updateDefaultGw(odb)
 
 		wg.Add(1)
 		go func() {
@@ -449,24 +444,6 @@ func generateTargetPorts(containers []db.Container) ovsdb.InterfaceSlice {
 		})
 	}
 	return configs
-}
-
-func updateDefaultGw(odb ovsdb.Client) {
-	if err := upLink("", quiltBridge); err != nil {
-		log.WithError(err).Error("failed to up default gateway")
-	}
-
-	currIPs, err := listIP("", quiltBridge)
-	if err != nil {
-		log.WithError(err).Errorf("failed to list IPs")
-		return
-	}
-
-	gwNet := &net.IPNet{IP: ipdef.GatewayIP, Mask: ipdef.QuiltSubnet.Mask}
-	targetIPs := []string{gwNet.String()}
-	if err := updateIPs("", quiltBridge, currIPs, targetIPs); err != nil {
-		log.WithError(err).Errorf("failed to update IPs")
-	}
 }
 
 func updateIPs(namespace string, dev string, currIPs []string,

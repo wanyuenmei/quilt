@@ -176,7 +176,7 @@ func TestWorker(t *testing.T) {
 			spew.Sdump(exp))
 	}
 
-	execExp := [][]string{ovsExecArgs(ip, leaderIP)}
+	execExp := ovsExecArgs(ip, leaderIP)
 	if !reflect.DeepEqual(ctx.execs, execExp) {
 		t.Errorf("execs = %s\n\nwant %s", spew.Sdump(ctx.execs), spew.Sdump(exp))
 	}
@@ -211,7 +211,7 @@ func TestChange(t *testing.T) {
 			spew.Sdump(exp))
 	}
 
-	execExp := [][]string{ovsExecArgs(ip, leaderIP)}
+	execExp := ovsExecArgs(ip, leaderIP)
 	if !reflect.DeepEqual(ctx.execs, execExp) {
 		t.Errorf("execs = %s\n\nwant %s", spew.Sdump(ctx.execs), spew.Sdump(exp))
 	}
@@ -256,7 +256,7 @@ func TestChange(t *testing.T) {
 			spew.Sdump(exp))
 	}
 
-	execExp = [][]string{ovsExecArgs(ip, leaderIP)}
+	execExp = ovsExecArgs(ip, leaderIP)
 	if !reflect.DeepEqual(ctx.execs, execExp) {
 		t.Errorf("execs = %s\n\nwant %s", spew.Sdump(ctx.execs), spew.Sdump(exp))
 	}
@@ -439,8 +439,8 @@ func etcdArgsWorker(etcdIPs []string) []string {
 	}
 }
 
-func ovsExecArgs(ip, leader string) []string {
-	return []string{"ovs-vsctl", "set", "Open_vSwitch", ".",
+func ovsExecArgs(ip, leader string) [][]string {
+	vsctl := []string{"ovs-vsctl", "set", "Open_vSwitch", ".",
 		fmt.Sprintf("external_ids:ovn-remote=\"tcp:%s:6640\"", leader),
 		fmt.Sprintf("external_ids:ovn-encap-ip=%s", ip),
 		"external_ids:ovn-encap-type=\"stt\"",
@@ -450,6 +450,9 @@ func ovsExecArgs(ip, leader string) []string {
 		"--", "set", "bridge", "quilt-int", "fail_mode=secure",
 		"other_config:hwaddr=\"02:00:0a:00:00:01\"",
 	}
+	up := []string{"ip", "link", "set", "dev", "quilt-int", "up"}
+	addr := []string{"ip", "addr", "add", "10.0.0.1/8", "dev", "quilt-int"}
+	return [][]string{vsctl, up, addr}
 }
 
 func validateImage(image string) {
