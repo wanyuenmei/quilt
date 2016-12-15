@@ -109,6 +109,7 @@ func (sv *supervisor) runSystemOnce() {
 	}
 
 	if minion.Role != sv.role {
+		sv.SetInit(false)
 		sv.RemoveAll()
 	}
 
@@ -158,6 +159,8 @@ func (sv *supervisor) updateWorker(IP string, leaderIP string, etcdIPs []string)
 		"--", "set", "bridge", "quilt-int", "fail_mode=secure")
 	if err != nil {
 		log.WithError(err).Warnf("Failed to exec in %s.", Ovsvswitchd)
+	} else {
+		sv.SetInit(true)
 	}
 
 	/* The ovn controller doesn't support reconfiguring ovn-remote mid-run.
@@ -194,6 +197,8 @@ func (sv *supervisor) updateMaster(IP string, etcdIPs []string, leader bool) {
 	} else {
 		sv.Remove(Ovnnorthd)
 	}
+
+	sv.SetInit(true)
 }
 
 func (sv *supervisor) run(name string, args ...string) {
@@ -231,6 +236,17 @@ func (sv *supervisor) Remove(name string) {
 	if err != nil && err != docker.ErrNoSuchContainer {
 		log.WithError(err).Warnf("Failed to remove %s.", name)
 	}
+}
+
+func (sv *supervisor) SetInit(init bool) {
+	sv.conn.Transact(func(view db.Database) error {
+		self, err := view.MinionSelf()
+		if err == nil {
+			self.SupervisorInit = init
+			view.Commit(self)
+		}
+		return err
+	})
 }
 
 func (sv *supervisor) RemoveAll() {

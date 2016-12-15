@@ -11,6 +11,7 @@ type Minion struct {
 	Spec           string `json:"-"`
 	Subnet         string `json:"-"` // no need to include in the JSON, stored in Etcd
 	AuthorizedKeys string `json:"-" rowStringer:"omit"`
+	SupervisorInit bool   `json:"-"`
 
 	// Below fields are included in the JSON encoding.
 	Role      Role

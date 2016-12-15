@@ -94,7 +94,7 @@ type OFRuleSlice []OFRule
 
 func runWorker(conn db.Conn, dk docker.Client) {
 	minion, err := conn.MinionSelf()
-	if err != nil || minion.Role != db.Worker {
+	if err != nil || !minion.SupervisorInit || minion.Role != db.Worker {
 		return
 	}
 
@@ -117,6 +117,12 @@ func runWorker(conn db.Conn, dk docker.Client) {
 	// containers won't be removed while we're in the process of setting them up.
 	// Not ideal, but for now it's good enough.
 	conn.Transact(func(view db.Database) error {
+		if !checkSupervisorInit(view) {
+			// Avoid a race condition where minion.SupervisorInit changed to
+			// false since we checked above.
+			return nil
+		}
+
 		containers := view.SelectFromContainer(func(c db.Container) bool {
 			return c.DockerID != "" && c.IP != "" && c.Mac != "" &&
 				c.Pid != 0
@@ -145,16 +151,13 @@ func runWorker(conn db.Conn, dk docker.Client) {
 		}
 		updatePorts(odb, containers)
 
-		if exists, err := LinkExists("", quiltBridge); exists {
-			updateDefaultGw(odb)
-			wg.Add(1)
-			go func() {
-				updateOpenFlow(odb, containers, labels, connections)
-				wg.Done()
-			}()
-		} else if err != nil {
-			log.WithError(err).Error("failed to check if link exists")
-		}
+		updateDefaultGw(odb)
+
+		wg.Add(1)
+		go func() {
+			updateOpenFlow(odb, containers, labels, connections)
+			wg.Done()
+		}()
 
 		updateContainerIPs(containers, labels)
 

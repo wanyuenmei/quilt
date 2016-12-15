@@ -40,6 +40,11 @@ func TestRunMaster(t *testing.T) {
 		etcd.Leader = true
 		view.Commit(etcd)
 
+		minion := view.InsertMinion()
+		minion.SupervisorInit = true
+		minion.Self = true
+		view.Commit(minion)
+
 		for i := 0; i < 3; i++ {
 			si := strconv.Itoa(i)
 			l := view.InsertLabel()

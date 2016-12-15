@@ -7,7 +7,6 @@ package network
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/join"
@@ -34,16 +33,6 @@ type dbslice []dbport
 
 // Run blocks implementing the network services.
 func Run(conn db.Conn, dk docker.Client) {
-	for {
-		odb, err := ovsdb.Open()
-		if err == nil {
-			odb.Close()
-			break
-		}
-		log.WithError(err).Debug("Could not connect to ovsdb-server.")
-		time.Sleep(5 * time.Second)
-	}
-
 	loopLog := util.NewEventTimer("Network")
 	for range conn.TriggerTick(30, db.MinionTable, db.ContainerTable,
 		db.ConnectionTable, db.LabelTable, db.EtcdTable).C {
@@ -60,11 +49,12 @@ func Run(conn db.Conn, dk docker.Client) {
 // and label.  The specialized OpenFlow rules Quilt requires are managed by the workers
 // individuallly.
 func runMaster(conn db.Conn) {
-	var leader bool
+	var leader, init bool
 	var labels []db.Label
 	var containers []db.Container
 	var connections []db.Connection
 	conn.Transact(func(view db.Database) error {
+		init = checkSupervisorInit(view)
 		leader = view.EtcdLeader()
 
 		labels = view.SelectFromLabel(func(label db.Label) bool {
@@ -79,7 +69,7 @@ func runMaster(conn db.Conn) {
 		return nil
 	})
 
-	if !leader {
+	if !init || !leader {
 		return
 	}
 
@@ -153,4 +143,9 @@ func (dbs dbslice) Len() int {
 // Get returns the element at index i of the slice
 func (dbs dbslice) Get(i int) interface{} {
 	return dbs[i]
+}
+
+func checkSupervisorInit(view db.Database) bool {
+	self, err := view.MinionSelf()
+	return err == nil && self.SupervisorInit
 }
