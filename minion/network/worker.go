@@ -472,54 +472,39 @@ func updateContainerIPs(containers []db.Container, labels []db.Label) {
 		labelIP[l.Label] = l.IP
 	}
 
-	containerChannel := make(chan db.Container)
-	var wg sync.WaitGroup
-	wg.Add(concurrencyLimit)
-	for i := 0; i < concurrencyLimit; i++ {
-		go func() {
-			updateContainers(containerChannel, labelIP)
-			wg.Done()
-		}()
-	}
-
 	for _, c := range containers {
-		containerChannel <- c
+		updateContainerIP(c, labelIP)
 	}
-	close(containerChannel)
-
-	wg.Wait()
 }
 
-func updateContainers(in chan db.Container, labelIP map[string]string) {
-	for dbc := range in {
-		var err error
-		ns := networkNS(dbc.DockerID)
-		ip := dbc.IP
+func updateContainerIP(dbc db.Container, labelIP map[string]string) {
+	var err error
+	ns := networkNS(dbc.DockerID)
+	ip := dbc.IP
 
-		currIPs, err := listIP(ns, innerVeth)
-		if err != nil {
-			log.WithError(err).Error("failed to list current ip addresses")
-			continue
-		}
+	currIPs, err := listIP(ns, innerVeth)
+	if err != nil {
+		log.WithError(err).Error("failed to list current ip addresses")
+		return
+	}
 
-		newIPSet := make(map[string]struct{})
-		newIPSet[ip] = struct{}{}
-		for _, l := range dbc.Labels {
-			newIP := labelIP[l]
-			if newIP != "" {
-				newIPSet[newIP] = struct{}{}
-			}
+	newIPSet := make(map[string]struct{})
+	newIPSet[ip] = struct{}{}
+	for _, l := range dbc.Labels {
+		newIP := labelIP[l]
+		if newIP != "" {
+			newIPSet[newIP] = struct{}{}
 		}
+	}
 
-		var newIPs []string
-		for ip := range newIPSet {
-			newIPs = append(newIPs, ip+"/8")
-		}
+	var newIPs []string
+	for ip := range newIPSet {
+		newIPs = append(newIPs, ip+"/8")
+	}
 
-		if err := updateIPs(ns, innerVeth, currIPs, newIPs); err != nil {
-			log.WithError(err).Error("failed to update IPs")
-			continue
-		}
+	if err := updateIPs(ns, innerVeth, currIPs, newIPs); err != nil {
+		log.WithError(err).Error("failed to update IPs")
+		return
 	}
 }
 
