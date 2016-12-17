@@ -441,37 +441,6 @@ func TestInterfaces(t *testing.T) {
 	assert.Equal(t, iface, ovsdbIface)
 }
 
-func TestBridgeMac(t *testing.T) {
-	ovsdbClient := NewFakeOvsdbClient()
-
-	// Create new switch and a new bridge.
-	lswitch := "test-switch"
-	err := ovsdbClient.CreateLogicalSwitch(lswitch)
-	assert.Nil(t, err)
-
-	_, err = ovsdbClient.transact("Open_vSwitch", ovs.Operation{
-		Op:    "insert",
-		Table: "Bridge",
-		Row:   map[string]interface{}{"name": lswitch},
-	})
-	assert.Nil(t, err)
-
-	mac := "00:00:00:00:00:00"
-	err = ovsdbClient.SetBridgeMac(lswitch, mac)
-	assert.Nil(t, err)
-
-	bridgeReply, err := ovsdbClient.transact("Open_vSwitch", ovs.Operation{
-		Op:    "select",
-		Table: "Bridge",
-		Where: noCondition(),
-	})
-	assert.Nil(t, err)
-
-	bridge := bridgeReply[0].Rows[0]
-	otherConfig := bridge["other_config"].([]interface{})[1].(map[string]interface{})
-	assert.Equal(t, mac, otherConfig["hwaddr"])
-}
-
 type ACLSlice []ACL
 
 func (acls ACLSlice) Get(i int) interface{} {

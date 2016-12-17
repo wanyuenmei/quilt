@@ -626,24 +626,6 @@ func (ovsdb Client) ModifyInterface(iface Interface) error {
 	return errorCheck(results, len(ops))
 }
 
-// SetBridgeMac sets the MAC address of the bridge.
-func (ovsdb Client) SetBridgeMac(bridge, mac string) error {
-	mut := newMutation("other_config", "insert", map[string]string{"hwaddr": mac})
-	mutateOp := ovs.Operation{
-		Op:        "mutate",
-		Table:     "Bridge",
-		Mutations: []interface{}{mut},
-		Where:     newCondition("name", "==", bridge),
-	}
-
-	results, err := ovsdb.transact("Open_vSwitch", mutateOp)
-	if err != nil {
-		return fmt.Errorf("transaction error: setting bridge %s's mac to %s: %s",
-			bridge, mac, err)
-	}
-	return errorCheck(results, 1)
-}
-
 func ifaceFromRow(row row) (Interface, error) {
 	iface := Interface{}
 
