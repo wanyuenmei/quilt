@@ -1,9 +1,6 @@
 package network
 
 import (
-	"bufio"
-	"bytes"
-	"errors"
 	"fmt"
 	"os/exec"
 	"regexp"
@@ -68,36 +65,6 @@ func linkDelete(namespace, name string) error {
 			name, namespaceName(namespace), err)
 	}
 	return nil
-}
-
-// Lists all veths in the root namespace
-func listVeths() ([]string, error) {
-	var veths []string
-
-	stdout, _, err := ipExecVerbose("", "link show type veth")
-	if err != nil {
-		return nil, fmt.Errorf("failed to list veths: %s", err)
-	}
-
-	scanner := bufio.NewScanner(bytes.NewReader(stdout))
-	skipRE := regexp.MustCompile("^\\s+.*")
-	vethRE := regexp.MustCompile("^\\d+: (\\w+)@.*")
-	for scanner.Scan() {
-		line := scanner.Text()
-		if skipRE.FindStringIndex(line) != nil {
-			// Skip if the line begins with whitespace
-			continue
-		}
-		match := vethRE.FindStringSubmatch(line)
-		if match == nil || len(match) != 2 {
-			return nil, errors.New("list of veths is not parsing properly")
-		}
-		veths = append(veths, match[1])
-	}
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("scanner error while getting veths: %s", err)
-	}
-	return veths, nil
 }
 
 func listIP(namespace, dev string) ([]string, error) {
