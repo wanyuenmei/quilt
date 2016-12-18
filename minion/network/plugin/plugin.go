@@ -2,7 +2,6 @@ package plugin
 
 import (
 	"fmt"
-	"math/rand"
 	"net"
 	"os"
 	"path/filepath"
@@ -199,5 +198,3 @@ func expectNoEndpoint(eid string) error {
 func endpointExists(eid string) (bool, error) {
 	return network.LinkExists("", ipdef.IFName(eid))
 }
-
-var rand32 = rand.Uint32

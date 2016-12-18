@@ -2,7 +2,6 @@ package plugin
 
 import (
 	"fmt"
-	"math/rand"
 	"testing"
 
 	"github.com/NetSys/quilt/minion/ipdef"
@@ -129,16 +128,6 @@ func TestEndpointOperInfo(t *testing.T) {
 	setup()
 	defer teardown()
 
-	num := uint32(1)
-	rand32 = func() uint32 {
-		toRet := num
-		num++
-		return toRet
-	}
-	defer func() {
-		rand32 = rand.Uint32
-	}()
-
 	d := driver{}
 	req := &dnet.JoinRequest{EndpointID: zero, SandboxKey: "/test/docker0"}
 	d.Join(req)
@@ -153,16 +142,6 @@ func TestEndpointOperInfo(t *testing.T) {
 func TestJoin(t *testing.T) {
 	setup()
 	defer teardown()
-
-	num := uint32(1)
-	rand32 = func() uint32 {
-		toRet := num
-		num++
-		return toRet
-	}
-	defer func() {
-		rand32 = rand.Uint32
-	}()
 
 	d := driver{}
 	jreq := &dnet.JoinRequest{EndpointID: zero, SandboxKey: "/test/docker0"}
@@ -181,16 +160,6 @@ func TestJoin(t *testing.T) {
 func TestLeave(t *testing.T) {
 	setup()
 	defer teardown()
-
-	num := uint32(1)
-	rand32 = func() uint32 {
-		toRet := num
-		num++
-		return toRet
-	}
-	defer func() {
-		rand32 = rand.Uint32
-	}()
 
 	d := driver{}
 	d.Join(&dnet.JoinRequest{EndpointID: zero, SandboxKey: "/test/docker0"})
