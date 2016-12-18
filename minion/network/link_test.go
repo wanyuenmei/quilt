@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/NetSys/quilt/minion/ipdef"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -68,7 +69,7 @@ func TestAddVeth(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, 3, ec.c)
 
-	expPeer, _ := VethPairNames("0000000000000")
+	expPeer := ipdef.IFName("tmp_" + "0000000000000")
 	assert.Equal(t, expPeer, peer)
 
 	ipExecVerbose = ec.execErr

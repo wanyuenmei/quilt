@@ -18,3 +18,12 @@ func TestToMac(t *testing.T) {
 		assert.Equal(t, exp, IPStrToMac(addr.String()))
 	}
 }
+
+func TestIFName(t *testing.T) {
+	ifNameSize = 5
+	assert.Equal(t, IFName("123456689"), "1234")
+	assert.Equal(t, IFName("1234"), "1234")
+	assert.Equal(t, IFName("123"), "123")
+	assert.Equal(t, IFName("1"), "1")
+	assert.Equal(t, IFName(""), "")
+}

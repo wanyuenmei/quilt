@@ -197,8 +197,7 @@ func expectNoEndpoint(eid string) error {
 }
 
 func endpointExists(eid string) (bool, error) {
-	_, name := network.VethPairNames(eid)
-	return network.LinkExists("", name)
+	return network.LinkExists("", ipdef.IFName(eid))
 }
 
 var rand32 = rand.Uint32

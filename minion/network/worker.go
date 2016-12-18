@@ -422,7 +422,7 @@ func updatePorts(odb ovsdb.Client, containers []db.Container) {
 func generateTargetPorts(containers []db.Container) ovsdb.InterfaceSlice {
 	var configs ovsdb.InterfaceSlice
 	for _, dbc := range containers {
-		_, vethOut := VethPairNames(dbc.EndpointID)
+		vethOut := ipdef.IFName(dbc.EndpointID)
 		peerBr, peerQuilt := patchPorts(dbc.DockerID)
 		configs = append(configs, ovsdb.Interface{
 			Name:   vethOut,
@@ -615,7 +615,7 @@ func generateTargetOpenFlow(odb ovsdb.Client, containers []db.Container,
 
 	var rules []string
 	for _, dbc := range containers {
-		_, vethOut := VethPairNames(dbc.EndpointID)
+		vethOut := ipdef.IFName(dbc.EndpointID)
 		_, peerQuilt := patchPorts(dbc.DockerID)
 		dbcMac := dbc.Mac
 
@@ -968,13 +968,8 @@ func networkNS(id string) string {
 	return fmt.Sprintf("%s_ns", id[0:13])
 }
 
-// VethPairNames returns the veth pair for the given id.
-func VethPairNames(id string) (in, out string) {
-	return fmt.Sprintf("%s_i", id[0:13]), fmt.Sprintf("%s_c", id[0:13])
-}
-
 func patchPorts(id string) (br, quilt string) {
-	return fmt.Sprintf("%s_br", id[0:12]), fmt.Sprintf("%s_q", id[0:12])
+	return ipdef.IFName("br_" + id), ipdef.IFName("q_" + id)
 }
 
 func ipExec(namespace, format string, args ...interface{}) error {

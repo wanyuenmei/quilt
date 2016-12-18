@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"syscall"
 )
 
 var (
@@ -44,4 +45,19 @@ func IPStrToMac(ipStr string) string {
 func IPToMac(ip net.IP) string {
 	ip = ip.To4()
 	return fmt.Sprintf("02:00:%02x:%02x:%02x:%02x", ip[0], ip[1], ip[2], ip[3])
+}
+
+// Allow mocking out for unit tests.
+var ifNameSize = syscall.IFNAMSIZ
+
+// IFName transforms a string into something suitable for an interface name.
+func IFName(name string) string {
+	// The IFNAMESIZ #define is the size of a C buffer, not the length of a string.
+	// Thus, it assumes one NULL character at the end which we can't overwrite.
+	size := ifNameSize - 1
+
+	if len(name) < size {
+		return name
+	}
+	return name[0:size]
 }

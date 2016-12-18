@@ -25,7 +25,7 @@ var (
 type mock map[string]struct{}
 
 func (m mock) fakeDelVeth(s string) error {
-	_, name := network.VethPairNames(s)
+	name := ipdef.IFName(s)
 	if _, ok := m[name]; !ok {
 		return fmt.Errorf("no such veth: %s", name)
 	}
@@ -34,7 +34,7 @@ func (m mock) fakeDelVeth(s string) error {
 }
 
 func (m mock) fakeAddVeth(s string) (string, error) {
-	_, name := network.VethPairNames(s)
+	name := ipdef.IFName(s)
 	if _, ok := m[name]; ok {
 		return "", fmt.Errorf("veth exists: %s", name)
 	}

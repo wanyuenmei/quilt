@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
+
+	"github.com/NetSys/quilt/minion/ipdef"
 )
 
 // DelVeth deletes a virtual ethernet interface.
 var DelVeth = func(endpointID string) error {
-	_, name := VethPairNames(endpointID)
+	name := ipdef.IFName(endpointID)
 	if err := linkDelete("", name); err != nil {
 		return err
 	}
@@ -17,7 +19,8 @@ var DelVeth = func(endpointID string) error {
 
 // AddVeth creates a virtual ethernet interface.
 var AddVeth = func(endpointID string) (string, error) {
-	tmpPeer, name := VethPairNames(endpointID)
+	name := ipdef.IFName(endpointID)
+	tmpPeer := ipdef.IFName("tmp_" + endpointID)
 
 	// Create veth pair
 	err := ipExec("", "link add %s type veth peer name %s", name, tmpPeer)
