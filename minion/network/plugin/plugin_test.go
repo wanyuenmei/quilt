@@ -65,7 +65,7 @@ func TestGetCapabilities(t *testing.T) {
 
 	d := driver{}
 	resp, err := d.GetCapabilities()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	exp := dnet.CapabilitiesResponse{Scope: dnet.LocalScope}
 	assert.Equal(t, exp, *resp)
@@ -83,11 +83,11 @@ func TestCreateEndpoint(t *testing.T) {
 
 	d := driver{}
 	_, err := d.CreateEndpoint(req)
-	assert.NotNil(t, err)
+	assert.EqualError(t, err, "invalid IP: ")
 
 	req.Interface.Address = "10.1.0.1"
 	_, err = d.CreateEndpoint(req)
-	assert.NotNil(t, err)
+	assert.EqualError(t, err, "invalid IP: 10.1.0.1")
 
 	req.Interface.Address = "10.1.0.1/8"
 	req.Interface.MacAddress = ""
@@ -95,14 +95,14 @@ func TestCreateEndpoint(t *testing.T) {
 		MacAddress: ipdef.IPStrToMac("10.1.0.1"),
 	}
 	resp, err := d.CreateEndpoint(req)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, expResp, *resp.Interface)
 
 	req.EndpointID = one
 	req.Interface.Address = "10.1.0.2/8"
 	expResp.MacAddress = ipdef.IPStrToMac("10.1.0.2")
 	resp, err = d.CreateEndpoint(req)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, expResp, *resp.Interface)
 }
 
@@ -112,16 +112,17 @@ func TestDeleteEndpoint(t *testing.T) {
 
 	d := driver{}
 	req := &dnet.JoinRequest{EndpointID: zero, SandboxKey: "/test/docker0"}
-	d.Join(req)
+	_, err := d.Join(req)
+	assert.NoError(t, err)
 
 	delReq := &dnet.DeleteEndpointRequest{EndpointID: zero}
-	err := d.DeleteEndpoint(delReq)
-	assert.Nil(t, err)
+	err = d.DeleteEndpoint(delReq)
+	assert.NoError(t, err)
 
 	d.Leave(&dnet.LeaveRequest{EndpointID: zero})
 	delReq = &dnet.DeleteEndpointRequest{EndpointID: zero}
 	err = d.DeleteEndpoint(delReq)
-	assert.NotNil(t, err)
+	assert.EqualError(t, err, "endpoint 0000000000000 doesn't exists")
 }
 
 func TestEndpointOperInfo(t *testing.T) {
@@ -130,13 +131,15 @@ func TestEndpointOperInfo(t *testing.T) {
 
 	d := driver{}
 	req := &dnet.JoinRequest{EndpointID: zero, SandboxKey: "/test/docker0"}
-	d.Join(req)
-	_, err := d.EndpointInfo(&dnet.InfoRequest{EndpointID: zero})
-	assert.Nil(t, err)
+	_, err := d.Join(req)
+	assert.NoError(t, err)
+
+	_, err = d.EndpointInfo(&dnet.InfoRequest{EndpointID: zero})
+	assert.NoError(t, err)
 
 	d.Leave(&dnet.LeaveRequest{EndpointID: zero})
 	_, err = d.EndpointInfo(&dnet.InfoRequest{EndpointID: one})
-	assert.NotNil(t, err)
+	assert.EqualError(t, err, "endpoint 1111111111111 doesn't exists")
 }
 
 func TestJoin(t *testing.T) {
@@ -146,7 +149,7 @@ func TestJoin(t *testing.T) {
 	d := driver{}
 	jreq := &dnet.JoinRequest{EndpointID: zero, SandboxKey: "/test/docker0"}
 	resp, err := d.Join(jreq)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	ifaceName := resp.InterfaceName
 	expIFace := dnet.InterfaceName{SrcName: "tmpVeth", DstPrefix: ifacePrefix}
@@ -154,7 +157,7 @@ func TestJoin(t *testing.T) {
 
 	jreq = &dnet.JoinRequest{EndpointID: zero, SandboxKey: "/test/docker2"}
 	_, err = d.Join(jreq)
-	assert.NotNil(t, err)
+	assert.EqualError(t, err, "endpoint 0000000000000 already exists")
 }
 
 func TestLeave(t *testing.T) {
@@ -162,11 +165,12 @@ func TestLeave(t *testing.T) {
 	defer teardown()
 
 	d := driver{}
-	d.Join(&dnet.JoinRequest{EndpointID: zero, SandboxKey: "/test/docker0"})
+	_, err := d.Join(&dnet.JoinRequest{EndpointID: zero, SandboxKey: "/test/docker0"})
+	assert.NoError(t, err)
 
-	err := d.Leave(&dnet.LeaveRequest{EndpointID: zero})
-	assert.Nil(t, err)
+	err = d.Leave(&dnet.LeaveRequest{EndpointID: zero})
+	assert.NoError(t, err)
 
 	err = d.DeleteEndpoint(&dnet.DeleteEndpointRequest{EndpointID: zero})
-	assert.NotNil(t, err)
+	assert.EqualError(t, err, "endpoint 0000000000000 doesn't exists")
 }
