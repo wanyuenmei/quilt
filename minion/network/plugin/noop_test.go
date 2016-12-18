@@ -9,7 +9,6 @@ import (
 
 func TestNoop(t *testing.T) {
 	setup()
-	defer teardown()
 	d := driver{}
 
 	err := d.CreateNetwork(&dnet.CreateNetworkRequest{})

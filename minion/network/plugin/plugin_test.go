@@ -2,66 +2,66 @@ package plugin
 
 import (
 	"fmt"
+	"syscall"
 	"testing"
 
 	"github.com/NetSys/quilt/minion/ipdef"
-	"github.com/NetSys/quilt/minion/network"
 	"github.com/stretchr/testify/assert"
+	"github.com/vishvananda/netlink"
 
 	dnet "github.com/docker/go-plugins-helpers/network"
 )
 
 var (
-	m          mock
-	delVeth    = network.DelVeth
-	addVeth    = network.AddVeth
-	linkExists = network.LinkExists
-
-	zero = "0000000000000"
-	one  = "1111111111111"
+	zero  = "000000000000000000000000000000000000000000000000"
+	one   = "111111111111111111111111111111111111111111111111"
+	links = map[string]netlink.Link{}
 )
 
-type mock map[string]struct{}
-
-func (m mock) fakeDelVeth(s string) error {
-	name := ipdef.IFName(s)
-	if _, ok := m[name]; !ok {
-		return fmt.Errorf("no such veth: %s", name)
+func mockLinkAdd(l netlink.Link) error {
+	name := l.Attrs().Name
+	if len(name) >= syscall.IFNAMSIZ {
+		panic(fmt.Sprintf("len(\"%s\") >= %d", name, syscall.IFNAMSIZ))
 	}
-	delete(m, name)
+
+	if _, ok := links[name]; ok {
+		return fmt.Errorf("veth exists: %s", name)
+	}
+
+	links[name] = l
 	return nil
 }
 
-func (m mock) fakeAddVeth(s string) (string, error) {
-	name := ipdef.IFName(s)
-	if _, ok := m[name]; ok {
-		return "", fmt.Errorf("veth exists: %s", name)
+func mockLinkDel(l netlink.Link) error {
+	name := l.Attrs().Name
+	if _, ok := links[name]; !ok {
+		return fmt.Errorf("del: no such veth: %s", name)
 	}
-	m[name] = struct{}{}
-	return "tmpVeth", nil
+	delete(links, name)
+	return nil
 }
 
-func (m mock) fakeLinkExists(s, t string) (bool, error) {
-	_, ok := m[t]
-	return ok, nil
+func mockLinkByName(name string) (netlink.Link, error) {
+	if _, ok := links[name]; !ok {
+		return nil, fmt.Errorf("byName: no such veth: %s", name)
+	}
+	return links[name], nil
+}
+
+func mockLinkSetUp(link netlink.Link) error {
+	return nil
 }
 
 func setup() {
-	m = mock(map[string]struct{}{})
-	network.DelVeth = m.fakeDelVeth
-	network.AddVeth = m.fakeAddVeth
-	network.LinkExists = m.fakeLinkExists
-}
-
-func teardown() {
-	network.DelVeth = delVeth
-	network.AddVeth = addVeth
-	network.LinkExists = linkExists
+	links = map[string]netlink.Link{}
+	linkAdd = mockLinkAdd
+	linkDel = mockLinkDel
+	linkSetUp = mockLinkSetUp
+	linkByName = mockLinkByName
 }
 
 func TestGetCapabilities(t *testing.T) {
 	setup()
-	defer teardown()
 
 	d := driver{}
 	resp, err := d.GetCapabilities()
@@ -73,7 +73,6 @@ func TestGetCapabilities(t *testing.T) {
 
 func TestCreateEndpoint(t *testing.T) {
 	setup()
-	defer teardown()
 
 	req := &dnet.CreateEndpointRequest{}
 	req.EndpointID = zero
@@ -108,7 +107,6 @@ func TestCreateEndpoint(t *testing.T) {
 
 func TestDeleteEndpoint(t *testing.T) {
 	setup()
-	defer teardown()
 
 	d := driver{}
 	req := &dnet.JoinRequest{EndpointID: zero, SandboxKey: "/test/docker0"}
@@ -122,12 +120,11 @@ func TestDeleteEndpoint(t *testing.T) {
 	d.Leave(&dnet.LeaveRequest{EndpointID: zero})
 	delReq = &dnet.DeleteEndpointRequest{EndpointID: zero}
 	err = d.DeleteEndpoint(delReq)
-	assert.EqualError(t, err, "endpoint 0000000000000 doesn't exists")
+	assert.EqualError(t, err, "byName: no such veth: 000000000000000")
 }
 
 func TestEndpointOperInfo(t *testing.T) {
 	setup()
-	defer teardown()
 
 	d := driver{}
 	req := &dnet.JoinRequest{EndpointID: zero, SandboxKey: "/test/docker0"}
@@ -139,12 +136,11 @@ func TestEndpointOperInfo(t *testing.T) {
 
 	d.Leave(&dnet.LeaveRequest{EndpointID: zero})
 	_, err = d.EndpointInfo(&dnet.InfoRequest{EndpointID: one})
-	assert.EqualError(t, err, "endpoint 1111111111111 doesn't exists")
+	assert.EqualError(t, err, "byName: no such veth: 111111111111111")
 }
 
 func TestJoin(t *testing.T) {
 	setup()
-	defer teardown()
 
 	d := driver{}
 	jreq := &dnet.JoinRequest{EndpointID: zero, SandboxKey: "/test/docker0"}
@@ -152,17 +148,19 @@ func TestJoin(t *testing.T) {
 	assert.NoError(t, err)
 
 	ifaceName := resp.InterfaceName
-	expIFace := dnet.InterfaceName{SrcName: "tmpVeth", DstPrefix: ifacePrefix}
+	expIFace := dnet.InterfaceName{
+		SrcName:   ipdef.IFName("tmp_" + zero),
+		DstPrefix: ifacePrefix,
+	}
 	assert.Equal(t, expIFace, ifaceName)
 
 	jreq = &dnet.JoinRequest{EndpointID: zero, SandboxKey: "/test/docker2"}
 	_, err = d.Join(jreq)
-	assert.EqualError(t, err, "endpoint 0000000000000 already exists")
+	assert.EqualError(t, err, "failed to create veth: veth exists: 000000000000000")
 }
 
 func TestLeave(t *testing.T) {
 	setup()
-	defer teardown()
 
 	d := driver{}
 	_, err := d.Join(&dnet.JoinRequest{EndpointID: zero, SandboxKey: "/test/docker0"})
@@ -172,5 +170,5 @@ func TestLeave(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = d.DeleteEndpoint(&dnet.DeleteEndpointRequest{EndpointID: zero})
-	assert.EqualError(t, err, "endpoint 0000000000000 doesn't exists")
+	assert.EqualError(t, err, "byName: no such veth: 000000000000000")
 }

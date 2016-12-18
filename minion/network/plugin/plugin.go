@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/NetSys/quilt/minion/ipdef"
-	"github.com/NetSys/quilt/minion/network"
 
 	dnet "github.com/docker/go-plugins-helpers/network"
+	"github.com/vishvananda/netlink"
 )
 
 const (
@@ -27,6 +27,8 @@ var (
 )
 
 type driver struct{}
+
+const mtu int = 1400
 
 // Run runs the network driver and starts the server to listen for requests. It will
 // block until the server socket has been created.
@@ -69,8 +71,8 @@ func (d driver) CreateEndpoint(req *dnet.CreateEndpointRequest) (
 		return nil, fmt.Errorf("invalid IP: %s", req.Interface.Address)
 	}
 
-	if err := expectNoEndpoint(req.EndpointID); err != nil {
-		return nil, err
+	if _, err := getOuterLink(req.EndpointID); err == nil {
+		return nil, fmt.Errorf("endpoint %s exists", req.EndpointID)
 	}
 
 	resp := &dnet.CreateEndpointResponse{
@@ -83,7 +85,7 @@ func (d driver) CreateEndpoint(req *dnet.CreateEndpointRequest) (
 
 // EndpointInfo will return an error if the endpoint does not exist.
 func (d driver) EndpointInfo(req *dnet.InfoRequest) (*dnet.InfoResponse, error) {
-	if err := expectEndpoint(req.EndpointID); err != nil {
+	if _, err := getOuterLink(req.EndpointID); err != nil {
 		return nil, err
 	}
 	return &dnet.InfoResponse{}, nil
@@ -92,61 +94,59 @@ func (d driver) EndpointInfo(req *dnet.InfoRequest) (*dnet.InfoResponse, error) 
 // DeleteEndpoint will do nothing, but checks for the error condition of deleting a
 // non-existent endpoint.
 func (d driver) DeleteEndpoint(req *dnet.DeleteEndpointRequest) error {
-	return expectEndpoint(req.EndpointID)
+	_, err := getOuterLink(req.EndpointID)
+	return err
 }
 
 // Join creates a Veth pair for the given endpoint ID, returning the interface info.
 func (d driver) Join(req *dnet.JoinRequest) (*dnet.JoinResponse, error) {
-	if err := expectNoEndpoint(req.EndpointID); err != nil {
-		return nil, err
-	}
-
 	// We just need to create the Veth and tell Docker where it should go; Docker
 	// will take care of moving it into the container and renaming it.
-	tempPeer, err := network.AddVeth(req.EndpointID)
+	outer := ipdef.IFName(req.EndpointID)
+	inner := ipdef.IFName("tmp_" + req.EndpointID)
+	err := linkAdd(&netlink.Veth{
+		LinkAttrs: netlink.LinkAttrs{Name: outer, MTU: mtu},
+		PeerName:  inner,
+	})
 	if err != nil {
-		network.DelVeth(req.EndpointID) // Just in case
-		return nil, err
+		return nil, fmt.Errorf("failed to create veth: %s", err)
+	}
+
+	outerLink, err := getOuterLink(req.EndpointID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find interface %s: %s", outer, err)
+	}
+
+	err = linkSetUp(outerLink)
+	if err != nil {
+		return nil, fmt.Errorf("failed to bring up link %s: %s", outer, err)
 	}
 
 	resp := &dnet.JoinResponse{}
 	resp.Gateway = ipdef.GatewayIP.String()
-	resp.InterfaceName = dnet.InterfaceName{
-		SrcName:   tempPeer,
-		DstPrefix: ifacePrefix,
-	}
+	resp.InterfaceName = dnet.InterfaceName{SrcName: inner, DstPrefix: ifacePrefix}
 	return resp, nil
 }
 
 // Leave destroys a veth pair for the given endpoint ID.
 func (d driver) Leave(req *dnet.LeaveRequest) error {
-	if err := expectEndpoint(req.EndpointID); err != nil {
-		return err
+	outer, err := getOuterLink(req.EndpointID)
+	if err != nil {
+		return fmt.Errorf("failed to find link %s: %s", outer, err)
 	}
 
-	return network.DelVeth(req.EndpointID)
-}
-
-func expectEndpoint(eid string) error {
-	if ok, err := endpointExists(eid); err != nil {
-		return err
-	} else if !ok {
-		return fmt.Errorf("endpoint %s doesn't exists", eid)
+	if err := linkDel(outer); err != nil {
+		return fmt.Errorf("failed to delete link %s: %s", outer, err)
 	}
-
 	return nil
 }
 
-func expectNoEndpoint(eid string) error {
-	if ok, err := endpointExists(eid); err != nil {
-		return err
-	} else if ok {
-		return fmt.Errorf("endpoint %s already exists", eid)
-	}
-
-	return nil
+func getOuterLink(eid string) (netlink.Link, error) {
+	return linkByName(ipdef.IFName(eid))
 }
 
-func endpointExists(eid string) (bool, error) {
-	return network.LinkExists("", ipdef.IFName(eid))
-}
+// Mock variables for unit testing
+var linkAdd = netlink.LinkAdd
+var linkDel = netlink.LinkDel
+var linkSetUp = netlink.LinkSetUp
+var linkByName = netlink.LinkByName

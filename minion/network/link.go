@@ -2,73 +2,8 @@ package network
 
 import (
 	"fmt"
-	"os/exec"
 	"regexp"
-
-	"github.com/NetSys/quilt/minion/ipdef"
 )
-
-// DelVeth deletes a virtual ethernet interface.
-var DelVeth = func(endpointID string) error {
-	name := ipdef.IFName(endpointID)
-	if err := linkDelete("", name); err != nil {
-		return err
-	}
-	return nil
-}
-
-// AddVeth creates a virtual ethernet interface.
-var AddVeth = func(endpointID string) (string, error) {
-	name := ipdef.IFName(endpointID)
-	tmpPeer := ipdef.IFName("tmp_" + endpointID)
-
-	// Create veth pair
-	err := ipExec("", "link add %s type veth peer name %s", name, tmpPeer)
-	if err != nil {
-		return "", fmt.Errorf("error adding veth %s with peer %s: %v",
-			name, tmpPeer, err)
-	}
-
-	// Set the host side link status to up
-	if err = ipExec("", "link set %s up", name); err != nil {
-		return "", fmt.Errorf("error bringing veth %s up: %v", name, err)
-	}
-
-	if err = ipExec("", "link set dev %s mtu %d", tmpPeer, innerMTU); err != nil {
-		return "", fmt.Errorf("error setting peer %s MTU: %v", tmpPeer, err)
-	}
-
-	return tmpPeer, nil
-}
-
-// LinkExists reports whether or not the virtual link exists.
-var LinkExists = func(namespace, name string) (bool, error) {
-	cmd := fmt.Sprintf("ip link show %s", name)
-	if namespace != "" {
-		cmd = fmt.Sprintf("ip netns exec %s %s", namespace, cmd)
-	}
-	stdout, _, err := shVerbose(cmd)
-	// If err is of type *ExitError then that means it has a non-zero exit
-	// code which we are okay with
-	if _, ok := err.(*exec.ExitError); !ok && err != nil {
-		err = fmt.Errorf("error checking if link %s exists in %s: %s",
-			name, namespaceName(namespace), err)
-		return false, err
-	}
-	if string(stdout) == "" {
-		return false, nil
-	}
-	return true, nil
-}
-
-// Interprets the empty string as the "root" namespace
-func linkDelete(namespace, name string) error {
-	if err := ipExec(namespace, "link delete %s", name); err != nil {
-		return fmt.Errorf("error deleting link %s in %s: %s",
-			name, namespaceName(namespace), err)
-	}
-	return nil
-}
 
 func listIP(namespace, dev string) ([]string, error) {
 	var ips []string

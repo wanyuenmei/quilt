@@ -28,7 +28,6 @@ import (
 const (
 	nsPath           string = "/var/run/netns"
 	innerVeth        string = "eth0"
-	innerMTU         int    = 1400
 	concurrencyLimit int    = 32 // Adjust to change per function goroutine limit
 )
 
