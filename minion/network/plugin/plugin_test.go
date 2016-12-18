@@ -170,37 +170,3 @@ func TestLeave(t *testing.T) {
 	err = d.DeleteEndpoint(&dnet.DeleteEndpointRequest{EndpointID: zero})
 	assert.NotNil(t, err)
 }
-
-func TestNoop(t *testing.T) {
-	setup()
-	defer teardown()
-	d := driver{}
-
-	err := d.CreateNetwork(&dnet.CreateNetworkRequest{})
-	assert.Nil(t, err)
-
-	err = d.FreeNetwork(&dnet.FreeNetworkRequest{})
-	assert.Nil(t, err)
-
-	err = d.DiscoverNew(&dnet.DiscoveryNotification{})
-	assert.Nil(t, err)
-
-	err = d.DiscoverDelete(&dnet.DiscoveryNotification{})
-	assert.Nil(t, err)
-
-	err = d.ProgramExternalConnectivity(&dnet.ProgramExternalConnectivityRequest{})
-	assert.Nil(t, err)
-
-	err = d.RevokeExternalConnectivity(&dnet.RevokeExternalConnectivityRequest{})
-	assert.Nil(t, err)
-
-	resp, err := d.AllocateNetwork(&dnet.AllocateNetworkRequest{})
-	assert.Nil(t, err)
-
-	if resp.Options != nil && len(resp.Options) > 0 {
-		t.Fatalf("AllocateNetwork responded with non-empty response: %v", *resp)
-	}
-
-	err = d.DeleteNetwork(&dnet.DeleteNetworkRequest{})
-	assert.Nil(t, err)
-}
