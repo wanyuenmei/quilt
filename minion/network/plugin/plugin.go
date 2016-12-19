@@ -17,8 +17,8 @@ const (
 	// NetworkName is the name of the network driver plugin.
 	NetworkName = "quilt"
 
-	pluginDir = "/run/docker/plugins"
-	innerVeth = "eth"
+	pluginDir   = "/run/docker/plugins"
+	ifacePrefix = "eth"
 )
 
 var (
@@ -110,8 +110,11 @@ func (d driver) Join(req *dnet.JoinRequest) (*dnet.JoinResponse, error) {
 	}
 
 	resp := &dnet.JoinResponse{}
-	resp.InterfaceName = dnet.InterfaceName{SrcName: tempPeer, DstPrefix: innerVeth}
 	resp.Gateway = ipdef.GatewayIP.String()
+	resp.InterfaceName = dnet.InterfaceName{
+		SrcName:   tempPeer,
+		DstPrefix: ifacePrefix,
+	}
 	return resp, nil
 }
 

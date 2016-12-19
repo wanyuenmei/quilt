@@ -149,7 +149,7 @@ func TestJoin(t *testing.T) {
 	assert.Nil(t, err)
 
 	ifaceName := resp.InterfaceName
-	expIFace := dnet.InterfaceName{SrcName: "tmpVeth", DstPrefix: innerVeth}
+	expIFace := dnet.InterfaceName{SrcName: "tmpVeth", DstPrefix: ifacePrefix}
 	assert.Equal(t, expIFace, ifaceName)
 
 	jreq = &dnet.JoinRequest{EndpointID: zero, SandboxKey: "/test/docker2"}
