@@ -118,13 +118,18 @@ func (eCmd *Exec) Run() int {
 	}
 	defer sshClient.Close()
 
+	return execHelper(sshClient, container.DockerID, eCmd.command, eCmd.allocatePTY)
+}
+
+func execHelper(sshClient ssh.Client, dockerID string, cmd string, requestPTY bool) int {
 	var flags string
-	if eCmd.allocatePTY {
+	if requestPTY {
 		flags = "-it"
 	}
-	command := strings.Join(
-		[]string{"docker exec", flags, container.DockerID, eCmd.command}, " ")
-	if err = sshClient.Run(eCmd.allocatePTY, command); err != nil {
+
+	command := strings.Join([]string{"docker exec", flags, dockerID, cmd}, " ")
+
+	if err := sshClient.Run(requestPTY, command); err != nil {
 		if exitErr, ok := err.(exitError); ok {
 			log.WithError(err).Debug(
 				"SSH command returned a nonzero exit code")

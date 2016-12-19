@@ -168,3 +168,32 @@ func checkExecParsing(t *testing.T, args []string, expArgs Exec, expErr error) {
 	assert.Equal(t, expArgs.privateKey, execCmd.privateKey)
 	assert.Equal(t, expArgs.allocatePTY, execCmd.allocatePTY)
 }
+
+func TestExecHelperErrors(t *testing.T) {
+	// SSH ExitError
+	mockSSHClient := new(testutils.MockSSHClient)
+	mockSSHClient.On("Run", true, "docker exec -it id123 foo bar").
+		Return(mockExitError{10}).Once()
+
+	exitCode := execHelper(mockSSHClient, "id123", "foo bar", true)
+	assert.Equal(t, 10, exitCode)
+	mockSSHClient.AssertExpectations(t)
+
+	// Other SSH error
+	mockSSHClient = new(testutils.MockSSHClient)
+	mockSSHClient.On("Run", true, "docker exec -it id123 echo hello").
+		Return(assert.AnError).Once()
+
+	exitCode = execHelper(mockSSHClient, "id123", "echo hello", true)
+	assert.Equal(t, 1, exitCode)
+	mockSSHClient.AssertExpectations(t)
+}
+
+func TestExecHelper(t *testing.T) {
+	mockSSHClient := new(testutils.MockSSHClient)
+	mockSSHClient.On("Run", false, "docker exec  id123 /bin/sh").Return(nil).Once()
+
+	exitCode := execHelper(mockSSHClient, "id123", "/bin/sh", false)
+	assert.Equal(t, 0, exitCode)
+	mockSSHClient.AssertExpectations(t)
+}
