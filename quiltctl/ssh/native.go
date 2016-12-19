@@ -86,10 +86,11 @@ func (c NativeClient) Run(requestPTY bool, command string) error {
 	}
 	defer session.Close()
 	session.Stdout = os.Stdout
-	session.Stdin = os.Stdin
 	session.Stderr = os.Stderr
 
 	if requestPTY {
+		session.Stdin = os.Stdin
+
 		pty := newPty(session)
 		if err := pty.Request(); err != nil {
 			return err
