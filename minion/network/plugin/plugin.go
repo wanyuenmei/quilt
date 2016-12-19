@@ -69,11 +69,6 @@ func (d driver) CreateEndpoint(req *dnet.CreateEndpointRequest) (
 		return nil, fmt.Errorf("invalid IP: %s", req.Interface.Address)
 	}
 
-	mac := req.Interface.MacAddress
-	if mac != "" {
-		return nil, fmt.Errorf("expected no mac in request, got mac=%s", mac)
-	}
-
 	if err := expectNoEndpoint(req.EndpointID); err != nil {
 		return nil, err
 	}
