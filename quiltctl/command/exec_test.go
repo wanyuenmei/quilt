@@ -2,6 +2,7 @@ package command
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,6 +14,18 @@ import (
 	"github.com/NetSys/quilt/quiltctl/ssh"
 	"github.com/NetSys/quilt/quiltctl/testutils"
 )
+
+type mockExitError struct {
+	exitCode int
+}
+
+func (err mockExitError) Error() string {
+	return fmt.Sprint("exited with error code: ", err.exitCode)
+}
+
+func (err mockExitError) ExitStatus() int {
+	return err.exitCode
+}
 
 func TestExecPTY(t *testing.T) {
 	isTerminal = func() bool {

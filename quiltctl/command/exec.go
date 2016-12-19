@@ -30,6 +30,13 @@ type Exec struct {
 	clientGetter client.Getter
 }
 
+// exitError is an interface to "golang.org/x/crypto/ssh".ExitError that allows for
+// mocking in unit tests.
+type exitError interface {
+	Error() string
+	ExitStatus() int
+}
+
 // NewExecCommand creates a new Exec command instance.
 func NewExecCommand() *Exec {
 	return &Exec{
@@ -118,6 +125,12 @@ func (eCmd *Exec) Run() int {
 	command := strings.Join(
 		[]string{"docker exec", flags, container.DockerID, eCmd.command}, " ")
 	if err = sshClient.Run(eCmd.allocatePTY, command); err != nil {
+		if exitErr, ok := err.(exitError); ok {
+			log.WithError(err).Debug(
+				"SSH command returned a nonzero exit code")
+			return exitErr.ExitStatus()
+		}
+
 		log.WithError(err).Info("Error running command over SSH")
 		return 1
 	}
