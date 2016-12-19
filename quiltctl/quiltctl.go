@@ -15,6 +15,7 @@ var commands = map[string]command.SubCommand{
 	"exec":       command.NewExecCommand(),
 	"get":        &command.Get{},
 	"inspect":    &command.Inspect{},
+	"login":      command.NewLoginCommand(),
 	"logs":       command.NewLogCommand(),
 	"machines":   command.NewMachineCommand(),
 	"minion":     &command.Minion{},

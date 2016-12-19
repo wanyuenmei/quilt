@@ -26,6 +26,7 @@ func main() {
 			"stop <namespace> | get <import_path> | " +
 			"machines | containers | ps | ssh <machine> | " +
 			"exec <container> <command> | " +
+			"login <container> | " +
 			"logs <container>]")
 		fmt.Println("\nWhen provided a stitch, quilt takes responsibility\n" +
 			"for deploying it as specified.  Alternatively, quilt may be\n" +
