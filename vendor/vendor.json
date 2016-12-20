@@ -534,6 +534,24 @@
 			"revision": "b94837a2404ab90efe9289e77a70694c355739cb"
 		},
 		{
+			"checksumSHA1": "qj+wKptfUOqmZJujLw0Y9Ge9aiA=",
+			"path": "github.com/vishvananda/netlink",
+			"revision": "13fb20a9787c14bfc4c7996ce27d7224aa815812",
+			"revisionTime": "2016-12-17T22:34:13Z"
+		},
+		{
+			"checksumSHA1": "gJ0+FLGRvDtMdUCMAYzWjJ4NTzA=",
+			"path": "github.com/vishvananda/netlink/nl",
+			"revision": "13fb20a9787c14bfc4c7996ce27d7224aa815812",
+			"revisionTime": "2016-12-17T22:34:13Z"
+		},
+		{
+			"checksumSHA1": "i13is+0a52xNtPwq1GP0gKJjb54=",
+			"path": "github.com/vishvananda/netns",
+			"revision": "2c9454e4fc6e2edc1a1c84e64ed3d6e662fb6991",
+			"revisionTime": "2016-12-19T07:29:00Z"
+		},
+		{
 			"checksumSHA1": "h+pFYiRHBogczS8/F1NoN3Ata44=",
 			"path": "golang.org/x/crypto/curve25519",
 			"revision": "5bcd134fee4dd1475da17714aac19c0aa0142e2f"
