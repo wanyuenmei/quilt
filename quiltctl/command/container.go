@@ -82,7 +82,7 @@ func (cCmd *Container) Run() int {
 func writeContainers(fd io.Writer, machines []db.Machine, containers []db.Container) {
 	w := tabwriter.NewWriter(fd, 0, 0, 4, ' ', 0)
 	defer w.Flush()
-	fmt.Fprintln(w, "ID\tMACHINE\tIMAGE\tCOMMAND\tLABELS")
+	fmt.Fprintln(w, "STITCH ID\tCONTAINER\tMACHINE\tIMAGE\tCOMMAND\tLABELS")
 
 	ipIDMap := map[string]int{}
 	for _, m := range machines {
@@ -107,12 +107,11 @@ func writeContainers(fd io.Writer, machines []db.Machine, containers []db.Contai
 			machineStr = fmt.Sprintf("Machine-%d", machineID)
 		}
 
-		fmt.Fprintln(w, "\t\t\t\t")
 		for _, dbc := range db.SortContainers(machineDBC[machineID]) {
 			cmd := strings.Join(dbc.Command, " ")
 			labels := strings.Join(dbc.Labels, ", ")
-			fmt.Fprintf(w, "%v\t%v\t%v\t\"%v\"\t%v\n", dbc.StitchID,
-				machineStr, dbc.Image, cmd, labels)
+			fmt.Fprintf(w, "%v\tContainer-%v\t%v\t%v\t\"%v\"\t%v\n",
+				dbc.StitchID, dbc.ID, machineStr, dbc.Image, cmd, labels)
 		}
 	}
 }

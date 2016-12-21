@@ -30,18 +30,28 @@ func TestMachineFlags(t *testing.T) {
 func TestMachineOutput(t *testing.T) {
 	t.Parallel()
 
-	res := machinesStr([]db.Machine{{
+	machines := []db.Machine{{
 		ID:       1,
 		Role:     db.Master,
 		Provider: "Amazon",
 		Region:   "us-west-1",
 		Size:     "m4.large",
 		PublicIP: "8.8.8.8",
-	}})
+	}}
 
-	exp := "Machine-1{Master, Amazon us-west-1 m4.large, PublicIP=8.8.8.8}\n"
+	var b bytes.Buffer
+	writeMachines(&b, machines)
+	result := string(b.Bytes())
 
-	assert.Equal(t, exp, res)
+	/* By replacing space with underscore, we make the spaces explicit and whitespace
+	* errors easier to debug. */
+	result = strings.Replace(result, " ", "_", -1)
+
+	exp := `MACHINE______ROLE______PROVIDER____REGION_______SIZE________CONNECTED
+Machine-1____Master____Amazon______us-west-1____m4.large____false
+`
+
+	assert.Equal(t, exp, result)
 }
 
 func TestContainerFlags(t *testing.T) {
@@ -60,17 +70,17 @@ func TestContainerOutput(t *testing.T) {
 	t.Parallel()
 
 	containers := []db.Container{
-		{StitchID: 3, Minion: "3.3.3.3", Image: "image1",
+		{ID: 1, StitchID: 3, Minion: "3.3.3.3", Image: "image1",
 			Command: []string{"cmd", "1"}},
-		{StitchID: 1, Minion: "1.1.1.1", Image: "image2",
+		{ID: 2, StitchID: 1, Minion: "1.1.1.1", Image: "image2",
 			Labels: []string{"label1", "label2"}},
-		{StitchID: 4, Minion: "1.1.1.1", Image: "image3",
+		{ID: 3, StitchID: 4, Minion: "1.1.1.1", Image: "image3",
 			Command: []string{"cmd"},
 			Labels:  []string{"label1"}},
-		{StitchID: 7, Minion: "2.2.2.2", Image: "image1",
+		{ID: 4, StitchID: 7, Minion: "2.2.2.2", Image: "image1",
 			Command: []string{"cmd", "3", "4"},
 			Labels:  []string{"label1"}},
-		{StitchID: 8, Image: "image1"},
+		{ID: 5, StitchID: 8, Image: "image1"},
 	}
 
 	machines := []db.Machine{
@@ -86,17 +96,13 @@ func TestContainerOutput(t *testing.T) {
 	/* By replacing space with underscore, we make the spaces explicit and whitespace
 	* errors easier to debug. */
 	result = strings.Replace(result, " ", "_", -1)
-
-	expected := `ID____MACHINE______IMAGE_____COMMAND______LABELS
-__________________________________________
-3__________________image1____"cmd_1"______
-__________________________________________
-1_____Machine-5____image2____""___________label1,_label2
-4_____Machine-5____image3____"cmd"________label1
-__________________________________________
-7_____Machine-6____image1____"cmd_3_4"____label1
-__________________________________________
-8_____Machine-7____image1____""___________
+	expected := `STITCH_ID____CONTAINER______MACHINE______` +
+		`IMAGE_____COMMAND______LABELS
+3____________Container-1_________________image1____"cmd_1"______
+1____________Container-2____Machine-5____image2____""___________label1,_label2
+4____________Container-3____Machine-5____image3____"cmd"________label1
+7____________Container-4____Machine-6____image1____"cmd_3_4"____label1
+8____________Container-5____Machine-7____image1____""___________
 `
 	assert.Equal(t, expected, result)
 }

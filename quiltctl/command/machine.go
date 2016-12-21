@@ -3,6 +3,9 @@ package command
 import (
 	"flag"
 	"fmt"
+	"io"
+	"os"
+	"text/tabwriter"
 
 	log "github.com/Sirupsen/logrus"
 
@@ -55,17 +58,18 @@ func (mCmd *Machine) Run() int {
 		return 1
 	}
 
-	str := machinesStr(machines)
-	fmt.Print(str)
-
+	writeMachines(os.Stdout, machines)
 	return 0
 }
 
-func machinesStr(machines []db.Machine) string {
-	var machinesStr string
-	for _, m := range db.SortMachines(machines) {
-		machinesStr += fmt.Sprintf("%v\n", m)
-	}
+func writeMachines(fd io.Writer, machines []db.Machine) {
+	w := tabwriter.NewWriter(fd, 0, 0, 4, ' ', 0)
+	defer w.Flush()
+	fmt.Fprintln(w, "MACHINE\tROLE\tPROVIDER\tREGION\tSIZE\tCONNECTED")
 
-	return machinesStr
+	for _, m := range db.SortMachines(machines) {
+		machineName := fmt.Sprintf("Machine-%d", m.ID)
+		fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\n",
+			machineName, m.Role, m.Provider, m.Region, m.Size, m.Connected)
+	}
 }
