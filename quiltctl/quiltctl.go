@@ -19,6 +19,7 @@ var commands = map[string]command.SubCommand{
 	"logs":       command.NewLogCommand(ssh.NewNativeClient()),
 	"machines":   command.NewMachineCommand(),
 	"minion":     &command.Minion{},
+	"ps":         command.NewPsCommand(),
 	"run":        command.NewRunCommand(),
 	"ssh":        command.NewSSHCommand(),
 	"stop":       command.NewStopCommand(),
