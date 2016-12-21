@@ -24,7 +24,7 @@ func TestMachineFlags(t *testing.T) {
 	err := parseHelper(machineCmd, []string{"-H", expHost})
 
 	assert.NoError(t, err)
-	assert.Equal(t, expHost, machineCmd.host)
+	assert.Equal(t, expHost, machineCmd.common.host)
 }
 
 func TestMachineOutput(t *testing.T) {
@@ -53,7 +53,7 @@ func TestContainerFlags(t *testing.T) {
 	err := parseHelper(containerCmd, []string{"-H", expHost})
 
 	assert.NoError(t, err)
-	assert.Equal(t, expHost, containerCmd.host)
+	assert.Equal(t, expHost, containerCmd.common.host)
 }
 
 func TestContainerOutput(t *testing.T) {

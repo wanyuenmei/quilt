@@ -1,6 +1,7 @@
 package command
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -17,7 +18,7 @@ import (
 
 // Container contains the options for querying containers.
 type Container struct {
-	*commonFlags
+	common       *commonFlags
 	clientGetter client.Getter
 }
 
@@ -25,7 +26,19 @@ type Container struct {
 func NewContainerCommand() *Container {
 	return &Container{
 		clientGetter: getter.New(),
-		commonFlags:  &commonFlags{},
+		common:       &commonFlags{},
+	}
+}
+
+// InstallFlags sets up parsing for command line flags
+func (cCmd *Container) InstallFlags(flags *flag.FlagSet) {
+	cCmd.common.InstallFlags(flags)
+	flags.Usage = func() {
+		fmt.Println("usage: quilt container [-H=<daemon_host>]")
+		fmt.Println("`container` displays the status of quilt-managed " +
+			"Docker containers.")
+
+		flags.PrintDefaults()
 	}
 }
 
@@ -36,7 +49,7 @@ func (cCmd *Container) Parse(args []string) error {
 
 // Run retrieves and prints the requested containers.
 func (cCmd *Container) Run() int {
-	localClient, err := cCmd.clientGetter.Client(cCmd.host)
+	localClient, err := cCmd.clientGetter.Client(cCmd.common.host)
 	if err != nil {
 		log.Error(err)
 		return 1
