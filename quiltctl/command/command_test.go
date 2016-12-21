@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"errors"
 	"flag"
-	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
 	clientMock "github.com/NetSys/quilt/api/client/mocks"
@@ -23,15 +23,8 @@ func TestMachineFlags(t *testing.T) {
 	machineCmd := NewMachineCommand()
 	err := parseHelper(machineCmd, []string{"-H", expHost})
 
-	if err != nil {
-		t.Errorf("Unexpected error when parsing machine args: %s", err.Error())
-		return
-	}
-
-	if machineCmd.host != expHost {
-		t.Errorf("Expected machine command to parse arg %s, but got %s",
-			expHost, machineCmd.host)
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, expHost, machineCmd.host)
 }
 
 func TestMachineOutput(t *testing.T) {
@@ -47,9 +40,8 @@ func TestMachineOutput(t *testing.T) {
 	}})
 
 	exp := "Machine-1{Master, Amazon us-west-1 m4.large, PublicIP=8.8.8.8}\n"
-	if res != exp {
-		t.Errorf("\nGot: %s\nExp: %s\n", res, exp)
-	}
+
+	assert.Equal(t, exp, res)
 }
 
 func TestContainerFlags(t *testing.T) {
@@ -60,15 +52,8 @@ func TestContainerFlags(t *testing.T) {
 	containerCmd := NewContainerCommand()
 	err := parseHelper(containerCmd, []string{"-H", expHost})
 
-	if err != nil {
-		t.Errorf("Unexpected error when parsing container args: %s", err.Error())
-		return
-	}
-
-	if containerCmd.host != expHost {
-		t.Errorf("Expected container command to parse arg %s, but got %s",
-			expHost, containerCmd.host)
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, expHost, containerCmd.host)
 }
 
 func TestContainerOutput(t *testing.T) {
@@ -113,33 +98,15 @@ __________________________________________
 __________________________________________
 8_____Machine-7____image1____""___________
 `
-	if result != expected {
-		t.Errorf("Bad Container Output\nResult:\n%s\nExpected:\n%s\n",
-			result, expected)
-	}
+	assert.Equal(t, expected, result)
 }
 
 func checkGetParsing(t *testing.T, args []string, expImport string, expErr error) {
 	getCmd := &Get{}
 	err := parseHelper(getCmd, args)
 
-	if expErr != nil {
-		if err.Error() != expErr.Error() {
-			t.Errorf("Expected error %s, but got %s",
-				expErr.Error(), err.Error())
-		}
-		return
-	}
-
-	if err != nil {
-		t.Errorf("Unexpected error when parsing get args: %s", err.Error())
-		return
-	}
-
-	if getCmd.importPath != expImport {
-		t.Errorf("Expected get command to parse arg %s, but got %s",
-			expImport, getCmd.importPath)
-	}
+	assert.Equal(t, expErr, err)
+	assert.Equal(t, expImport, getCmd.importPath)
 }
 
 func TestGetFlags(t *testing.T) {
@@ -155,23 +122,8 @@ func checkStopParsing(t *testing.T, args []string, expNamespace string, expErr e
 	stopCmd := NewStopCommand()
 	err := parseHelper(stopCmd, args)
 
-	if expErr != nil {
-		if err.Error() != expErr.Error() {
-			t.Errorf("Expected error %s, but got %s",
-				expErr.Error(), err.Error())
-		}
-		return
-	}
-
-	if err != nil {
-		t.Errorf("Unexpected error when parsing stop args: %s", err.Error())
-		return
-	}
-
-	if stopCmd.namespace != expNamespace {
-		t.Errorf("Expected stop command to parse arg %s, but got %s",
-			expNamespace, stopCmd.namespace)
-	}
+	assert.Equal(t, expErr, err)
+	assert.Equal(t, expNamespace, stopCmd.namespace)
 }
 
 func TestStopFlags(t *testing.T) {
@@ -189,28 +141,9 @@ func checkSSHParsing(t *testing.T, args []string, expMachine int,
 	sshCmd := NewSSHCommand()
 	err := parseHelper(sshCmd, args)
 
-	if expErr != nil {
-		if err.Error() != expErr.Error() {
-			t.Errorf("Expected error %s, but got %s",
-				expErr.Error(), err.Error())
-		}
-		return
-	}
-
-	if err != nil {
-		t.Errorf("Unexpected error when parsing ssh args: %s", err.Error())
-		return
-	}
-
-	if sshCmd.targetMachine != expMachine {
-		t.Errorf("Expected ssh command to parse target machine %d, but got %d",
-			expMachine, sshCmd.targetMachine)
-	}
-
-	if !reflect.DeepEqual(sshCmd.sshArgs, expSSHArgs) {
-		t.Errorf("Expected ssh command to parse SSH args %v, but got %v",
-			expSSHArgs, sshCmd.sshArgs)
-	}
+	assert.Equal(t, expErr, err)
+	assert.Equal(t, expMachine, sshCmd.targetMachine)
+	assert.Equal(t, expSSHArgs, sshCmd.sshArgs)
 }
 
 func TestSSHFlags(t *testing.T) {
@@ -235,9 +168,8 @@ func TestStopNamespace(t *testing.T) {
 	stopCmd.namespace = "namespace"
 	stopCmd.Run()
 	expStitch := `{"namespace": "namespace"}`
-	if c.DeployArg != expStitch {
-		t.Error("stop command invoked Quilt with the wrong stitch")
-	}
+
+	assert.Equal(t, expStitch, c.DeployArg)
 }
 
 func TestSSHCommandCreation(t *testing.T) {
@@ -246,9 +178,8 @@ func TestSSHCommandCreation(t *testing.T) {
 	exp := []string{"ssh", "quilt@host", "-o", "StrictHostKeyChecking=no",
 		"-o", "UserKnownHostsFile=/dev/null", "-i", "~/.ssh/quilt"}
 	res := runSSHCommand("host", []string{"-i", "~/.ssh/quilt"})
-	if !reflect.DeepEqual(res.Args, exp) {
-		t.Errorf("Bad SSH command creation: expected %v, got %v.", exp, res.Args)
-	}
+
+	assert.Equal(t, exp, res.Args)
 }
 
 func parseHelper(cmd SubCommand, args []string) error {

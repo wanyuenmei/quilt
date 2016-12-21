@@ -142,17 +142,9 @@ func checkExecParsing(t *testing.T, args []string, expArgs Exec, expErr error) {
 	execCmd := NewExecCommand(nil)
 	err := parseHelper(execCmd, args)
 
-	if expErr != nil {
-		if err.Error() != expErr.Error() {
-			t.Errorf("Expected error %s, but got %s",
-				expErr.Error(), err.Error())
-		}
-		return
-	}
-
-	assert.Nil(t, err)
-	assert.Equal(t, execCmd.targetContainer, expArgs.targetContainer)
-	assert.Equal(t, execCmd.command, expArgs.command)
-	assert.Equal(t, execCmd.privateKey, expArgs.privateKey)
-	assert.Equal(t, execCmd.allocatePTY, expArgs.allocatePTY)
+	assert.Equal(t, expErr, err)
+	assert.Equal(t, expArgs.targetContainer, execCmd.targetContainer)
+	assert.Equal(t, expArgs.command, execCmd.command)
+	assert.Equal(t, expArgs.privateKey, execCmd.privateKey)
+	assert.Equal(t, expArgs.allocatePTY, execCmd.allocatePTY)
 }

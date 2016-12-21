@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/NetSys/quilt/api"
@@ -85,41 +86,10 @@ func checkLogParsing(t *testing.T, args []string, exp Log, expErr error) {
 	logsCmd := NewLogCommand(nil)
 	err := parseHelper(logsCmd, args)
 
-	if err != nil {
-		if expErr != nil {
-			if err.Error() != expErr.Error() {
-				t.Errorf("Expected error %s, but got %s",
-					expErr.Error(), err.Error())
-			}
-			return
-		}
-
-		t.Errorf("Unexpected error when parsing log args: %s", err.Error())
-		return
-	}
-
-	if logsCmd.targetContainer != exp.targetContainer {
-		t.Errorf("Expected log command to parse target container %d, but got %d",
-			exp.targetContainer, logsCmd.targetContainer)
-	}
-
-	if logsCmd.privateKey != exp.privateKey {
-		t.Errorf("Expected log command to parse private key %s, but got %s",
-			exp.privateKey, logsCmd.privateKey)
-	}
-
-	if logsCmd.sinceTimestamp != exp.sinceTimestamp {
-		t.Errorf("Expected log command to parse since timestamp %s, but got %s",
-			exp.sinceTimestamp, logsCmd.sinceTimestamp)
-	}
-
-	if logsCmd.showTimestamps != exp.showTimestamps {
-		t.Errorf("Expected log command to parse timestamp flag %t, but got %t",
-			exp.showTimestamps, logsCmd.showTimestamps)
-	}
-
-	if logsCmd.shouldTail != exp.shouldTail {
-		t.Errorf("Expected log command to parse tail flag %t, but got %t",
-			exp.shouldTail, logsCmd.shouldTail)
-	}
+	assert.Equal(t, expErr, err)
+	assert.Equal(t, exp.targetContainer, logsCmd.targetContainer)
+	assert.Equal(t, exp.privateKey, logsCmd.privateKey)
+	assert.Equal(t, exp.sinceTimestamp, logsCmd.sinceTimestamp)
+	assert.Equal(t, exp.showTimestamps, logsCmd.showTimestamps)
+	assert.Equal(t, exp.shouldTail, logsCmd.shouldTail)
 }
