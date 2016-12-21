@@ -12,20 +12,31 @@ type Client struct {
 	ClusterReturn   []db.Cluster
 	HostReturn      string
 	DeployArg       string
+
+	MachineErr, ContainerErr, EtcdErr, ClusterErr, HostErr, DeployErr error
 }
 
 // QueryMachines retrieves the machines tracked by the Quilt daemon.
 func (c *Client) QueryMachines() ([]db.Machine, error) {
+	if c.MachineErr != nil {
+		return nil, c.MachineErr
+	}
 	return c.MachineReturn, nil
 }
 
 // QueryContainers retrieves the containers tracked by the Quilt daemon.
 func (c *Client) QueryContainers() ([]db.Container, error) {
+	if c.ContainerErr != nil {
+		return nil, c.ContainerErr
+	}
 	return c.ContainerReturn, nil
 }
 
 // QueryEtcd retrieves the etcd information tracked by the Quilt daemon.
 func (c *Client) QueryEtcd() ([]db.Etcd, error) {
+	if c.EtcdErr != nil {
+		return nil, c.EtcdErr
+	}
 	return c.EtcdReturn, nil
 }
 
@@ -42,6 +53,9 @@ func (c *Client) QueryLabels() ([]db.Label, error) {
 
 // QueryClusters retrieves cluster information tracked by the Quilt daemon.
 func (c *Client) QueryClusters() ([]db.Cluster, error) {
+	if c.ClusterErr != nil {
+		return nil, c.ClusterErr
+	}
 	return c.ClusterReturn, nil
 }
 
@@ -52,6 +66,9 @@ func (c *Client) Close() error {
 
 // Deploy makes a request to the Quilt daemon to deploy the given deployment.
 func (c *Client) Deploy(depl string) error {
+	if c.DeployErr != nil {
+		return c.DeployErr
+	}
 	c.DeployArg = depl
 	return nil
 }
