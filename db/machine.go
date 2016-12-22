@@ -96,10 +96,10 @@ func (m Machine) less(arg row) bool {
 		return upl
 	case downl != downr:
 		return !downl
-	case l.CloudID != r.CloudID:
-		return l.CloudID < r.CloudID
-	default:
+	case l.ID != r.ID:
 		return l.ID < r.ID
+	default:
+		return l.CloudID < r.CloudID
 	}
 }
 
