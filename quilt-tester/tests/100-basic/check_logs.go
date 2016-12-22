@@ -4,35 +4,34 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 
+	"github.com/NetSys/quilt/api"
+	"github.com/NetSys/quilt/api/client/getter"
 	log "github.com/Sirupsen/logrus"
 )
 
 var machineRegex = regexp.MustCompile(`Machine-(\d+){(.+?), .*, PublicIP=(.*?),`)
 
 func main() {
-	machinesBytes, err := exec.Command("quilt", "machines").CombinedOutput()
+	printQuiltPs()
+
+	c, err := getter.New().Client(api.DefaultSocket)
 	if err != nil {
-		log.WithError(err).Fatal("Failed to retrieve machines")
+		log.WithError(err).Fatal("FAILED, couldn't get quiltctl client")
+	}
+	defer c.Close()
+
+	machines, err := c.QueryMachines()
+	if err != nil {
+		log.WithError(err).Fatal("FAILED, couldn't query the machines")
 	}
 
-	machines := strings.TrimSpace(string(machinesBytes))
-	fmt.Println("`quilt machines` output:")
-	fmt.Println(machines)
-
 	failed := false
-	for _, machineLine := range strings.Split(machines, "\n") {
-		matches := machineRegex.FindStringSubmatch(machineLine)
-		if len(matches) != 4 {
-			log.WithField("machine", machineLine).
-				Error("Failed to parse machine")
-			failed = true
-			continue
-		}
-		id, role, ip := matches[1], matches[2], matches[3]
-		fmt.Printf("%s-%s (%s) minion logs:\n", role, id, ip)
-		logsOutput, err := exec.Command("quilt", "ssh", id,
+	for _, machine := range machines {
+		fmt.Println(machine)
+		logsOutput, err := exec.Command("quilt", "ssh", strconv.Itoa(machine.ID),
 			"docker", "logs", "minion").CombinedOutput()
 		if err != nil {
 			log.WithError(err).Error("Unable to get minion logs")
@@ -53,4 +52,12 @@ func main() {
 	} else {
 		fmt.Println("PASSED")
 	}
+}
+
+func printQuiltPs() {
+	psout, err := exec.Command("quilt", "ps").CombinedOutput()
+	if err != nil {
+		log.WithError(err).Fatal("Failed to run `quilt ps`")
+	}
+	fmt.Println(string(psout))
 }
