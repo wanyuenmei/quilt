@@ -22,12 +22,19 @@ files:
 
 ##### Our app
 First, we make sure that our MongoDB connection URI is set to the `MONGO_URI`
-environment variable. E.g.:
+environment variable. Note that this is set in our MEAN app code, not the
+Quilt.js specs:
 
 ```javascript
 var mongoose = require('mongoose');
 mongoose.connect(process.env.MONGO_URI);
 ```
+
+This is already done in the `awesome-restaurant-app`, but you'll need to
+do something similar to your own MEAN app before deploying it with Quilt.
+
+For an example, see how [server.js](https://github.com/LuiseV/awesome-restaurant-app/blob/master/server.js#L10)
+in the `awesome-restaurant-app` uses the URI in [config/database.js](https://github.com/LuiseV/awesome-restaurant-app/blob/master/config/database.js) to connect to MongoDB.
 
 ##### specs/mean/Dockerfile
 In [`specs/mean/Dockerfile`](./specs/mean/Dockerfile), we change the `git clone`
@@ -61,7 +68,7 @@ The push refers to a repository [docker.io/luise/awesome-restaurant-app]
 ```
 
 The above step requires that Docker is installed and running, and that we're
-authenticated. Check out
+authenticated - e.g. by using `docker login` for DockerHub. Check out
 [Docker's website](https://docs.docker.com/engine/installation/) for more.
 
 ##### specs/mean/example.js
@@ -94,9 +101,14 @@ If you want to change the characteristics of the VMs, go ahead and modify the
 relevant properties of the `baseMachine` object.
 
 ##### Deploy
-Now we're ready to deploy our MEAN stack application! In one shell, run `quilt
-daemon`, and in another, run `quilt run specs/mean/example.js` - both from the
-`quilt` directory. You should see something like this:
+Now we're ready to deploy our MEAN stack application! If you haven't already
+worked through the [GettingStarted.md](./GettingStarted.md) guide, now is a
+good time to check it out and set up your `GOPATH` and `QUILTPATH`, and
+`quilt get` the Quilt.js specs.
+
+When you're set up, run `quilt daemon` in one shell, and then run
+`quilt run specs/mean/example.js` in another shell - both from the `quilt`
+directory. You should see something like this:
 
 ```
 $ quilt daemon
