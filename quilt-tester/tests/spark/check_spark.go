@@ -3,31 +3,53 @@ package main
 import (
 	"fmt"
 	"os/exec"
-	"regexp"
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
+
+	"github.com/NetSys/quilt/api"
+	"github.com/NetSys/quilt/api/client/getter"
 )
 
 func main() {
-	containers, err := exec.Command("quilt", "containers").Output()
+	clientGetter := getter.New()
+
+	clnt, err := clientGetter.Client(api.DefaultSocket)
 	if err != nil {
-		log.WithError(err).Fatal("Unable to get containers.")
+		log.WithError(err).Fatal("FAILED, couldn't get quiltctl client.")
+	}
+	defer clnt.Close()
+
+	leader, err := clientGetter.LeaderClient(clnt)
+	if err != nil {
+		log.WithError(err).Fatal("FAILED, couldn't get leader client.")
 	}
 
+	containers, err := leader.QueryContainers()
+	if err != nil {
+		log.WithError(err).Fatal("FAILED, couldn't query containers.")
+	}
+
+	containersPretty, _ := exec.Command("quilt", "containers").Output()
 	fmt.Println("`quilt containers` output:")
-	fmt.Println(string(containers))
+	fmt.Println(string(containersPretty))
 
-	matches := regexp.MustCompile(`(\d+) .*run master.*`).
-		FindStringSubmatch(string(containers))
-	if len(matches) != 2 {
-		log.Fatal("Unable to find StitchID of Spark master.")
+	var id string
+	failed := true
+	for _, dbc := range containers {
+		if strings.Join(dbc.Command, " ") == "run master" {
+			id = fmt.Sprint(dbc.StitchID)
+			failed = false
+			println("found id ", id)
+		}
+	}
+	if failed {
+		log.Fatal("FAILED, unable to find StitchID of Spark master.")
 	}
 
-	id := matches[1]
 	logs, err := exec.Command("quilt", "logs", id).CombinedOutput()
 	if err != nil {
-		log.WithError(err).Fatal("Unable to get Spark master logs.")
+		log.WithError(err).Fatal("FAILED, unable to get Spark master logs.")
 	}
 
 	fmt.Printf("`quilt logs %s` output:\n", id)
