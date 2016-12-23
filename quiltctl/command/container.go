@@ -69,24 +69,47 @@ func (cCmd *Container) Run() int {
 		return 1
 	}
 
+	connections, err := c.QueryConnections()
+	if err != nil {
+		log.WithError(err).Error("Unable to query connections.")
+		return 1
+	}
+
 	machines, err := localClient.QueryMachines()
 	if err != nil {
 		log.WithError(err).Error("Unable to query machines")
 		return 1
 	}
 
-	writeContainers(os.Stdout, machines, containers)
+	writeContainers(os.Stdout, containers, machines, connections)
 	return 0
 }
 
-func writeContainers(fd io.Writer, machines []db.Machine, containers []db.Container) {
+func writeContainers(fd io.Writer, containers []db.Container, machines []db.Machine,
+	connections []db.Connection) {
 	w := tabwriter.NewWriter(fd, 0, 0, 4, ' ', 0)
 	defer w.Flush()
-	fmt.Fprintln(w, "STITCH ID\tCONTAINER\tMACHINE\tIMAGE\tCOMMAND\tLABELS")
+	fmt.Fprintln(w, "ID\tMACHINE\tCONTAINER\tLABELS\tPUBLIC IP")
+
+	labelPublicPortMap := map[string]string{}
+	for _, c := range connections {
+		if c.From != "public" {
+			continue
+		}
+
+		if c.MinPort == c.MaxPort {
+			labelPublicPortMap[c.To] = fmt.Sprintf("%d", c.MinPort)
+		} else {
+			labelPublicPortMap[c.To] = fmt.Sprintf(
+				"%d-%d", c.MinPort, c.MaxPort)
+		}
+	}
 
 	ipIDMap := map[string]int{}
+	idMachineMap := map[int]db.Machine{}
 	for _, m := range machines {
 		ipIDMap[m.PrivateIP] = m.ID
+		idMachineMap[m.ID] = m
 	}
 
 	machineDBC := map[int][]db.Container{}
@@ -101,17 +124,55 @@ func writeContainers(fd io.Writer, machines []db.Machine, containers []db.Contai
 	}
 	sort.Ints(machineIDs)
 
-	for _, machineID := range machineIDs {
-		machineStr := ""
-		if machineID != 0 {
-			machineStr = fmt.Sprintf("Machine-%d", machineID)
+	for i, machineID := range machineIDs {
+		if i > 0 {
+			// Insert a blank line between each machine.
+			// Need to print tabs in a blank line; otherwise, spacing will
+			// change in subsequent lines.
+			fmt.Fprintf(w, "\t\t\t\t\n")
 		}
 
 		for _, dbc := range db.SortContainers(machineDBC[machineID]) {
-			cmd := strings.Join(dbc.Command, " ")
+			publicPorts := []string{}
+			for _, label := range dbc.Labels {
+				if p, ok := labelPublicPortMap[label]; ok {
+					publicPorts = append(publicPorts, p)
+				}
+			}
+
+			machine := machineStr(machineID)
+			container := containerStr(dbc.Image, dbc.Command)
 			labels := strings.Join(dbc.Labels, ", ")
-			fmt.Fprintf(w, "%v\tContainer-%v\t%v\t%v\t\"%v\"\t%v\n",
-				dbc.StitchID, dbc.ID, machineStr, dbc.Image, cmd, labels)
+			publicIP := publicIPStr(idMachineMap[machineID].PublicIP,
+				publicPorts)
+
+			fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\n",
+				dbc.StitchID, machine, container, labels, publicIP)
 		}
 	}
+}
+
+func machineStr(machineID int) string {
+	if machineID == 0 {
+		return ""
+	}
+	return fmt.Sprintf("Machine-%d", machineID)
+}
+func containerStr(image string, args []string) string {
+	if image == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s %s", image, strings.Join(args, " "))
+}
+
+func publicIPStr(hostPublicIP string, publicPorts []string) string {
+	if hostPublicIP == "" || len(publicPorts) == 0 {
+		return ""
+	}
+
+	if len(publicPorts) == 1 {
+		return fmt.Sprintf("%s:%s", hostPublicIP, publicPorts[0])
+	}
+
+	return fmt.Sprintf("%s:[%s]", hostPublicIP, strings.Join(publicPorts, ","))
 }

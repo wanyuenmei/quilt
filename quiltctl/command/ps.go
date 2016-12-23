@@ -57,6 +57,7 @@ func (pCmd *Ps) Run() int {
 		return 1
 	}
 
+	fmt.Println("MACHINES")
 	writeMachines(os.Stdout, machines)
 
 	leaderClient, err := pCmd.clientGetter.LeaderClient(localClient)
@@ -66,6 +67,11 @@ func (pCmd *Ps) Run() int {
 	}
 	defer leaderClient.Close()
 
+	connections, err := leaderClient.QueryConnections()
+	if err != nil {
+		log.WithError(err).Error("Unable to query connections.")
+	}
+
 	containers, err := leaderClient.QueryContainers()
 	if err != nil {
 		log.WithError(err).Error("Unable to query containers.")
@@ -73,6 +79,7 @@ func (pCmd *Ps) Run() int {
 	}
 
 	fmt.Println()
-	writeContainers(os.Stdout, machines, containers)
+	fmt.Println("CONTAINERS")
+	writeContainers(os.Stdout, containers, machines, connections)
 	return 0
 }

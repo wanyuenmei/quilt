@@ -65,11 +65,11 @@ func (mCmd *Machine) Run() int {
 func writeMachines(fd io.Writer, machines []db.Machine) {
 	w := tabwriter.NewWriter(fd, 0, 0, 4, ' ', 0)
 	defer w.Flush()
-	fmt.Fprintln(w, "MACHINE\tROLE\tPROVIDER\tREGION\tSIZE\tCONNECTED")
+	fmt.Fprintln(w, "ID\tROLE\tPROVIDER\tREGION\tSIZE\tPUBLIC IP\tCONNECTED")
 
 	for _, m := range db.SortMachines(machines) {
-		machineName := fmt.Sprintf("Machine-%d", m.ID)
-		fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\n",
-			machineName, m.Role, m.Provider, m.Region, m.Size, m.Connected)
+		fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\t%v\n",
+			m.ID, m.Role, m.Provider, m.Region, m.Size, m.PublicIP,
+			m.Connected)
 	}
 }

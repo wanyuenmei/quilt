@@ -47,8 +47,9 @@ func TestMachineOutput(t *testing.T) {
 	* errors easier to debug. */
 	result = strings.Replace(result, " ", "_", -1)
 
-	exp := `MACHINE______ROLE______PROVIDER____REGION_______SIZE________CONNECTED
-Machine-1____Master____Amazon______us-west-1____m4.large____false
+	exp := `ID____ROLE______PROVIDER____REGION_______SIZE` +
+		`________PUBLIC_IP____CONNECTED
+1_____Master____Amazon______us-west-1____m4.large____8.8.8.8______false
 `
 
 	assert.Equal(t, exp, result)
@@ -84,27 +85,59 @@ func TestContainerOutput(t *testing.T) {
 	}
 
 	machines := []db.Machine{
-		{ID: 5, PrivateIP: "1.1.1.1"},
+		{ID: 5, PublicIP: "7.7.7.7", PrivateIP: "1.1.1.1"},
 		{ID: 6, PrivateIP: "2.2.2.2"},
 		{ID: 7, PrivateIP: ""},
 	}
 
+	connections := []db.Connection{
+		{ID: 1, From: "public", To: "label1", MinPort: 80, MaxPort: 80},
+		{ID: 2, From: "notpublic", To: "label2", MinPort: 100, MaxPort: 101},
+	}
+
 	var b bytes.Buffer
-	writeContainers(&b, machines, containers)
+	writeContainers(&b, containers, machines, connections)
 	result := string(b.Bytes())
 
 	/* By replacing space with underscore, we make the spaces explicit and whitespace
 	* errors easier to debug. */
 	result = strings.Replace(result, " ", "_", -1)
-	expected := `STITCH_ID____CONTAINER______MACHINE______` +
-		`IMAGE_____COMMAND______LABELS
-3____________Container-1_________________image1____"cmd_1"______
-1____________Container-2____Machine-5____image2____""___________label1,_label2
-4____________Container-3____Machine-5____image3____"cmd"________label1
-7____________Container-4____Machine-6____image1____"cmd_3_4"____label1
-8____________Container-5____Machine-7____image1____""___________
+	expected := `ID____MACHINE______CONTAINER_________LABELS____________PUBLIC_IP
+3__________________image1_cmd_1________________________
+_______________________________________________________
+1_____Machine-5____image2____________label1,_label2____7.7.7.7:80
+4_____Machine-5____image3_cmd________label1____________7.7.7.7:80
+_______________________________________________________
+7_____Machine-6____image1_cmd_3_4____label1____________
+_______________________________________________________
+8_____Machine-7____image1______________________________
 `
+
 	assert.Equal(t, expected, result)
+}
+
+func TestMachineStr(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, "", machineStr(0))
+	assert.Equal(t, "Machine-10", machineStr(10))
+}
+
+func TestContainerStr(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, "", containerStr("", nil))
+	assert.Equal(t, "", containerStr("", []string{"arg0"}))
+	assert.Equal(t, "container arg0 arg1",
+		containerStr("container", []string{"arg0", "arg1"}))
+}
+
+func TestPublicIPStr(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, "", publicIPStr("", nil))
+	assert.Equal(t, "", publicIPStr("", []string{"80-88"}))
+	assert.Equal(t, "", publicIPStr("1.2.3.4", nil))
+	assert.Equal(t, "1.2.3.4:80-88", publicIPStr("1.2.3.4", []string{"80-88"}))
+	assert.Equal(t, "1.2.3.4:[70,80-88]",
+		publicIPStr("1.2.3.4", []string{"70", "80-88"}))
 }
 
 func checkGetParsing(t *testing.T, args []string, expImport string, expErr error) {
