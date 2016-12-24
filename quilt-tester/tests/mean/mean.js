@@ -1,4 +1,4 @@
-var HaProxy = require("github.com/NetSys/quilt/specs/haproxy/haproxy");
+var HaProxy = require("github.com/NetSys/quilt/specs/haproxy/haproxy").Haproxy;
 var Mongo = require("github.com/NetSys/quilt/specs/mongo/mongo");
 var Node = require("github.com/NetSys/quilt/specs/node/node");
 var infrastructure = require("github.com/NetSys/quilt/quilt-tester/config/infrastructure")
@@ -15,7 +15,7 @@ var app = new Node({
     MONGO_URI: mongo.uri("mean-example")
   }
 });
-var haproxy = new HaProxy.New(3, app.services());
+var haproxy = new HaProxy(3, app.services());
 
 mongo.connect(mongo.port(), app);
 app.connect(mongo.port(), mongo);
