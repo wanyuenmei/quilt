@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"net"
 	"os"
 	"os/exec"
 	"strings"
@@ -19,8 +18,8 @@ func main() {
 	}
 
 	addrs := strings.Split(addrsVar, ",")
-	for _, addr := range addrs {
-		resolveHostname(strings.Split(addr, ":")[0])
+	if err := pingWait(addrs); err != nil {
+		log.Fatalf("Error ping wait: %s", err.Error())
 	}
 
 	if err := configureHAProxy(addrs); err != nil {
@@ -63,15 +62,29 @@ func configureHAProxy(addrs []string) error {
 	return err
 }
 
-func resolveHostname(hostname string) []string {
-	for {
-		addrs, err := net.LookupHost(hostname)
-		if err == nil {
-			log.Printf("Resolved %s to %+v", hostname, addrs)
-			return addrs
+func pingWait(addrs []string) error {
+	var err error
+	for _, fullAddr := range addrs {
+		addr := strings.Split(fullAddr, ":")[0]
+		log.Printf("Pinging %s", addr)
+		for pinged := false; !pinged; pinged, err = ping(addr) {
+			if err != nil {
+				return err
+			}
+			time.Sleep(time.Second)
 		}
-
-		log.Printf("Unable to resolve %s: %s. Retrying...", hostname, err.Error())
-		time.Sleep(time.Second)
+		log.Printf("Successfully pinged %s", addr)
 	}
+	return nil
+}
+
+func ping(addr string) (bool, error) {
+	err := exec.Command("ping", "-c1", addr).Run()
+	if err != nil {
+		if _, ok := err.(*exec.ExitError); ok {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
