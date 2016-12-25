@@ -54,6 +54,7 @@ func waitForMongo(mongoURI string) {
 	if err != nil {
 		log.Fatalf("Failed to parse Mongo URI: %s\n", err.Error())
 	}
+	dialInfo.Timeout = time.Second
 
 	for {
 		_, err = mgo.DialWithInfo(dialInfo)
