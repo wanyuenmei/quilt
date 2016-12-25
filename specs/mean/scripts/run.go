@@ -2,12 +2,13 @@ package main
 
 import (
 	"log"
-	"net"
 	"os"
 	"os/exec"
 	"time"
 
 	"gopkg.in/mgo.v2"
+
+	"github.com/NetSys/quilt/specs"
 )
 
 func main() {
@@ -21,7 +22,9 @@ func main() {
 		log.Fatal("You must specify a `MONGO_URI`")
 	}
 
-	resolveHostname(host)
+	if err := specs.PingWait([]string{host}); err != nil {
+		log.Fatalf("Error ping wait: %s", err.Error())
+	}
 	waitForMongo(mongoURI)
 
 	if err := runServer(); err != nil {
@@ -34,19 +37,6 @@ func runServer() error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
-}
-
-func resolveHostname(hostname string) []string {
-	for {
-		addrs, err := net.LookupHost(hostname)
-		if err == nil {
-			log.Printf("Resolved %s to %+v", hostname, addrs)
-			return addrs
-		}
-
-		log.Printf("Unable to resolve %s: %s. Retrying...", hostname, err.Error())
-		time.Sleep(time.Second)
-	}
 }
 
 func waitForMongo(mongoURI string) {
