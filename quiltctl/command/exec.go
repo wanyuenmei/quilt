@@ -96,6 +96,7 @@ func (eCmd *Exec) Run() int {
 		log.WithError(err).Error("Error getting container client")
 		return 1
 	}
+	defer containerClient.Close()
 
 	container, err := util.GetContainer(containerClient, eCmd.targetContainer)
 	if err != nil {
