@@ -209,6 +209,9 @@ func (dk Client) RemoveID(id string) error {
 }
 
 // Pull retrieves the given docker image from an image cache.
+// The `image` argument can be of the form <repo>, <repo>:<tag>, or
+// <repo>:<tag>@<digestFormat>:<digest>.
+// If no tag is specified, then the "latest" tag is applied.
 func (dk Client) Pull(image string) error {
 	dk.Lock()
 	defer dk.Unlock()
@@ -218,13 +221,18 @@ func (dk Client) Pull(image string) error {
 		return nil
 	}
 
+	repo, tag := dkc.ParseRepositoryTag(image)
+	if tag == "" {
+		tag = "latest"
+	}
+
 	log.Infof("Pulling docker image %s.", image)
-	opts := dkc.PullImageOptions{Repository: image}
+	opts := dkc.PullImageOptions{Repository: repo, Tag: tag}
 	if err := dk.PullImage(opts, dkc.AuthConfiguration{}); err != nil {
 		return err
 	}
 
-	dk.imageCache[image] = now.Add(pullCacheTimeout)
+	dk.imageCache[repo+":"+tag] = now.Add(pullCacheTimeout)
 	return nil
 }
 

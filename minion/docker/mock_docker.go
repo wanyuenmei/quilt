@@ -99,7 +99,7 @@ func (dk MockClient) PullImage(opts dkc.PullImageOptions,
 		return errors.New("pull error")
 	}
 
-	dk.Pulled[opts.Repository] = struct{}{}
+	dk.Pulled[opts.Repository+":"+opts.Tag] = struct{}{}
 	return nil
 }
 
@@ -181,7 +181,12 @@ func (dk *MockClient) CreateContainer(opts dkc.CreateContainerOptions) (*dkc.Con
 		return nil, errors.New("create error")
 	}
 
-	if _, ok := dk.Pulled[opts.Config.Image]; !ok {
+	image := opts.Config.Image
+	if strings.Count(image, ":") == 0 {
+		image = image + ":latest"
+	}
+
+	if _, ok := dk.Pulled[image]; !ok {
 		return nil, errors.New("create a missing image")
 	}
 

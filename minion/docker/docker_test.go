@@ -23,13 +23,46 @@ func TestPull(t *testing.T) {
 	assert.Nil(t, err)
 
 	exp := map[string]struct{}{
-		"foo": {},
+		"foo:latest": {},
 	}
 	assert.Equal(t, exp, md.Pulled)
 	assert.Equal(t, exp, cacheKeys(dk.imageCache))
 
 	err = dk.Pull("foo")
 	assert.Nil(t, err)
+	assert.Equal(t, exp, md.Pulled)
+	assert.Equal(t, exp, cacheKeys(dk.imageCache))
+
+	err = dk.Pull("bar")
+	assert.Nil(t, err)
+
+	exp = map[string]struct{}{
+		"foo:latest": {},
+		"bar:latest": {},
+	}
+	assert.Equal(t, exp, md.Pulled)
+	assert.Equal(t, exp, cacheKeys(dk.imageCache))
+
+	err = dk.Pull("bar:tag")
+	assert.Nil(t, err)
+
+	exp = map[string]struct{}{
+		"foo:latest": {},
+		"bar:latest": {},
+		"bar:tag":    {},
+	}
+	assert.Equal(t, exp, md.Pulled)
+	assert.Equal(t, exp, cacheKeys(dk.imageCache))
+
+	err = dk.Pull("bar:tag2@sha256:asdfasdfasdfasdf")
+	assert.Nil(t, err)
+
+	exp = map[string]struct{}{
+		"foo:latest": {},
+		"bar:latest": {},
+		"bar:tag":    {},
+		"bar:tag2":   {},
+	}
 	assert.Equal(t, exp, md.Pulled)
 	assert.Equal(t, exp, cacheKeys(dk.imageCache))
 }
@@ -42,14 +75,14 @@ func checkCache(prePull func()) (bool, error) {
 		return false, err
 	}
 
-	delete(md.Pulled, testImage)
+	delete(md.Pulled, testImage+":latest")
 
 	prePull()
-	if err := dk.Pull(testImage); err != nil {
+	if err := dk.Pull(testImage + ":latest"); err != nil {
 		return false, err
 	}
 
-	_, pulled := md.Pulled[testImage]
+	_, pulled := md.Pulled[testImage+":latest"]
 	return !pulled, nil
 }
 
