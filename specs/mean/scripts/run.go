@@ -12,48 +12,33 @@ import (
 )
 
 func main() {
-	host := os.Getenv("HOST")
-	if host == "" {
-		log.Fatal("You must specify a `HOST`")
+	dialInfo, err := mgo.ParseURL(os.Getenv("MONGO_URI"))
+	if err != nil {
+		log.Fatalf("Failed to parse MONGO_URI: %s\n", err)
 	}
 
-	mongoURI := os.Getenv("MONGO_URI")
-	if mongoURI == "" {
-		log.Fatal("You must specify a `MONGO_URI`")
-	}
-
-	if err := specs.PingWait([]string{host}); err != nil {
+	// Due to a cache in the go name resolution code, we shell out to ping first
+	// before relying on Dial.  Otherwise, dial would cache /etc/hosts before it was
+	// ready causing irrecoverable problems.
+	if err := specs.PingWait(dialInfo.Addrs); err != nil {
 		log.Fatalf("Error ping wait: %s", err.Error())
 	}
-	waitForMongo(mongoURI)
 
-	if err := runServer(); err != nil {
-		log.Fatalf("Error running server: %s", err.Error())
-	}
-}
-
-func runServer() error {
-	cmd := exec.Command("npm", "start")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
-
-func waitForMongo(mongoURI string) {
-	dialInfo, err := mgo.ParseURL(mongoURI)
-	if err != nil {
-		log.Fatalf("Failed to parse Mongo URI: %s\n", err.Error())
-	}
-	dialInfo.Timeout = time.Second
-
+	dialInfo.Timeout = 5 * time.Second
 	for {
-		_, err = mgo.DialWithInfo(dialInfo)
-		if err == nil {
+		if _, err = mgo.DialWithInfo(dialInfo); err == nil {
 			log.Print("Connected to Mongo")
-			return
+			break
 		}
 
 		log.Printf("Failed to connect: %s\n", err.Error())
-		time.Sleep(time.Second)
+		time.Sleep(5 * time.Second)
+	}
+
+	cmd := exec.Command("npm", "start")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		log.Fatalf("Error running server: %s", err.Error())
 	}
 }
