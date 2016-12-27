@@ -1,6 +1,7 @@
 package command
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -29,42 +30,45 @@ func TestPsErrors(t *testing.T) {
 	var mockGetter *testutils.Getter
 	var mockClient, mockLeaderClient *clientMock.Client
 
+	mockErr := errors.New("error")
+
 	// Error connecting to local client
 	mockGetter = new(testutils.Getter)
-	mockGetter.On("Client", mock.Anything).Return(nil, assert.AnError)
+	mockGetter.On("Client", mock.Anything).Return(nil, mockErr)
 
 	cmd = &Ps{&commonFlags{}, mockGetter}
-	assert.Equal(t, 1, cmd.Run())
+	assert.EqualError(t, cmd.run(), "error connecting to quilt daemon: error")
 	mockGetter.AssertExpectations(t)
 
 	// Error querying machines
 	mockGetter = new(testutils.Getter)
-	mockClient = &clientMock.Client{MachineErr: assert.AnError}
+	mockClient = &clientMock.Client{MachineErr: mockErr}
 	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
+	mockGetter.On("LeaderClient", mock.Anything).Return(nil, mockErr)
 
 	cmd = &Ps{&commonFlags{}, mockGetter}
-	assert.Equal(t, 1, cmd.Run())
+	assert.EqualError(t, cmd.run(), "unable to query machines: error")
 	mockGetter.AssertExpectations(t)
 
 	// Error connecting to leader
 	mockGetter = new(testutils.Getter)
 	mockClient = new(clientMock.Client)
 	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
-	mockGetter.On("LeaderClient", mock.Anything).Return(nil, assert.AnError)
+	mockGetter.On("LeaderClient", mock.Anything).Return(nil, mockErr)
 
 	cmd = &Ps{&commonFlags{}, mockGetter}
-	assert.Equal(t, 1, cmd.Run())
+	assert.EqualError(t, cmd.run(), "unable to connect to a cluster leader: error")
 	mockGetter.AssertExpectations(t)
 
 	// Error querying containers
 	mockGetter = new(testutils.Getter)
 	mockClient = new(clientMock.Client)
-	mockLeaderClient = &clientMock.Client{ContainerErr: assert.AnError}
+	mockLeaderClient = &clientMock.Client{ContainerErr: mockErr}
 	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
 	mockGetter.On("LeaderClient", mock.Anything).Return(mockLeaderClient, nil)
 
 	cmd = &Ps{&commonFlags{}, mockGetter}
-	assert.Equal(t, 1, cmd.Run())
+	assert.EqualError(t, cmd.run(), "unable to query containers: error")
 	mockGetter.AssertExpectations(t)
 }
 
