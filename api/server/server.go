@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -101,6 +102,14 @@ func (s server) Deploy(cts context.Context, deployReq *pb.DeployRequest) (
 	if len(stitch.Machines) > ipdef.MaxMinionCount {
 		return &pb.DeployReply{}, fmt.Errorf("cannot boot more than %d "+
 			"machines", ipdef.MaxMinionCount)
+	}
+
+	for _, c := range stitch.Containers {
+		parts := strings.Split(c.Image, ":")
+		if len(parts) > 3 || (len(parts) >= 2 && parts[1] == "") {
+			return &pb.DeployReply{}, fmt.Errorf("could not parse "+
+				"container image: %s", c.Image)
+		}
 	}
 
 	err = s.conn.Txn(db.ClusterTable).Run(func(view db.Database) error {

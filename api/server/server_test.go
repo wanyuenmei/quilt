@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"testing"
 
 	"golang.org/x/net/context"
@@ -74,6 +75,30 @@ func TestBadDeployment(t *testing.T) {
 		&pb.DeployRequest{Deployment: badDeployment})
 
 	assert.EqualError(t, err, "unexpected end of JSON input")
+}
+func TestInvalidImage(t *testing.T) {
+	conn := db.New()
+	s := server{conn: conn}
+	testInvalidImage(t, s, "has:morethan:two:colons")
+	testInvalidImage(t, s, "hasEmptyTag:")
+	testInvalidImage(t, s, "hasEmptyTag::digest")
+}
+
+func testInvalidImage(t *testing.T, s server, img string) {
+	deployment := fmt.Sprintf(`
+	{"Containers":[
+		{"ID": 1,
+                "Image":"%s",
+                "Command":[
+                        "sleep",
+                        "10000"
+                ],
+                "Env": {}
+	}]}`, img)
+
+	_, err := s.Deploy(context.Background(),
+		&pb.DeployRequest{Deployment: deployment})
+	assert.EqualError(t, err, "could not parse container image: "+img)
 }
 
 func TestDeploy(t *testing.T) {
