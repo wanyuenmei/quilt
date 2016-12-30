@@ -69,13 +69,15 @@ format-check:
 
 lint: format
 	cd -P . && govendor vet +local
+	LINT_CODE=0; \
 	for package in $(PACKAGES) ; do \
 		if [[ $$package != *minion/pb* && $$package != *api/pb* ]] ; then \
-			golint -min_confidence .25 -set_exit_status $$package || exit 1 ; \
+			golint -min_confidence .25 -set_exit_status $$package || LINT_CODE=1; \
 		fi \
-	done
-	find . -path ./vendor -prune -o -name '*' -type file -print | xargs misspell -error
-	ineffassign .
+	done ; \
+	find . -path ./vendor -prune -o -name '*' -type file -print | xargs misspell -error ; \
+	ineffassign . ; \
+	exit $$LINT_CODE
 
 generate:
 	govendor generate +local
