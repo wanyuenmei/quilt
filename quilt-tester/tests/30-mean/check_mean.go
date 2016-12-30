@@ -35,11 +35,14 @@ func main() {
 		log.WithError(err).Fatal("FAILED, couldn't query machines")
 	}
 
-	httpGetTest(machines, containers)
-	log.Info("PASSED")
+	if httpGetTest(machines, containers) {
+		log.Info("PASSED")
+	} else {
+		log.Info("FAILED")
+	}
 }
 
-func httpGetTest(machines []db.Machine, containers []db.Container) {
+func httpGetTest(machines []db.Machine, containers []db.Container) bool {
 	log.Info("HTTP Get Test")
 
 	minionIPMap := map[string]string{}
@@ -64,18 +67,23 @@ func httpGetTest(machines []db.Machine, containers []db.Container) {
 		log.Fatal("FAILED, Found no public IPs")
 	}
 
+	var failed bool
 	for i := 0; i < 25; i++ {
 		for _, ip := range publicIPs {
 			resp, err := http.Get("http://" + ip)
 			if err != nil {
-				log.WithError(err).Fatal("FAILED, HTTP error")
+				log.WithError(err).Error("HTTP Error")
+				failed = true
 			}
 
-			if resp.StatusCode != 200 {
-				log.Fatal("FAILED, HAProxy had non 200 status", resp)
+			if resp.StatusCode == 200 {
+				log.Info(resp)
+			} else {
+				log.Error(resp)
+				failed = true
 			}
-
-			log.Info(resp)
 		}
 	}
+
+	return !failed
 }
