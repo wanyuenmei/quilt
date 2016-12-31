@@ -70,7 +70,7 @@ func (rCmd *Run) Parse(args []string) error {
 	return nil
 }
 
-const emptyDeployment = "{}"
+var errNoCluster = errors.New("no cluster")
 
 // Run starts the run for the provided Stitch.
 func (rCmd *Run) Run() int {
@@ -104,13 +104,13 @@ func (rCmd *Run) Run() int {
 	defer c.Close()
 
 	curr, err := getCurrentDeployment(c)
-	if err != nil {
+	if err != nil && err != errNoCluster {
 		log.WithError(err).Error("Unable to get current deployment.")
 		return 1
 	}
 
-	if !rCmd.force && curr != emptyDeployment {
-		diff, err := diffDeployment(curr, deployment)
+	if !rCmd.force && err != errNoCluster {
+		diff, err := diffDeployment(curr.String(), deployment)
 		if err != nil {
 			log.WithError(err).Error("Unable to diff deployments.")
 			return 1
@@ -143,16 +143,16 @@ func (rCmd *Run) Run() int {
 	return 0
 }
 
-func getCurrentDeployment(c client.Client) (string, error) {
+func getCurrentDeployment(c client.Client) (stitch.Stitch, error) {
 	clusters, err := c.QueryClusters()
 	if err != nil {
-		return "", err
+		return stitch.Stitch{}, err
 	}
 	switch len(clusters) {
 	case 0:
-		return emptyDeployment, nil
+		return stitch.Stitch{}, errNoCluster
 	case 1:
-		return clusters[0].Spec, nil
+		return stitch.FromJSON(clusters[0].Spec)
 	default:
 		panic("unreached")
 	}

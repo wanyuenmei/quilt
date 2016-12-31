@@ -1,7 +1,6 @@
 package command
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 
@@ -9,6 +8,7 @@ import (
 
 	"github.com/NetSys/quilt/api/client"
 	"github.com/NetSys/quilt/api/client/getter"
+	"github.com/NetSys/quilt/stitch"
 )
 
 // Stop contains the options for stopping namespaces.
@@ -65,37 +65,24 @@ func (sCmd *Stop) Run() int {
 	}
 	defer c.Close()
 
+	newCluster := stitch.Stitch{
+		Namespace: sCmd.namespace,
+	}
 	if sCmd.namespace == "" {
-		sCmd.namespace, err = clusterName(c)
+		currDepl, err := getCurrentDeployment(c)
 		if err != nil {
 			log.WithError(err).
 				Error("Failed to get namespace of current cluster")
 			return 1
 		}
+		newCluster.Namespace = currDepl.Namespace
 	}
 
-	specStr := fmt.Sprintf(`{"namespace": %q}`, sCmd.namespace)
-	if err = c.Deploy(specStr); err != nil {
+	if err = c.Deploy(newCluster.String()); err != nil {
 		log.WithError(err).Error("Unable to stop namespace.")
 		return 1
 	}
 
 	log.WithField("namespace", sCmd.namespace).Debug("Stopping namespace")
 	return 0
-}
-
-// Returns the name of the current cluster
-func clusterName(c client.Client) (string, error) {
-	clusters, err := c.QueryClusters()
-	if err != nil {
-		return "", err
-	}
-	switch len(clusters) {
-	case 0:
-		return "", errors.New("no cluster set")
-	case 1:
-		return clusters[0].Namespace, nil
-	default:
-		panic("more than 1 current cluster")
-	}
 }
