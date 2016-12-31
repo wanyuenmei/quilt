@@ -50,6 +50,38 @@ func TestStopNamespace(t *testing.T) {
 	assertDeployed(t, stitch.Stitch{Namespace: "namespace"}, c.DeployArg)
 }
 
+func TestStopContainers(t *testing.T) {
+	t.Parallel()
+
+	mockGetter := new(testutils.Getter)
+	c := &clientMock.Client{}
+	mockGetter.On("Client", mock.Anything).Return(c, nil)
+
+	c.ClusterReturn = []db.Cluster{
+		{
+			Spec: `{"namespace": "testSpace", "machines": ` +
+				`[{"provider": "Amazon"}, {"provider": "Google"}]}`,
+		},
+	}
+
+	stopCmd := NewStopCommand()
+	stopCmd.clientGetter = mockGetter
+	stopCmd.onlyContainers = true
+	stopCmd.Run()
+
+	assertDeployed(t, stitch.Stitch{
+		Namespace: "testSpace",
+		Machines: []stitch.Machine{
+			{
+				Provider: "Amazon",
+			},
+			{
+				Provider: "Google",
+			},
+		},
+	}, c.DeployArg)
+}
+
 func assertDeployed(t *testing.T, exp stitch.Stitch, deployed string) {
 	actual, err := stitch.FromJSON(deployed)
 	assert.NoError(t, err)

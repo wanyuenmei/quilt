@@ -13,7 +13,8 @@ import (
 
 // Stop contains the options for stopping namespaces.
 type Stop struct {
-	namespace string
+	namespace      string
+	onlyContainers bool
 
 	common       *commonFlags
 	clientGetter client.Getter
@@ -33,10 +34,12 @@ func (sCmd *Stop) InstallFlags(flags *flag.FlagSet) {
 
 	flags.StringVar(&sCmd.namespace, "namespace", "",
 		"the namespace to stop")
+	flags.BoolVar(&sCmd.onlyContainers, "containers", false,
+		"only destroy containers")
 
 	flags.Usage = func() {
 		fmt.Println("usage: quilt stop [-H=<daemon_host>] " +
-			"[-namespace=<namespace>] <namespace>]")
+			"[-containers] [-namespace=<namespace>] <namespace>]")
 		fmt.Println("`stop` creates an empty Stitch for the given namespace, " +
 			"and sends it to the Quilt daemon to be executed. If no " +
 			"namespace is specified, `stop` attempts to use the namespace " +
@@ -68,14 +71,25 @@ func (sCmd *Stop) Run() int {
 	newCluster := stitch.Stitch{
 		Namespace: sCmd.namespace,
 	}
-	if sCmd.namespace == "" {
+	if sCmd.namespace == "" || sCmd.onlyContainers {
 		currDepl, err := getCurrentDeployment(c)
 		if err != nil {
 			log.WithError(err).
-				Error("Failed to get namespace of current cluster")
+				Error("Failed to get current cluster")
 			return 1
 		}
-		newCluster.Namespace = currDepl.Namespace
+		if sCmd.namespace == "" {
+			newCluster.Namespace = currDepl.Namespace
+		}
+		if sCmd.onlyContainers {
+			if newCluster.Namespace != currDepl.Namespace {
+				log.Error("Stopping only containers for a namespace " +
+					"not tracked by the remote daemon is not " +
+					"currently supported")
+				return 1
+			}
+			newCluster.Machines = currDepl.Machines
+		}
 	}
 
 	if err = c.Deploy(newCluster.String()); err != nil {

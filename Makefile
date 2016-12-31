@@ -38,6 +38,7 @@ COV_SKIP= /api/client/mocks \
 	  /quilt-tester/tests/15-bandwidth \
 	  /quilt-tester/tests/20-spark \
 	  /quilt-tester/tests/30-mean \
+	  /quilt-tester/tests/40-stop \
 	  /quilt-tester/tests/100-logs \
 	  /quilt-tester/tests/75-network \
 	  /quilt-tester/tests/mean /quiltctl/testutils \
