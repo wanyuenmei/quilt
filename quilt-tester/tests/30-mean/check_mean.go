@@ -91,6 +91,7 @@ func httpGetTest(machines []db.Machine, containers []db.Container) bool {
 			if err != nil {
 				log.WithError(err).Error("HTTP Error")
 				failed = true
+				continue
 			}
 
 			if resp.StatusCode == 200 {
