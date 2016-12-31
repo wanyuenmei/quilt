@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"net"
 	"os/exec"
@@ -76,7 +75,6 @@ type OFRuleSlice []OFRule
 //    - On each container:
 //        * Make the quilt-int device on the host the default gateway (this is the LOCAL
 //          port on the quilt-int bridge).
-//        * Setup /etc/resolv.conf with the same nameservers as the host.
 //    - On the quilt-int bridge:
 //        * Forward packets from containers to LOCAL, if their dst MAC is that of the
 //          default gateway.
@@ -126,15 +124,10 @@ func runWorker(conn db.Conn, dk docker.Client) {
 		connections := view.SelectFromConnection(nil)
 
 		var wg sync.WaitGroup
-		wg.Add(2)
 
+		wg.Add(1)
 		go func() {
 			updateEtcHosts(dk, containers, labels, connections)
-			wg.Done()
-		}()
-
-		go func() {
-			updateNameservers(dk, containers)
 			wg.Done()
 		}()
 
@@ -728,56 +721,6 @@ func generateTargetOpenFlow(odb ovsdb.Client, containers []db.Container,
 	}
 
 	return targetRules, nil
-}
-
-// updateNameservers assigns each container the same nameservers as the host.
-func updateNameservers(dk docker.Client, containers []db.Container) {
-	hostResolv, err := ioutil.ReadFile("/etc/resolv.conf")
-	if err != nil {
-		log.WithError(err).Error("failed to read /etc/resolv.conf")
-	}
-
-	nsRE := regexp.MustCompile("nameserver\\s([0-9]{1,3}\\.){3}[0-9]{1,3}\\s+")
-	matches := nsRE.FindAllString(string(hostResolv), -1)
-	newNameservers := strings.Join(matches, "\n")
-
-	containerChan := make(chan db.Container)
-	var wg sync.WaitGroup
-	wg.Add(concurrencyLimit)
-	for i := 0; i < concurrencyLimit; i++ {
-		go func() {
-			updateNS(dk, newNameservers, containerChan)
-			wg.Done()
-		}()
-	}
-
-	for _, dbc := range containers {
-		containerChan <- dbc
-	}
-	close(containerChan)
-	wg.Wait()
-}
-
-func updateNS(dk docker.Client, newNameservers string, in chan db.Container) {
-	for dbc := range in {
-		id := dbc.DockerID
-		currNameservers, err := dk.GetFromContainer(id,
-			"/etc/resolv.conf")
-		if err != nil {
-			log.WithError(err).Error("failed to get " +
-				"/etc/resolv.conf")
-			continue
-		}
-
-		if newNameservers != currNameservers {
-			err = dk.WriteToContainer(id, newNameservers, "/etc",
-				"resolv.conf", 0644)
-			if err != nil {
-				log.WithError(err).Error(
-					"failed to update /etc/resolv.conf")
-			}
-		}
-	}
 }
 
 func updateEtcHosts(dk docker.Client, containers []db.Container, labels []db.Label,

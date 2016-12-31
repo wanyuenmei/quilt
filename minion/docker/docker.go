@@ -103,6 +103,7 @@ func (dk Client) Run(opts RunOptions) (string, error) {
 		PidMode:     opts.PidMode,
 		Privileged:  opts.Privileged,
 		VolumesFrom: opts.VolumesFrom,
+		DNSSearch:   []string{"q"},
 	}
 
 	id, err := dk.create(opts.Name, opts.Image, opts.Args, opts.Labels, env, hc, nil)
