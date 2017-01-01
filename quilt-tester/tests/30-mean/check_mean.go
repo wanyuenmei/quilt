@@ -50,7 +50,7 @@ func logContainers(containers []db.Container) bool {
 		cmd := exec.Command("quilt", "logs", strconv.Itoa(c.StitchID))
 		out, err := cmd.CombinedOutput()
 		if err != nil {
-			log.WithError(err).Error("Failed to log: %s", c)
+			log.WithError(err).Errorf("Failed to log: %s", c)
 			failed = true
 		}
 		log.Infof("Container: %s\n%s\n\n", c, string(out))
