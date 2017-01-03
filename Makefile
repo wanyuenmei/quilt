@@ -35,6 +35,7 @@ COV_SKIP= /api/client/mocks \
 	  /minion/pprofile \
 	  /quilt-tester \
 	  /quilt-tester/tests/10-network \
+	  /quilt-tester/tests/15-bandwidth \
 	  /quilt-tester/tests/20-spark \
 	  /quilt-tester/tests/30-mean \
 	  /quilt-tester/tests/100-logs \
