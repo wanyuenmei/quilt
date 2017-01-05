@@ -89,7 +89,7 @@ func writeContainers(fd io.Writer, containers []db.Container, machines []db.Mach
 	connections []db.Connection) {
 	w := tabwriter.NewWriter(fd, 0, 0, 4, ' ', 0)
 	defer w.Flush()
-	fmt.Fprintln(w, "ID\tMACHINE\tCONTAINER\tLABELS\tPUBLIC IP")
+	fmt.Fprintln(w, "ID\tMACHINE\tCONTAINER\tLABELS\tSTATUS\tPUBLIC IP")
 
 	labelPublicPortMap := map[string]string{}
 	for _, c := range connections {
@@ -129,7 +129,7 @@ func writeContainers(fd io.Writer, containers []db.Container, machines []db.Mach
 			// Insert a blank line between each machine.
 			// Need to print tabs in a blank line; otherwise, spacing will
 			// change in subsequent lines.
-			fmt.Fprintf(w, "\t\t\t\t\n")
+			fmt.Fprintf(w, "\t\t\t\t\t\n")
 		}
 
 		for _, dbc := range db.SortContainers(machineDBC[machineID]) {
@@ -143,11 +143,18 @@ func writeContainers(fd io.Writer, containers []db.Container, machines []db.Mach
 			machine := machineStr(machineID)
 			container := containerStr(dbc.Image, dbc.Command)
 			labels := strings.Join(dbc.Labels, ", ")
+			status := ""
+			if dbc.IP != "" {
+				status = "Running"
+			} else if dbc.Minion != "" {
+				status = "Scheduled"
+			}
 			publicIP := publicIPStr(idMachineMap[machineID].PublicIP,
 				publicPorts)
 
-			fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\n",
-				dbc.StitchID, machine, container, labels, publicIP)
+			fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\n",
+				dbc.StitchID, machine, container, labels, status,
+				publicIP)
 		}
 	}
 }

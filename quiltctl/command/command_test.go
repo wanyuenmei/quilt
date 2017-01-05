@@ -71,8 +71,8 @@ func TestContainerOutput(t *testing.T) {
 	t.Parallel()
 
 	containers := []db.Container{
-		{ID: 1, StitchID: 3, Minion: "3.3.3.3", Image: "image1",
-			Command: []string{"cmd", "1"}},
+		{ID: 1, StitchID: 3, Minion: "3.3.3.3", IP: "1.2.3.4",
+			Image: "image1", Command: []string{"cmd", "1"}},
 		{ID: 2, StitchID: 1, Minion: "1.1.1.1", Image: "image2",
 			Labels: []string{"label1", "label2"}},
 		{ID: 3, StitchID: 4, Minion: "1.1.1.1", Image: "image3",
@@ -102,15 +102,16 @@ func TestContainerOutput(t *testing.T) {
 	/* By replacing space with underscore, we make the spaces explicit and whitespace
 	* errors easier to debug. */
 	result = strings.Replace(result, " ", "_", -1)
-	expected := `ID____MACHINE______CONTAINER_________LABELS____________PUBLIC_IP
-3__________________image1_cmd_1________________________
-_______________________________________________________
-1_____Machine-5____image2____________label1,_label2____7.7.7.7:80
-4_____Machine-5____image3_cmd________label1____________7.7.7.7:80
-_______________________________________________________
-7_____Machine-6____image1_cmd_3_4____label1____________
-_______________________________________________________
-8_____Machine-7____image1______________________________
+	expected := `ID____MACHINE______CONTAINER_________LABELS` +
+		`____________STATUS_______PUBLIC_IP
+3__________________image1_cmd_1________________________Running______
+____________________________________________________________________
+1_____Machine-5____image2____________label1,_label2____Scheduled____7.7.7.7:80
+4_____Machine-5____image3_cmd________label1____________Scheduled____7.7.7.7:80
+____________________________________________________________________
+7_____Machine-6____image1_cmd_3_4____label1____________Scheduled____
+____________________________________________________________________
+8_____Machine-7____image1___________________________________________
 `
 
 	assert.Equal(t, expected, result)
