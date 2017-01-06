@@ -45,6 +45,8 @@ var amis = map[string]string{
 	"us-west-2":      "ami-e1fe2281",
 }
 
+var sleep = time.Sleep
+
 // New creates a new Amazon EC2 cluster.
 func New(namespace string) (*Cluster, error) {
 	clst := newAmazon(namespace)
@@ -334,7 +336,7 @@ OuterLoop:
 			if err == nil {
 				continue OuterLoop
 			}
-			time.Sleep(5 * time.Second)
+			sleep(5 * time.Second)
 		}
 
 		log.Warn("Failed to tag spot requests: ", err)
@@ -357,23 +359,29 @@ OuterLoop:
 		machines, err := clst.List()
 		if err != nil {
 			log.WithError(err).Warn("Failed to get machines.")
-			time.Sleep(10 * time.Second)
+			sleep(10 * time.Second)
 			continue
 		}
 
 		exists := make(map[awsID]struct{})
 		for _, inst := range machines {
+			// If the machine wasn't configured completely when the List()
+			// call was made, the cluster will fail to join and boot them
+			// twice.
+			if inst.Size == "" {
+				continue
+			}
+
 			id := awsID{
 				spotID: inst.ID,
 				region: inst.Region,
 			}
-
 			exists[id] = struct{}{}
 		}
 
 		for _, id := range awsIDs {
 			if _, ok := exists[id]; ok != boot {
-				time.Sleep(10 * time.Second)
+				sleep(10 * time.Second)
 				continue OuterLoop
 			}
 		}
