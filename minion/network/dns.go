@@ -27,7 +27,7 @@ var table *dnsTable
 func runDNS(conn db.Conn) {
 	self, err := conn.MinionSelf()
 	if err != nil {
-		log.WithError(err).Warn("Failed to get self")
+		log.WithError(err).Debug("Failed to get self")
 		return
 	}
 
