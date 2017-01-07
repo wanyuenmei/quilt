@@ -95,7 +95,7 @@ go-get:
 	    github.com/mattn/goveralls \
 	    github.com/modocache/gover \
 	    github.com/kardianos/govendor \
-	    github.com/vektra/mockery
+	    github.com/vektra/mockery/.../
 
 tests:
 	cd -P quilt-tester && \
