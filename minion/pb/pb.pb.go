@@ -76,6 +76,69 @@ func (m *MinionConfig) String() string            { return proto.CompactTextStri
 func (*MinionConfig) ProtoMessage()               {}
 func (*MinionConfig) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
 
+func (m *MinionConfig) GetID() string {
+	if m != nil {
+		return m.ID
+	}
+	return ""
+}
+
+func (m *MinionConfig) GetRole() MinionConfig_Role {
+	if m != nil {
+		return m.Role
+	}
+	return MinionConfig_NONE
+}
+
+func (m *MinionConfig) GetPrivateIP() string {
+	if m != nil {
+		return m.PrivateIP
+	}
+	return ""
+}
+
+func (m *MinionConfig) GetSpec() string {
+	if m != nil {
+		return m.Spec
+	}
+	return ""
+}
+
+func (m *MinionConfig) GetProvider() string {
+	if m != nil {
+		return m.Provider
+	}
+	return ""
+}
+
+func (m *MinionConfig) GetSize() string {
+	if m != nil {
+		return m.Size
+	}
+	return ""
+}
+
+func (m *MinionConfig) GetRegion() string {
+	if m != nil {
+		return m.Region
+	}
+	return ""
+}
+
+func (m *MinionConfig) GetEtcdMembers() []string {
+	if m != nil {
+		return m.EtcdMembers
+	}
+	return nil
+}
+
+func (m *MinionConfig) GetAuthorizedKeys() []string {
+	if m != nil {
+		return m.AuthorizedKeys
+	}
+	return nil
+}
+
 type Reply struct {
 }
 
@@ -105,7 +168,7 @@ var _ grpc.ClientConn
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
-const _ = grpc.SupportPackageIsVersion3
+const _ = grpc.SupportPackageIsVersion4
 
 // Client API for Minion service
 
@@ -201,7 +264,7 @@ var _Minion_serviceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: fileDescriptor0,
+	Metadata: "minion/pb/pb.proto",
 }
 
 func init() { proto.RegisterFile("minion/pb/pb.proto", fileDescriptor0) }

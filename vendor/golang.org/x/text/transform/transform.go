@@ -24,6 +24,10 @@ var (
 	// complete the transformation.
 	ErrShortSrc = errors.New("transform: short source buffer")
 
+	// ErrEndOfSpan means that the input and output (the transformed input)
+	// are not identical.
+	ErrEndOfSpan = errors.New("transform: input and output are not identical")
+
 	// errInconsistentByteCount means that Transform returned success (nil
 	// error) but also returned nSrc inconsistent with the src argument.
 	errInconsistentByteCount = errors.New("transform: inconsistent byte count returned")
@@ -58,6 +62,41 @@ type Transformer interface {
 
 	// Reset resets the state and allows a Transformer to be reused.
 	Reset()
+}
+
+// SpanningTransformer extends the Transformer interface with a Span method
+// that determines how much of the input already conforms to the Transformer.
+type SpanningTransformer interface {
+	Transformer
+
+	// Span returns a position in src such that transforming src[:n] results in
+	// identical output src[:n] for these bytes. It does not necessarily return
+	// the largest such n. The atEOF argument tells whether src represents the
+	// last bytes of the input.
+	//
+	// Callers should always account for the n bytes consumed before
+	// considering the error err.
+	//
+	// A nil error means that all input bytes are known to be identical to the
+	// output produced by the Transformer. A nil error can be be returned
+	// regardless of whether atEOF is true. If err is nil, then then n must
+	// equal len(src); the converse is not necessarily true.
+	//
+	// ErrEndOfSpan means that the Transformer output may differ from the
+	// input after n bytes. Note that n may be len(src), meaning that the output
+	// would contain additional bytes after otherwise identical output.
+	// ErrShortSrc means that src had insufficient data to determine whether the
+	// remaining bytes would change. Other than the error conditions listed
+	// here, implementations are free to report other errors that arise.
+	//
+	// Calling Span can modify the Transformer state as a side effect. In
+	// effect, it does the transformation just as calling Transform would, only
+	// without copying to a destination buffer and only up to a point it can
+	// determine the input and output bytes are the same. This is obviously more
+	// limited than calling Transform, but can be more efficient in terms of
+	// copying and allocating buffers. Calls to Span and Transform may be
+	// interleaved.
+	Span(src []byte, atEOF bool) (n int, err error)
 }
 
 // NopResetter can be embedded by implementations of Transformer to add a nop
@@ -207,7 +246,9 @@ func (w *Writer) Write(data []byte) (n int, err error) {
 			return n, werr
 		}
 		src = src[nSrc:]
-		if w.n > 0 && len(src) <= n {
+		if w.n == 0 {
+			n += nSrc
+		} else if len(src) <= n {
 			// Enough bytes from w.src have been consumed. We make src point
 			// to data instead to reduce the copying.
 			w.n = 0
@@ -216,25 +257,38 @@ func (w *Writer) Write(data []byte) (n int, err error) {
 			if n < len(data) && (err == nil || err == ErrShortSrc) {
 				continue
 			}
-		} else {
-			n += nSrc
 		}
-		switch {
-		case err == ErrShortDst && (nDst > 0 || nSrc > 0):
-		case err == ErrShortSrc && len(src) < len(w.src):
-			m := copy(w.src, src)
-			// If w.n > 0, bytes from data were already copied to w.src and n
-			// was already set to the number of bytes consumed.
-			if w.n == 0 {
-				n += m
+		switch err {
+		case ErrShortDst:
+			// This error is okay as long as we are making progress.
+			if nDst > 0 || nSrc > 0 {
+				continue
 			}
-			w.n = m
-			return n, nil
-		case err == nil && w.n > 0:
-			return n, errInconsistentByteCount
-		default:
-			return n, err
+		case ErrShortSrc:
+			if len(src) < len(w.src) {
+				m := copy(w.src, src)
+				// If w.n > 0, bytes from data were already copied to w.src and n
+				// was already set to the number of bytes consumed.
+				if w.n == 0 {
+					n += m
+				}
+				w.n = m
+				err = nil
+			} else if nDst > 0 || nSrc > 0 {
+				// Not enough buffer to store the remainder. Keep processing as
+				// long as there is progress. Without this case, transforms that
+				// require a lookahead larger than the buffer may result in an
+				// error. This is not something one may expect to be common in
+				// practice, but it may occur when buffers are set to small
+				// sizes during testing.
+				continue
+			}
+		case nil:
+			if w.n > 0 {
+				err = errInconsistentByteCount
+			}
 		}
+		return n, err
 	}
 }
 
@@ -263,6 +317,10 @@ func (nop) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err error) {
 	return n, n, err
 }
 
+func (nop) Span(src []byte, atEOF bool) (n int, err error) {
+	return len(src), nil
+}
+
 type discard struct{ NopResetter }
 
 func (discard) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err error) {
@@ -274,8 +332,8 @@ var (
 	// by consuming all bytes and writing nothing.
 	Discard Transformer = discard{}
 
-	// Nop is a Transformer that copies src to dst.
-	Nop Transformer = nop{}
+	// Nop is a SpanningTransformer that copies src to dst.
+	Nop SpanningTransformer = nop{}
 )
 
 // chain is a sequence of links. A chain with N Transformers has N+1 links and
@@ -342,6 +400,8 @@ func (c *chain) Reset() {
 		c.link[i].p, c.link[i].n = 0, 0
 	}
 }
+
+// TODO: make chain use Span (is going to be fun to implement!)
 
 // Transform applies the transformers of c in sequence.
 func (c *chain) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err error) {
@@ -433,8 +493,7 @@ func (c *chain) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err erro
 	return dstL.n, srcL.p, err
 }
 
-// RemoveFunc returns a Transformer that removes from the input all runes r for
-// which f(r) is true. Illegal bytes in the input are replaced by RuneError.
+// Deprecated: use runes.Remove instead.
 func RemoveFunc(f func(r rune) bool) Transformer {
 	return removeF(f)
 }
@@ -508,6 +567,13 @@ const initialBufSize = 128
 // n <= len(s). If err == nil, n will be len(s). It calls Reset on t.
 func String(t Transformer, s string) (result string, n int, err error) {
 	t.Reset()
+	if s == "" {
+		// Fast path for the common case for empty input. Results in about a
+		// 86% reduction of running time for BenchmarkStringLowerEmpty.
+		if _, _, err := t.Transform(nil, nil, true); err == nil {
+			return "", 0, nil
+		}
+	}
 
 	// Allocate only once. Note that both dst and src escape when passed to
 	// Transform.
@@ -538,12 +604,21 @@ func String(t Transformer, s string) (result string, n int, err error) {
 
 		// TODO:  let transformers implement an optional Spanner interface, akin
 		// to norm's QuickSpan. This would even allow us to avoid any allocation.
-		if err != nil || !bytes.Equal(dst[:nDst], src[:nSrc]) {
+		if !bytes.Equal(dst[:nDst], src[:nSrc]) {
 			break
 		}
 		pPrefix = pSrc
-		if pPrefix == len(s) {
-			return s, len(s), nil
+		if err == ErrShortDst {
+			// A buffer can only be short if a transformer modifies its input.
+			break
+		} else if err == ErrShortSrc {
+			if nSrc == 0 {
+				// No progress was made.
+				break
+			}
+			// Equal so far and !atEOF, so continue checking.
+		} else if err != nil || pPrefix == len(s) {
+			return string(s[:pPrefix]), pPrefix, err
 		}
 	}
 	// Post-condition: pDst == pPrefix + nDst && pSrc == pPrefix + nSrc.

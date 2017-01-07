@@ -45,6 +45,13 @@ func (m *DBQuery) String() string            { return proto.CompactTextString(m)
 func (*DBQuery) ProtoMessage()               {}
 func (*DBQuery) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
 
+func (m *DBQuery) GetTable() string {
+	if m != nil {
+		return m.Table
+	}
+	return ""
+}
+
 type QueryReply struct {
 	TableContents string `protobuf:"bytes,1,opt,name=TableContents,json=tableContents" json:"TableContents,omitempty"`
 }
@@ -54,6 +61,13 @@ func (m *QueryReply) String() string            { return proto.CompactTextString
 func (*QueryReply) ProtoMessage()               {}
 func (*QueryReply) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{1} }
 
+func (m *QueryReply) GetTableContents() string {
+	if m != nil {
+		return m.TableContents
+	}
+	return ""
+}
+
 type DeployRequest struct {
 	Deployment string `protobuf:"bytes,1,opt,name=Deployment,json=deployment" json:"Deployment,omitempty"`
 }
@@ -62,6 +76,13 @@ func (m *DeployRequest) Reset()                    { *m = DeployRequest{} }
 func (m *DeployRequest) String() string            { return proto.CompactTextString(m) }
 func (*DeployRequest) ProtoMessage()               {}
 func (*DeployRequest) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{2} }
+
+func (m *DeployRequest) GetDeployment() string {
+	if m != nil {
+		return m.Deployment
+	}
+	return ""
+}
 
 type DeployReply struct {
 }
@@ -84,7 +105,7 @@ var _ grpc.ClientConn
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
-const _ = grpc.SupportPackageIsVersion3
+const _ = grpc.SupportPackageIsVersion4
 
 // Client API for API service
 
@@ -180,7 +201,7 @@ var _API_serviceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: fileDescriptor0,
+	Metadata: "pb/pb.proto",
 }
 
 func init() { proto.RegisterFile("pb/pb.proto", fileDescriptor0) }
