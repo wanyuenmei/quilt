@@ -2,7 +2,6 @@ package foreman
 
 import (
 	"reflect"
-	"strings"
 	"sync"
 	"time"
 
@@ -53,13 +52,7 @@ func Init(conn db.Conn) {
 		})
 
 		updateMinionMap(machines)
-
-		forEachMinion(func(m *minion) {
-			var err error
-			m.config, err = m.client.getMinion()
-			m.connected = err == nil
-		})
-
+		forEachMinion(updateConfig)
 		for _, m := range minions {
 			role := db.PBToRole(m.config.Role)
 			if m.connected && role != db.None {
@@ -92,26 +85,16 @@ func RunOnce(conn db.Conn) {
 
 	updateMinionMap(machines)
 
-	/* Request the current configuration from each minion. */
+	forEachMinion(updateConfig)
 	forEachMinion(func(m *minion) {
-		var err error
-		m.config, err = m.client.getMinion()
-
-		connected := err == nil
-		if connected && !m.connected {
-			log.WithField("machine", m.machine).Debug("New connection.")
-		}
-
-		if connected != m.machine.Connected {
+		if m.connected != m.machine.Connected {
 			tr := conn.Txn(db.MachineTable)
 			tr.Run(func(view db.Database) error {
-				m.machine.Connected = connected
+				m.machine.Connected = m.connected
 				view.Commit(m.machine)
 				return nil
 			})
 		}
-
-		m.connected = connected
 	})
 
 	var etcdIPs []string
@@ -187,6 +170,24 @@ func forEachMinion(do func(minion *minion)) {
 	wg.Wait()
 }
 
+func updateConfig(m *minion) {
+	var err error
+	m.config, err = m.client.getMinion()
+	if err != nil {
+		if m.connected {
+			log.WithError(err).Error("Failed to get minion config")
+		} else {
+			log.WithError(err).Debug("Failed to get minion config")
+		}
+	}
+
+	connected := err == nil
+	if connected && !m.connected {
+		log.WithField("machine", m.machine).Debug("New connection")
+	}
+	m.connected = connected
+}
+
 func newClientImpl(ip string) (client, error) {
 	cc, err := grpc.Dial(ip+":9999", grpc.WithInsecure())
 	if err != nil {
@@ -203,10 +204,6 @@ func (c clientImpl) getMinion() (pb.MinionConfig, error) {
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 	cfg, err := c.GetMinionConfig(ctx, &pb.Request{})
 	if err != nil {
-		if ctx.Err() == nil && !strings.Contains(err.Error(),
-			"transport failure") {
-			log.WithError(err).Error("Failed to get minion config.")
-		}
 		return pb.MinionConfig{}, err
 	}
 
