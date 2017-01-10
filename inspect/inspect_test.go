@@ -46,10 +46,13 @@ const testStitch = `var a = new Service("a", [new Container("ubuntu")]);
 
 const expGraph = `strict digraph {
     subgraph cluster_0 {
-        1; 2; 3; public;
+        6ea7e010f11bb105bf84de4df7ddb1d06468f333;
+        b7b8a22969314f4e0b7fd4935049d02233fada0b;
+        bf2a4d57f5842c52610dde4e093ef02815d5129c;
+        public;
     }
-    1 -> 2
-    2 -> 3
+    6ea7e010f11bb105bf84de4df7ddb1d06468f333 -> b7b8a22969314f4e0b7fd4935049d02233fada0b
+    b7b8a22969314f4e0b7fd4935049d02233fada0b -> bf2a4d57f5842c52610dde4e093ef02815d5129c
 }`
 
 func isGraphEqual(a, b string) bool {

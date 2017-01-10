@@ -4,9 +4,6 @@ var deployment = new Deployment({});
 // The label used by the QRI to denote connections with public internet.
 var publicInternetLabel = "public";
 
-// Used to generate unique IDs for identifiying containers.
-var containerIDCounter = 0;
-
 // Overwrite the deployment object with a new one.
 function createDeployment(deploymentOpts) {
     deployment = new Deployment(deploymentOpts);
@@ -26,9 +23,49 @@ function Deployment(deploymentOpts) {
     this.invariants = [];
 }
 
+function containerKey(c) {
+    var keyObj = c.clone();
+    keyObj._refID = "";
+    return JSON.stringify(keyObj);
+}
+
+// setQuiltIDs deterministically sets the id field of the containers based on
+// the container attributes. Deployments with multiple containers with the same
+// attributes are handled by also hashing an index.
+function setQuiltIDs(containers) {
+    // The refIDs for each container deployment.
+    var containerCount = {};
+    containers.forEach(function(c) {
+        var k = containerKey(c);
+        if (!containerCount[k]) {
+            containerCount[k] = [];
+        }
+        containerCount[k].push(c._refID);
+    });
+
+    // If multiple services contain the same instance of a container, there will
+    // be duplicate refIDs.
+    Object.keys(containerCount).forEach(function(k) {
+        containerCount[k] = _.uniq(containerCount[k]).sort();
+    });
+
+    containers.forEach(function(c) {
+        var k = containerKey(c);
+        c.id = hash(k + containerCount[k].indexOf(c._refID));
+    });
+}
+
 // Convert the deployment to the QRI deployment format.
 Deployment.prototype.toQuiltRepresentation = function() {
     this.vet();
+
+    var containers = [];
+    this.services.forEach(function(serv) {
+        serv.containers.forEach(function(c) {
+            containers.push(c);
+        });
+    });
+    var quiltIDs = setQuiltIDs(containers);
 
     // Map from container ID to container.
     var containerMap = {};
@@ -46,10 +83,6 @@ Deployment.prototype.toQuiltRepresentation = function() {
         // Collect the containers IDs, and add them to the container map.
         var ids = [];
         service.containers.forEach(function(container) {
-            // XXX: This is a temporary hack to facilitate representing Stitch IDs
-            // as strings. It should be removed once we properly hash the container
-            // attributes into a string.
-            container.id = container.id.toString()
             ids.push(container.id);
             containerMap[container.id] = container;
         });
@@ -344,8 +377,10 @@ Machine.prototype.replicate = function(n) {
 };
 
 function Container(image, command) {
-    // ID is used by the QRI to identify the containers within a service.
-    this.id = ++containerIDCounter;
+    // refID is used to distinguish deployments with multiple references to the
+    // same container, and deployments with multiple containers with the exact
+    // same attributes.
+    this._refID = _.uniqueId();
 
     this.image = image;
     this.command = command || [];

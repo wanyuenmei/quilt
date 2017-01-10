@@ -79,8 +79,8 @@ func TestContainer(t *testing.T) {
 	new Container("image", ["arg1", "arg2"]).withEnv({"foo": "bar"})
 	]));`,
 		map[string]Container{
-			"2": {
-				ID:      "2",
+			"7bd352cc06b0bfa0d13a25e8b28a34878c8ae9ba": {
+				ID:      "7bd352cc06b0bfa0d13a25e8b28a34878c8ae9ba",
 				Image:   "image",
 				Command: []string{"arg1", "arg2"},
 				Env:     map[string]string{"foo": "bar"},
@@ -91,8 +91,8 @@ func TestContainer(t *testing.T) {
 	new Container("image", ["arg1", "arg2"])
 	]));`,
 		map[string]Container{
-			"1": {
-				ID:      "1",
+			"67a8499599527201fa1664f04ea78f0eabce03e1": {
+				ID:      "67a8499599527201fa1664f04ea78f0eabce03e1",
 				Image:   "image",
 				Command: []string{"arg1", "arg2"},
 				Env:     map[string]string{},
@@ -105,8 +105,8 @@ func TestContainer(t *testing.T) {
 		])
 	);`,
 		map[string]Container{
-			"1": {
-				ID:      "1",
+			"1d43c15752b0e45b650db4f60a24c796751f892b": {
+				ID:      "1d43c15752b0e45b650db4f60a24c796751f892b",
 				Image:   "image",
 				Command: []string{},
 				Env:     map[string]string{},
@@ -117,8 +117,8 @@ func TestContainer(t *testing.T) {
 	c.env["foo"] = "bar";
 	deployment.deploy(new Service("foo", [c]));`,
 		map[string]Container{
-			"1": {
-				ID:      "1",
+			"9bde8c9286f7f90162669fd1443cb2a7112f2674": {
+				ID:      "9bde8c9286f7f90162669fd1443cb2a7112f2674",
 				Image:   "image",
 				Command: []string{},
 				Env:     map[string]string{"foo": "bar"},
@@ -129,15 +129,14 @@ func TestContainer(t *testing.T) {
 		new Service("foo", new Container("image", ["arg"]).replicate(2))
 	);`,
 		map[string]Container{
-			// IDs start from 2 because the reference container has ID 1.
-			"2": {
-				ID:      "2",
+			"3ccc0897b40f7d93fc3a28c68110dfcc8a38546e": {
+				ID:      "3ccc0897b40f7d93fc3a28c68110dfcc8a38546e",
 				Image:   "image",
 				Command: []string{"arg"},
 				Env:     map[string]string{},
 			},
-			"3": {
-				ID:      "3",
+			"8589230395202832f47a4e7440cfcd4361879a82": {
+				ID:      "8589230395202832f47a4e7440cfcd4361879a82",
 				Image:   "image",
 				Command: []string{"arg"},
 				Env:     map[string]string{},
@@ -152,17 +151,16 @@ func TestContainer(t *testing.T) {
 		new Service("baz", repl)
 	);`,
 		map[string]Container{
-			// IDs start from 2 because the reference container has ID 1.
-			"2": {
-				ID:      "2",
+			"ee4f124fe75dafe7950616b93267491505b2da53": {
+				ID:      "ee4f124fe75dafe7950616b93267491505b2da53",
 				Image:   "image",
 				Command: []string{"arg", "changed"},
 				Env: map[string]string{
 					"foo": "bar",
 				},
 			},
-			"3": {
-				ID:      "3",
+			"8589230395202832f47a4e7440cfcd4361879a82": {
+				ID:      "8589230395202832f47a4e7440cfcd4361879a82",
 				Image:   "image",
 				Command: []string{"arg"},
 				Env:     map[string]string{},
@@ -221,8 +219,10 @@ func TestLabel(t *testing.T) {
 	);`,
 		map[string]Label{
 			"web_tier": {
-				Name:        "web_tier",
-				IDs:         []string{"1"},
+				Name: "web_tier",
+				IDs: []string{
+					"76e8c2b7cc361d3b56876afbe99abbd9ead4f497",
+				},
 				Annotations: []string{},
 			},
 		})
@@ -235,8 +235,11 @@ func TestLabel(t *testing.T) {
 	);`,
 		map[string]Label{
 			"web_tier": {
-				Name:        "web_tier",
-				IDs:         []string{"1", "2"},
+				Name: "web_tier",
+				IDs: []string{
+					"76e8c2b7cc361d3b56876afbe99abbd9ead4f497",
+					"1c8527df6750f34b0936c855b0fefe23d3209162",
+				},
 				Annotations: []string{},
 			},
 		})
@@ -364,13 +367,17 @@ func TestCustomDeploy(t *testing.T) {
 	);`,
 		map[string]Label{
 			"web_tier": {
-				Name:        "web_tier",
-				IDs:         []string{"1"},
+				Name: "web_tier",
+				IDs: []string{
+					"76e8c2b7cc361d3b56876afbe99abbd9ead4f497",
+				},
 				Annotations: []string{},
 			},
 			"web_tier2": {
-				Name:        "web_tier2",
-				IDs:         []string{"2"},
+				Name: "web_tier2",
+				IDs: []string{
+					"1c8527df6750f34b0936c855b0fefe23d3209162",
+				},
 				Annotations: []string{},
 			},
 		})
