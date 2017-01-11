@@ -164,7 +164,7 @@ func (p *pty) Request() error {
 		return err
 	}
 
-	err = p.session.RequestPty("xterm", p.width, p.height, ssh.TerminalModes{
+	err = p.session.RequestPty("xterm", p.height, p.width, ssh.TerminalModes{
 		ssh.ECHO:          1,     // display what's being typed
 		ssh.ECHOCTL:       1,     // allow ^CONTROL_CHARACTERS
 		ssh.TTY_OP_ISPEED: 14400, // input speed = 14.4kbaud
