@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,10 +17,18 @@ import (
 	"github.com/NetSys/quilt/join"
 )
 
+// anyIPAllowed is used to indicate that any non-error response is okay for an external
+// DNS query.
+const anyIPAllowed = "0.0.0.0"
+
+var externalHostnames = []string{"google.com", "facebook.com", "en.wikipedia.org"}
+
 type testResult struct {
-	container    db.Container
-	unauthorized []string
-	unreachable  []string
+	container        db.Container
+	pingUnauthorized []string
+	pingUnreachable  []string
+	dnsIncorrect     []string
+	dnsNotFound      []string
 }
 
 func main() {
@@ -49,18 +58,32 @@ func main() {
 	var failed bool
 	for _, res := range runTests(tester, containers) {
 		fmt.Println(res.container)
-		if len(res.unauthorized) != 0 {
+		if len(res.pingUnauthorized) != 0 {
 			failed = true
 			fmt.Println(".. FAILED, could ping unauthorized containers")
-			for _, unauthorized := range res.unauthorized {
+			for _, unauthorized := range res.pingUnauthorized {
 				fmt.Printf(".... %s\n", unauthorized)
 			}
 		}
-		if len(res.unreachable) != 0 {
+		if len(res.pingUnreachable) != 0 {
 			failed = true
 			fmt.Println(".. FAILED, couldn't ping authorized containers")
-			for _, unreachable := range res.unreachable {
+			for _, unreachable := range res.pingUnreachable {
 				fmt.Printf(".... %s\n", unreachable)
+			}
+		}
+		if len(res.dnsIncorrect) != 0 {
+			failed = true
+			fmt.Println(".. FAILED, hostnames resolved incorrectly")
+			for _, incorrect := range res.dnsIncorrect {
+				fmt.Printf(".... %s\n", incorrect)
+			}
+		}
+		if len(res.dnsNotFound) != 0 {
+			failed = true
+			fmt.Println(".. FAILED, couldn't resolve hostnames")
+			for _, notFound := range res.dnsNotFound {
+				fmt.Printf(".... %s\n", notFound)
 			}
 		}
 	}
@@ -86,12 +109,7 @@ func runTests(tester networkTester, containers []db.Container) []testResult {
 		go func(testChan chan db.Container) {
 			defer wg.Done()
 			for c := range testChan {
-				unreachable, unauthorized := tester.test(c)
-				testResultsChan <- testResult{
-					container:    c,
-					unreachable:  unreachable,
-					unauthorized: unauthorized,
-				}
+				testResultsChan <- tester.test(c)
 			}
 		}(testChan)
 	}
@@ -125,7 +143,9 @@ func runTests(tester networkTester, containers []db.Container) []testResult {
 type networkTester struct {
 	labelMap      map[string]db.Label
 	connectionMap map[string][]string
+	hostnameIPMap map[string]string
 	allIPs        []string
+	allHostnames  []string
 }
 
 func newNetworkTester(clnt client.Client) (networkTester, error) {
@@ -134,12 +154,23 @@ func newNetworkTester(clnt client.Client) (networkTester, error) {
 		return networkTester{}, err
 	}
 
+	hostnameIPMap := make(map[string]string)
+	for _, host := range externalHostnames {
+		hostnameIPMap[host] = anyIPAllowed
+	}
+
 	allIPsSet := make(map[string]struct{})
 	labelMap := make(map[string]db.Label)
 	for _, label := range labels {
 		labelMap[label.Label] = label
+
 		for _, ip := range append(label.ContainerIPs, label.IP) {
 			allIPsSet[ip] = struct{}{}
+		}
+
+		hostnameIPMap[label.Label+".q"] = label.IP
+		for i, ip := range label.ContainerIPs {
+			hostnameIPMap[fmt.Sprintf("%d.%s.q", i+1, label.Label)] = ip
 		}
 
 		// XXX: We've temporarily disabled load balancing and thus the label.IP
@@ -168,6 +199,7 @@ func newNetworkTester(clnt client.Client) (networkTester, error) {
 	return networkTester{
 		labelMap:      labelMap,
 		connectionMap: connectionMap,
+		hostnameIPMap: hostnameIPMap,
 		allIPs:        allIPs,
 	}, nil
 }
@@ -177,18 +209,18 @@ type pingResult struct {
 	reachable bool
 }
 
-// We have to limit our parallelization because `ping` creates a new SSH login
-// session every time. Doing this quickly in parallel breaks system-logind
+// We have to limit our parallelization because each `quilt exec` creates a new SSH login
+// session. Doing this quickly in parallel breaks system-logind
 // on the remote machine: https://github.com/systemd/systemd/issues/2925.
-const pingConcurrencyLimit = 10
+const concurrencyLimit = 10
 
 func (tester networkTester) pingAll(container db.Container) []pingResult {
 	pingResultsChan := make(chan pingResult, len(tester.allIPs))
 
 	// Create worker threads.
-	pingRequests := make(chan string, pingConcurrencyLimit)
+	pingRequests := make(chan string, concurrencyLimit)
 	var wg sync.WaitGroup
-	for i := 0; i < pingConcurrencyLimit; i++ {
+	for i := 0; i < concurrencyLimit; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -219,9 +251,49 @@ func (tester networkTester) pingAll(container db.Container) []pingResult {
 	return pingResults
 }
 
-func (tester networkTester) test(container db.Container) (
-	unreachable []string, unauthorized []string) {
+type lookupResult struct {
+	hostname string
+	ip       string
+	err      error
+}
 
+// Resolve all hostnames on the container with the given StitchID. Parallelize
+// over the hostnames.
+func (tester networkTester) lookupAll(container db.Container) []lookupResult {
+	lookupResultsChan := make(chan lookupResult, len(tester.hostnameIPMap))
+
+	// Create worker threads.
+	lookupRequests := make(chan string, concurrencyLimit)
+	var wg sync.WaitGroup
+	for i := 0; i < concurrencyLimit; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for hostname := range lookupRequests {
+				ip, err := lookup(container.StitchID, hostname)
+				lookupResultsChan <- lookupResult{hostname, ip, err}
+			}
+		}()
+	}
+
+	// Feed worker threads.
+	for hostname := range tester.hostnameIPMap {
+		lookupRequests <- hostname
+	}
+	close(lookupRequests)
+	wg.Wait()
+	close(lookupResultsChan)
+
+	// Collect results.
+	var results []lookupResult
+	for res := range lookupResultsChan {
+		results = append(results, res)
+	}
+
+	return results
+}
+
+func (tester networkTester) test(container db.Container) testResult {
 	// We should be able to ping ourselves.
 	expReachable := map[string]struct{}{
 		container.IP: {},
@@ -250,16 +322,41 @@ func (tester networkTester) test(container db.Container) (
 	_, failures, _ := join.HashJoin(pingSlice(expPings), pingSlice(pingResults),
 		nil, nil)
 
+	var pingUnreachable, pingUnauthorized []string
 	for _, badIntf := range failures {
 		bad := badIntf.(pingResult)
 		if bad.reachable {
-			unreachable = append(unreachable, bad.target)
+			pingUnreachable = append(pingUnreachable, bad.target)
 		} else {
-			unauthorized = append(unauthorized, bad.target)
+			pingUnauthorized = append(pingUnauthorized, bad.target)
 		}
 	}
 
-	return unreachable, unauthorized
+	lookupResults := tester.lookupAll(container)
+
+	var dnsIncorrect, dnsNotFound []string
+	for _, l := range lookupResults {
+		if l.err != nil {
+			msg := fmt.Sprintf("%s: %s", l.hostname, l.err)
+			dnsNotFound = append(dnsNotFound, msg)
+			continue
+		}
+
+		expIP := tester.hostnameIPMap[l.hostname]
+		if l.ip != expIP && expIP != anyIPAllowed {
+			msg := fmt.Sprintf("%s => %s (expected %s)", l.hostname, l.ip,
+				expIP)
+			dnsIncorrect = append(dnsIncorrect, msg)
+		}
+	}
+
+	return testResult{
+		container:        container,
+		pingUnreachable:  pingUnreachable,
+		pingUnauthorized: pingUnauthorized,
+		dnsIncorrect:     dnsIncorrect,
+		dnsNotFound:      dnsNotFound,
+	}
 }
 
 // ping `target` from within container `id` with 3 packets, with a timeout of
@@ -269,6 +366,23 @@ func ping(id int, target string) (string, bool) {
 		"quilt", "exec", strconv.Itoa(id), "ping", "-c", "3", "-W", "1", target).
 		CombinedOutput()
 	return string(outBytes), err == nil
+}
+
+func lookup(id int, hostname string) (string, error) {
+	outBytes, err := exec.Command(
+		"quilt", "exec", strconv.Itoa(id), "getent", "hosts", hostname).
+		CombinedOutput()
+	if err != nil {
+		return "", err
+	}
+
+	fields := strings.Fields(string(outBytes))
+	if len(fields) < 2 {
+		return "", fmt.Errorf("parse error: expected %q to have at "+
+			"least 2 fields", fields)
+	}
+
+	return fields[0], nil
 }
 
 type pingSlice []pingResult
