@@ -14,17 +14,22 @@ var service *compute.Service
 
 //go:generate mockery -inpkg -testonly -name=client
 type client interface {
-	ListInstances(project, zone string, opts apiOptions) (*compute.InstanceList, error)
-	InsertInstance(project, zone string, instance *compute.Instance) (*compute.Operation, error)
+	ListInstances(project, zone string, opts apiOptions) (*compute.InstanceList,
+		error)
+	InsertInstance(project, zone string, instance *compute.Instance) (
+		*compute.Operation, error)
 	DeleteInstance(project, zone, operation string) (*compute.Operation, error)
 	GetZoneOperation(project, zone, operation string) (*compute.Operation, error)
 	GetGlobalOperation(project, operation string) (*compute.Operation, error)
 	ListFirewalls(project string) (*compute.FirewallList, error)
-	InsertFirewall(project string, firewall *compute.Firewall) (*compute.Operation, error)
-	PatchFirewall(project, name string, firewall *compute.Firewall) (*compute.Operation, error)
+	InsertFirewall(project string, firewall *compute.Firewall) (
+		*compute.Operation, error)
+	PatchFirewall(project, name string, firewall *compute.Firewall) (
+		*compute.Operation, error)
 	DeleteFirewall(project, firewall string) (*compute.Operation, error)
 	ListNetworks(project string) (*compute.NetworkList, error)
-	InsertNetwork(project string, network *compute.Network) (*compute.Operation, error)
+	InsertNetwork(project string, network *compute.Network) (
+		*compute.Operation, error)
 }
 
 type clientImpl struct {
@@ -58,7 +63,8 @@ type apiOptions struct {
 	filter string
 }
 
-func (c *clientImpl) ListInstances(project, zone string, opts apiOptions) (*compute.InstanceList, error) {
+func (c *clientImpl) ListInstances(project, zone string, opts apiOptions) (
+	*compute.InstanceList, error) {
 	call := c.gce.Instances.List(project, zone)
 	if opts.filter != "" {
 		call = call.Filter(opts.filter)
@@ -81,8 +87,8 @@ func (c *clientImpl) DeleteInstance(project, zone, instance string) (*compute.Op
  * Service: ZoneOperations
  */
 
-func (c *clientImpl) GetZoneOperation(project, zone, operation string) (*compute.Operation,
-	error) {
+func (c *clientImpl) GetZoneOperation(project, zone, operation string) (
+	*compute.Operation, error) {
 	return c.gce.ZoneOperations.Get(project, zone, operation).Do()
 }
 
@@ -113,7 +119,8 @@ func (c *clientImpl) PatchFirewall(project, name string, firewall *compute.Firew
 	return c.gce.Firewalls.Patch(project, name, firewall).Do()
 }
 
-func (c *clientImpl) DeleteFirewall(project, firewall string) (*compute.Operation, error) {
+func (c *clientImpl) DeleteFirewall(project, firewall string) (
+	*compute.Operation, error) {
 	return c.gce.Firewalls.Delete(project, firewall).Do()
 }
 
@@ -125,6 +132,7 @@ func (c *clientImpl) ListNetworks(project string) (*compute.NetworkList, error) 
 	return c.gce.Networks.List(project).Do()
 }
 
-func (c *clientImpl) InsertNetwork(project string, network *compute.Network) (*compute.Operation, error) {
+func (c *clientImpl) InsertNetwork(project string, network *compute.Network) (
+	*compute.Operation, error) {
 	return c.gce.Networks.Insert(project, network).Do()
 }
