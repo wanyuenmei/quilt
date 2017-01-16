@@ -18,9 +18,6 @@ package google
 import (
 	"errors"
 	"fmt"
-	"net/http"
-	"os"
-	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
@@ -52,11 +49,10 @@ const (
 
 var supportedZones = []string{"us-central1-a", "us-east1-b", "europe-west1-b"}
 
-var authClient *http.Client  // the oAuth client
-var service *compute.Service // gce service
-
 // The Cluster objects represents a connection to GCE.
 type Cluster struct {
+	gce client
+
 	projID    string // gce project ID
 	imgURL    string // gce url to the VM image
 	baseURL   string // gce project specific url prefix
@@ -72,12 +68,14 @@ type Cluster struct {
 // Clusters are differentiated (namespace) by setting the description and
 // filtering off of that.
 func New(namespace string) (*Cluster, error) {
-	if err := gceInit(); err != nil {
-		log.WithError(err).Debug("failed to start up gce")
+	gce, err := newClient()
+	if err != nil {
+		log.WithError(err).Error("Failed to initialize GCE client")
 		return nil, err
 	}
 
 	clst := Cluster{
+		gce:       gce,
 		projID:    "declarative-infrastructure",
 		ns:        namespace,
 		ipv4Range: "192.168.0.0/16",
@@ -106,8 +104,9 @@ func (clst *Cluster) List() ([]machine.Machine, error) {
 	// listing that way doesn't get you information about the instances
 	var mList []machine.Machine
 	for _, zone := range supportedZones {
-		list, err := service.Instances.List(clst.projID, zone).
-			Filter(fmt.Sprintf("description eq %s", clst.ns)).Do()
+		list, err := clst.gce.ListInstances(clst.projID, zone, apiOptions{
+			filter: fmt.Sprintf("description eq %s", clst.ns),
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -160,7 +159,8 @@ func (clst *Cluster) Stop(machines []machine.Machine) error {
 	// XXX: should probably have a better clean up routine if an error is encountered
 	var names []string
 	for _, m := range machines {
-		if _, err := clst.instanceDel(m.ID, m.Region); err != nil {
+		_, err := clst.gce.DeleteInstance(clst.projID, m.Region, m.ID)
+		if err != nil {
 			log.WithFields(log.Fields{
 				"error": err,
 				"id":    m.ID,
@@ -241,12 +241,11 @@ func (clst *Cluster) operationWait(ops []*compute.Operation, domain int) error {
 			for len(ops) > 0 {
 				switch {
 				case domain == local:
-					op, err = service.ZoneOperations.
-						Get(clst.projID, ops[0].Zone,
-							ops[0].Name).Do()
+					op, err = clst.gce.GetZoneOperation(clst.projID,
+						ops[0].Zone, ops[0].Name)
 				case domain == global:
-					op, err = service.GlobalOperations.
-						Get(clst.projID, ops[0].Name).Do()
+					op, err = clst.gce.GetGlobalOperation(clst.projID,
+						ops[0].Name)
 				}
 				if err != nil {
 					return err
@@ -261,13 +260,6 @@ func (clst *Cluster) operationWait(ops []*compute.Operation, domain int) error {
 			}
 		}
 	}
-}
-
-// Get a GCE instance.
-func (clst *Cluster) instanceGet(name, zone string) (*compute.Instance, error) {
-	ist, err := service.Instances.
-		Get(clst.projID, zone, name).Do()
-	return ist, err
 }
 
 // Create new GCE instance.
@@ -317,20 +309,7 @@ func (clst *Cluster) instanceNew(name string, size string, zone string,
 		},
 	}
 
-	op, err := service.Instances.
-		Insert(clst.projID, zone, instance).Do()
-	if err != nil {
-		return nil, err
-	}
-	return op, nil
-}
-
-// Delete a GCE instance.
-//
-// Does not check if the operation succeeds
-func (clst *Cluster) instanceDel(name, zone string) (*compute.Operation, error) {
-	op, err := service.Instances.Delete(clst.projID, zone, name).Do()
-	return op, err
+	return clst.gce.InsertInstance(clst.projID, zone, instance)
 }
 
 func (clst *Cluster) parseACLs(fws []*compute.Firewall) (acls []acl.ACL) {
@@ -375,7 +354,7 @@ func (clst *Cluster) parseACLs(fws []*compute.Firewall) (acls []acl.ACL) {
 
 // SetACLs adds and removes acls in `clst` so that it conforms to `acls`.
 func (clst *Cluster) SetACLs(acls []acl.ACL) error {
-	list, err := service.Firewalls.List(clst.projID).Do()
+	list, err := clst.gce.ListFirewalls(clst.projID)
 	if err != nil {
 		return err
 	}
@@ -414,7 +393,7 @@ func (clst *Cluster) SetACLs(acls []acl.ACL) error {
 			log.WithField("ports", fmt.Sprintf(
 				"%d-%d", acl.MinPort, acl.MaxPort)).
 				Debug("Google: Deleting firewall")
-			op, err = clst.firewallDelete(fw.Name)
+			op, err = clst.gce.DeleteFirewall(clst.projID, fw.Name)
 			if err != nil {
 				return err
 			}
@@ -438,7 +417,7 @@ func (clst *Cluster) SetACLs(acls []acl.ACL) error {
 }
 
 func (clst *Cluster) getFirewall(name string) (*compute.Firewall, error) {
-	list, err := service.Firewalls.List(clst.projID).Do()
+	list, err := clst.gce.ListFirewalls(clst.projID)
 	if err != nil {
 		return nil, err
 	}
@@ -474,19 +453,8 @@ func (clst *Cluster) getCreateFirewall(minPort int, maxPort int) (
 	return clst.getFirewall(fwName)
 }
 
-// Creates the network for the cluster.
-func (clst *Cluster) networkNew(name string) (*compute.Operation, error) {
-	network := &compute.Network{
-		Name:      name,
-		IPv4Range: clst.ipv4Range,
-	}
-
-	op, err := service.Networks.Insert(clst.projID, network).Do()
-	return op, err
-}
-
 func (clst *Cluster) networkExists(name string) (bool, error) {
-	list, err := service.Networks.List(clst.projID).Do()
+	list, err := clst.gce.ListNetworks(clst.projID)
 	if err != nil {
 		return false, err
 	}
@@ -524,8 +492,7 @@ func (clst *Cluster) insertFirewall(name, ports string, sourceRanges []string) (
 		SourceRanges: sourceRanges,
 	}
 
-	op, err := service.Firewalls.Insert(clst.projID, firewall).Do()
-	return op, err
+	return clst.gce.InsertFirewall(clst.projID, firewall)
 }
 
 func (clst *Cluster) firewallExists(name string) (bool, error) {
@@ -548,43 +515,7 @@ func (clst *Cluster) firewallPatch(name string,
 		SourceRanges: ips,
 	}
 
-	op, err := service.Firewalls.Patch(clst.projID, name, firewall).Do()
-	return op, err
-}
-
-// Deletes the given firewall
-func (clst *Cluster) firewallDelete(name string) (*compute.Operation, error) {
-	return service.Firewalls.Delete(clst.projID, name).Do()
-}
-
-// Initialize GCE.
-//
-// Authenication and the client are things that are re-used across clusters.
-//
-// Idempotent, can call multiple times but will only initialize once.
-//
-// XXX: ^but should this be the case? maybe we can just have the user call it?
-func gceInit() error {
-	if authClient == nil {
-		log.Debug("GCE initializing...")
-		keyfile := filepath.Join(
-			os.Getenv("HOME"),
-			".gce",
-			"quilt.json")
-		err := os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", keyfile)
-		if err != nil {
-			return err
-		}
-		srv, err := newComputeService(context.Background())
-		if err != nil {
-			return err
-		}
-		service = srv
-	} else {
-		log.Debug("GCE already initialized! Skipping...")
-	}
-	log.Debug("GCE initialize success")
-	return nil
+	return clst.gce.PatchFirewall(clst.projID, name, firewall)
 }
 
 func newComputeService(ctx context.Context) (*compute.Service, error) {
@@ -614,7 +545,10 @@ func (clst *Cluster) netInit() error {
 	}
 
 	log.Debug("Creating network")
-	op, err := clst.networkNew(clst.ns)
+	op, err := clst.gce.InsertNetwork(clst.projID, &compute.Network{
+		Name:      clst.ns,
+		IPv4Range: clst.ipv4Range,
+	})
 	if err != nil {
 		return err
 	}
