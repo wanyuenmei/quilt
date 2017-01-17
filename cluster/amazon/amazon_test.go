@@ -511,7 +511,7 @@ func TestStop(t *testing.T) {
 	)
 }
 
-func TestWait(t *testing.T) {
+func TestWaitBoot(t *testing.T) {
 	t.Parallel()
 
 	sleep = func(t time.Duration) {}
@@ -611,5 +611,119 @@ func TestWait(t *testing.T) {
 	)
 
 	err = amazonCluster.wait(exp, true)
+	assert.NoError(t, err)
+}
+
+func TestWaitStop(t *testing.T) {
+	t.Parallel()
+
+	sleep = func(t time.Duration) {}
+	instances := []*ec2.Instance{
+		{
+			InstanceId:            aws.String("inst1"),
+			SpotInstanceRequestId: aws.String("spot1"),
+			State: &ec2.InstanceState{
+				Name: aws.String(ec2.InstanceStateNameRunning),
+			},
+		},
+		{
+			InstanceId:            aws.String("inst2"),
+			SpotInstanceRequestId: aws.String("spot2"),
+			State: &ec2.InstanceState{
+				Name: aws.String(ec2.InstanceStateNameRunning),
+			},
+		},
+	}
+	mc := new(mockClient)
+	mc.On("DescribeSecurityGroups", mock.Anything).Return(
+		&ec2.DescribeSecurityGroupsOutput{
+			SecurityGroups: []*ec2.SecurityGroup{
+				{
+					GroupId: aws.String("groupId"),
+				},
+			},
+		}, nil,
+	)
+	mc.On("RequestSpotInstances", mock.Anything).Return(
+		&ec2.RequestSpotInstancesOutput{
+			SpotInstanceRequests: []*ec2.SpotInstanceRequest{
+				{
+					SpotInstanceRequestId: aws.String("spot1"),
+				},
+				{
+					SpotInstanceRequestId: aws.String("spot2"),
+				},
+			},
+		}, nil,
+	)
+	mc.On("CreateTags", mock.Anything).Return(
+		&ec2.CreateTagsOutput{}, nil,
+	)
+	describeInstances := mc.On("DescribeInstances", mock.Anything)
+	describeInstances.Return(
+		&ec2.DescribeInstancesOutput{
+			Reservations: []*ec2.Reservation{
+				{
+					Instances: instances,
+				},
+			},
+		}, nil,
+	)
+
+	describeRequests := mc.On("DescribeSpotInstanceRequests", mock.Anything)
+	describeRequests.Return(
+		&ec2.DescribeSpotInstanceRequestsOutput{
+			SpotInstanceRequests: []*ec2.SpotInstanceRequest{
+				{
+					InstanceId:            aws.String("inst1"),
+					SpotInstanceRequestId: aws.String("spot1"),
+					State: aws.String(ec2.SpotInstanceStateActive),
+					Tags: []*ec2.Tag{
+						{
+							Key:   aws.String(testNamespace),
+							Value: aws.String(""),
+						},
+					},
+				},
+				{
+					InstanceId:            aws.String("inst2"),
+					SpotInstanceRequestId: aws.String("spot2"),
+					State: aws.String(ec2.SpotInstanceStateActive),
+					Tags: []*ec2.Tag{
+						{
+							Key:   aws.String(testNamespace),
+							Value: aws.String(""),
+						},
+					},
+				},
+			},
+		}, nil,
+	)
+
+	amazonCluster := newAmazon(testNamespace)
+	amazonCluster.newClient = func(region string) client {
+		return mc
+	}
+
+	exp := []awsID{{"spot1", "us-west-1"}, {"spot2", "us-west-1"}}
+	err := amazonCluster.wait(exp, false)
+	assert.Error(t, err, "timed out")
+
+	describeInstances.Return(
+		&ec2.DescribeInstancesOutput{
+			Reservations: []*ec2.Reservation{
+				{
+					Instances: []*ec2.Instance{},
+				},
+			},
+		}, nil,
+	)
+	describeRequests.Return(
+		&ec2.DescribeSpotInstanceRequestsOutput{
+			SpotInstanceRequests: []*ec2.SpotInstanceRequest{},
+		}, nil,
+	)
+
+	err = amazonCluster.wait(exp, false)
 	assert.NoError(t, err)
 }

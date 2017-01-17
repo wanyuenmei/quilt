@@ -365,10 +365,12 @@ OuterLoop:
 
 		exists := make(map[awsID]struct{})
 		for _, inst := range machines {
-			// If the machine wasn't configured completely when the List()
-			// call was made, the cluster will fail to join and boot them
-			// twice.
-			if inst.Size == "" {
+			// When booting, if the machine isn't configured completely
+			// when the List() call was made, the cluster will fail to join
+			// and boot them twice. When halting, we don't consider this as
+			// the opposite will happen and we'll try to halt multiple times.
+			// To halt, we need the machines to be completely gone.
+			if boot && inst.Size == "" {
 				continue
 			}
 
