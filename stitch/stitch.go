@@ -3,7 +3,9 @@
 package stitch
 
 import (
+	"crypto/sha1"
 	"encoding/json"
+	"fmt"
 
 	"github.com/robertkrimen/otto"
 
@@ -116,6 +118,9 @@ func newVM(getter ImportGetter) (*otto.Otto, error) {
 		return vm, err
 	}
 	if err := vm.Set("require", toOttoFunc(getter.requireImpl)); err != nil {
+		return vm, err
+	}
+	if err := vm.Set("hash", toOttoFunc(hashImpl)); err != nil {
 		return vm, err
 	}
 
@@ -246,6 +251,20 @@ func (stitch Stitch) String() string {
 		panic(err)
 	}
 	return string(jsonBytes)
+}
+
+func hashImpl(call otto.FunctionCall) (otto.Value, error) {
+	if len(call.ArgumentList) < 1 {
+		panic(call.Otto.MakeRangeError(
+			"hash requires an argument"))
+	}
+
+	toHash, err := call.Argument(0).ToString()
+	if err != nil {
+		return otto.Value{}, err
+	}
+
+	return call.Otto.ToValue(fmt.Sprintf("%x", sha1.Sum([]byte(toHash))))
 }
 
 // Get returns the value contained at the given index

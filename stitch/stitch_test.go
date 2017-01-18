@@ -441,6 +441,13 @@ func TestMarshal(t *testing.T) {
 	assert.Equal(t, exp, actual)
 }
 
+func TestHash(t *testing.T) {
+	t.Parallel()
+
+	checkJavascript(t, `hash("foo");`, "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33")
+	checkError(t, `hash();`, "RangeError: hash requires an argument")
+}
+
 func checkJavascript(t *testing.T, code string, exp interface{}) {
 	resultKey := "result"
 
