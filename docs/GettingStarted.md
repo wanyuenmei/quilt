@@ -52,11 +52,11 @@ aws_secret_access_key = <YOUR_SECRET_KEY>
 ```
 
 ## Your First Quilt-managed Infrastructure
-We suggest you read [specs/example.js](../specs/example.js) to understand the
+We suggest you read [specs/nginx/main.js](../specs/main.js) to understand the
 infrastructure defined by this Quilt.js spec.
 
 
-### Configure [specs/example.js](../specs/example.js)
+### Configure [specs/nginx/main.js](../specs/nginx/main.js)
 #### Set Up Your SSH Authentication
 Quilt-managed Machines use public key authentication to control SSH access.
 SSH authentication is configured with the `sshKeys` Machine attribute.
@@ -78,7 +78,7 @@ var baseMachine = new Machine({
 
 ### Deploying [specs/example.js](../specs/example.js)
 While in the `$GOPATH/src/github.com/NetSys/quilt/` directory, execute `quilt
-run specs/example.js`. Quilt will set up several Ubuntu VMs on your cloud
+run specs/nginx/main.js`. Quilt will set up several Ubuntu VMs on your cloud
 provider as Workers, and these Workers will host Nginx Docker containers.
 
 
@@ -120,7 +120,7 @@ other and your local computer.
 ### Loading the Nginx Webpage
 By default, Quilt-managed containers are disconnected from the public internet
 and isolated from one another. In order to make the Nginx container accessible
-from the public internet, [specs/example.js](../specs/example.js) explicitly
+from the public internet, [specs/nginx/app.js](../specs/nginx/app.js) explicitly
 opens port 80 on the Nginx container to the outside world:
 
 ```javascript
@@ -150,6 +150,6 @@ into your `QUILT_PATH`. You can read more about its functionality
 
 Try starting the Quilt daemon with `quilt daemon`. Then, in a separate shell, try
 `quilt get github.com/NetSys/quilt` and running
-`quilt run github.com/NetSys/quilt/specs/example.js` (remember to
+`quilt run github.com/NetSys/quilt/specs/nginx/main.js` (remember to
 configure the file that was just downloaded by following the instructions
 above).
