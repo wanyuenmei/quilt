@@ -41,6 +41,7 @@ COV_SKIP= /api/client/mocks \
 	  /quilt-tester/tests/40-stop \
 	  /quilt-tester/tests/100-logs \
 	  /quilt-tester/tests/75-network \
+	  /quilt-tester/tests/pub-facing \
 	  /quiltctl/testutils \
 	  /scripts \
 	  /minion/pb
