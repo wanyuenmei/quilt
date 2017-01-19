@@ -25,6 +25,7 @@ func TestGenerateOpenFlow(t *testing.T) {
 		"table=0,priority=1000,in_port=9,"+
 			"actions=load:0x2->NXM_NX_REG0[],load:0x8->NXM_NX_REG1[],"+
 			"load:0x9->NXM_NX_REG2[],resubmit(,1)",
-		"table=2,priority=1000,dl_dst=99:99:99:99:99:99,actions=output:8")
+		"table=2,priority=1000,dl_dst=99:99:99:99:99:99,actions=output:8",
+		"table=1,priority=850,dl_dst=ff:ff:ff:ff:ff:ff,actions=output:5,output:8")
 	assert.Equal(t, exp, flows)
 }

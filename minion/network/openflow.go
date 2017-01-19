@@ -2,6 +2,7 @@ package network
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/NetSys/quilt/minion/ipdef"
 )
@@ -77,9 +78,14 @@ Table_1 {
 		output:LOCAL,reg2
 	}
 
-	// If the patch port or the gateway sends a broadcast, send it to the veth.
-	if dl_dst=ff:ff:ff:ff:ff:ff {
+	// If the patch port sends a broadcast, send it to the veth.
+	if reg0=2 && dl_dst=ff:ff:ff:ff:ff:ff {
 		output:reg1
+	}
+
+	// If the gateway sends a broadcast, send it to all veths.
+	if dl_dst=ff:ff:ff:ff:ff:ff {
+		output:veth{1..n}
 	}
 
 	// If the veth sends a packet to the gateway, forward it.
@@ -133,7 +139,8 @@ var staticFlows = []string{
 	// Table 1
 	"table=1,priority=1000,reg0=0x1,dl_dst=ff:ff:ff:ff:ff:ff," +
 		"actions=output:LOCAL,output:NXM_NX_REG2[]",
-	"table=1,priority=900,dl_dst=ff:ff:ff:ff:ff:ff,actions=output:NXM_NX_REG1[]",
+	"table=1,priority=900,reg0=0x2,dl_dst=ff:ff:ff:ff:ff:ff," +
+		"actions=output:NXM_NX_REG1[]",
 	fmt.Sprintf("table=1,priority=800,reg0=1,dl_dst=%s,actions=LOCAL",
 		ipdef.GatewayMac),
 	fmt.Sprintf("table=1,priority=700,dl_dst=%s,actions=drop", ipdef.GatewayMac),
@@ -144,7 +151,10 @@ var staticFlows = []string{
 
 func generateOpenFlow(ofps []ofPort) []string {
 	flows := staticFlows
+	var gatewayBroadcastActions []string
 	for _, ofp := range ofps {
+		gatewayBroadcastActions = append(gatewayBroadcastActions,
+			fmt.Sprintf("output:%d", ofp.VethPort))
 		template := fmt.Sprintf("table=0,priority=1000,in_port=%s%s,"+
 			"actions=load:0x%s->NXM_NX_REG0[],load:0x%x->NXM_NX_REG1[],"+
 			"load:0x%x->NXM_NX_REG2[],resubmit(,1)",
@@ -155,5 +165,7 @@ func generateOpenFlow(ofps []ofPort) []string {
 			fmt.Sprintf("table=2,priority=1000,dl_dst=%s,actions=output:%d",
 				ofp.Mac, ofp.VethPort))
 	}
+	flows = append(flows, "table=1,priority=850,dl_dst=ff:ff:ff:ff:ff:ff,actions="+
+		strings.Join(gatewayBroadcastActions, ","))
 	return flows
 }
