@@ -78,9 +78,9 @@ func TestContainer(t *testing.T) {
 	checkContainers(t, `deployment.deploy(new Service("foo", [
 	new Container("image", ["arg1", "arg2"]).withEnv({"foo": "bar"})
 	]));`,
-		map[int]Container{
-			2: {
-				ID:      2,
+		map[string]Container{
+			"2": {
+				ID:      "2",
 				Image:   "image",
 				Command: []string{"arg1", "arg2"},
 				Env:     map[string]string{"foo": "bar"},
@@ -90,9 +90,9 @@ func TestContainer(t *testing.T) {
 	checkContainers(t, `deployment.deploy(new Service("foo", [
 	new Container("image", ["arg1", "arg2"])
 	]));`,
-		map[int]Container{
-			1: {
-				ID:      1,
+		map[string]Container{
+			"1": {
+				ID:      "1",
 				Image:   "image",
 				Command: []string{"arg1", "arg2"},
 				Env:     map[string]string{},
@@ -104,9 +104,9 @@ func TestContainer(t *testing.T) {
 		new Container("image")
 		])
 	);`,
-		map[int]Container{
-			1: {
-				ID:      1,
+		map[string]Container{
+			"1": {
+				ID:      "1",
 				Image:   "image",
 				Command: []string{},
 				Env:     map[string]string{},
@@ -116,9 +116,9 @@ func TestContainer(t *testing.T) {
 	checkContainers(t, `var c = new Container("image");
 	c.env["foo"] = "bar";
 	deployment.deploy(new Service("foo", [c]));`,
-		map[int]Container{
-			1: {
-				ID:      1,
+		map[string]Container{
+			"1": {
+				ID:      "1",
 				Image:   "image",
 				Command: []string{},
 				Env:     map[string]string{"foo": "bar"},
@@ -128,16 +128,16 @@ func TestContainer(t *testing.T) {
 	checkContainers(t, `deployment.deploy(
 		new Service("foo", new Container("image", ["arg"]).replicate(2))
 	);`,
-		map[int]Container{
+		map[string]Container{
 			// IDs start from 2 because the reference container has ID 1.
-			2: {
-				ID:      2,
+			"2": {
+				ID:      "2",
 				Image:   "image",
 				Command: []string{"arg"},
 				Env:     map[string]string{},
 			},
-			3: {
-				ID:      3,
+			"3": {
+				ID:      "3",
 				Image:   "image",
 				Command: []string{"arg"},
 				Env:     map[string]string{},
@@ -151,18 +151,18 @@ func TestContainer(t *testing.T) {
 	deployment.deploy(
 		new Service("baz", repl)
 	);`,
-		map[int]Container{
+		map[string]Container{
 			// IDs start from 2 because the reference container has ID 1.
-			2: {
-				ID:      2,
+			"2": {
+				ID:      "2",
 				Image:   "image",
 				Command: []string{"arg", "changed"},
 				Env: map[string]string{
 					"foo": "bar",
 				},
 			},
-			3: {
-				ID:      3,
+			"3": {
+				ID:      "3",
 				Image:   "image",
 				Command: []string{"arg"},
 				Env:     map[string]string{},
@@ -222,7 +222,7 @@ func TestLabel(t *testing.T) {
 		map[string]Label{
 			"web_tier": {
 				Name:        "web_tier",
-				IDs:         []int{1},
+				IDs:         []string{"1"},
 				Annotations: []string{},
 			},
 		})
@@ -236,7 +236,7 @@ func TestLabel(t *testing.T) {
 		map[string]Label{
 			"web_tier": {
 				Name:        "web_tier",
-				IDs:         []int{1, 2},
+				IDs:         []string{"1", "2"},
 				Annotations: []string{},
 			},
 		})
@@ -247,12 +247,12 @@ func TestLabel(t *testing.T) {
 		map[string]Label{
 			"foo": {
 				Name:        "foo",
-				IDs:         []int{},
+				IDs:         []string{},
 				Annotations: []string{},
 			},
 			"foo2": {
 				Name:        "foo2",
-				IDs:         []int{},
+				IDs:         []string{},
 				Annotations: []string{},
 			},
 		})
@@ -365,12 +365,12 @@ func TestCustomDeploy(t *testing.T) {
 		map[string]Label{
 			"web_tier": {
 				Name:        "web_tier",
-				IDs:         []int{1},
+				IDs:         []string{"1"},
 				Annotations: []string{},
 			},
 			"web_tier2": {
 				Name:        "web_tier2",
-				IDs:         []int{2},
+				IDs:         []string{"2"},
 				Annotations: []string{},
 			},
 		})
@@ -510,7 +510,7 @@ var checkMachines = queryChecker(func(s Stitch) interface{} {
 
 var checkContainers = queryChecker(func(s Stitch) interface{} {
 	// Convert the slice to a map because the ordering is non-deterministic.
-	containersMap := make(map[int]Container)
+	containersMap := make(map[string]Container)
 	for _, c := range s.Containers {
 		containersMap[c.ID] = c
 	}

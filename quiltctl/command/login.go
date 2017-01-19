@@ -4,7 +4,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"strconv"
 
 	log "github.com/Sirupsen/logrus"
 
@@ -26,7 +25,7 @@ quilt login -i ~/.ssh/quilt 5`
 // Login contains the options for opening shells in containers.
 type Login struct {
 	privateKey      string
-	targetContainer int
+	targetContainer string
 
 	common *commonFlags
 
@@ -61,12 +60,8 @@ func (lCmd *Login) Parse(args []string) error {
 	if len(args) < 1 {
 		return errors.New("must specify a target container")
 	}
-	targetContainer, err := strconv.Atoi(args[0])
-	if err != nil {
-		return fmt.Errorf("target container must be a number: %s", args[0])
-	}
 
-	lCmd.targetContainer = targetContainer
+	lCmd.targetContainer = args[0]
 	return nil
 }
 

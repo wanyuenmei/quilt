@@ -47,7 +47,7 @@ type Placement struct {
 
 // A Container may be instantiated in the stitch and queried by users.
 type Container struct {
-	ID      int
+	ID      string
 	Image   string
 	Command []string
 	Env     map[string]string
@@ -56,7 +56,7 @@ type Container struct {
 // A Label represents a logical group of containers.
 type Label struct {
 	Name        string
-	IDs         []int
+	IDs         []string
 	Annotations []string
 }
 

@@ -13,13 +13,13 @@ func TestGetContainer(t *testing.T) {
 	t.Parallel()
 
 	passedContainer := db.Container{
-		StitchID: 1,
+		StitchID: "1",
 	}
 	c := &mocks.Client{
 		ContainerReturn: []db.Container{
 			passedContainer,
-			{StitchID: 2},
-			{StitchID: 3},
+			{StitchID: "2"},
+			{StitchID: "3"},
 		},
 	}
 	res, err := GetContainer(c, passedContainer.StitchID)
@@ -32,10 +32,10 @@ func TestGetContainerErr(t *testing.T) {
 
 	c := &mocks.Client{
 		ContainerReturn: []db.Container{
-			{StitchID: 2},
-			{StitchID: 3},
+			{StitchID: "2"},
+			{StitchID: "3"},
 		},
 	}
-	_, err := GetContainer(c, 1)
-	assert.EqualError(t, err, "no container with stitchID 1")
+	_, err := GetContainer(c, "1")
+	assert.EqualError(t, err, `no container with stitchID "1"`)
 }

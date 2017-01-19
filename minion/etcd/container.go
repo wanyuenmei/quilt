@@ -86,7 +86,7 @@ func joinContainers(view db.Database, etcdDBCs []db.Container) {
 
 		return struct {
 			IP       string
-			StitchID int
+			StitchID string
 			Image    string
 			Command  string
 			Env      string

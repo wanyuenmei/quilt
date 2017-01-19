@@ -95,7 +95,7 @@ func updateConnections(view db.Database, spec stitch.Stitch) {
 }
 
 func queryContainers(spec stitch.Stitch) []db.Container {
-	containers := map[int]*db.Container{}
+	containers := map[string]*db.Container{}
 	for _, c := range spec.Containers {
 		containers[c.ID] = &db.Container{
 			StitchID: c.ID,

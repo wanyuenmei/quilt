@@ -142,7 +142,7 @@ func TestContainerString(t *testing.T) {
 		IP:         "1.2.3.4",
 		Minion:     "Test",
 		EndpointID: "TestEndpoint",
-		StitchID:   1,
+		StitchID:   "1",
 		DockerID:   "DockerID",
 		Image:      "test/test",
 		Status:     "testing",
@@ -563,16 +563,16 @@ func TestStringer(t *testing.T) {
 
 func TestSliceHelpers(t *testing.T) {
 	containers := []Container{
-		{StitchID: 3},
-		{StitchID: 5},
-		{StitchID: 5},
-		{StitchID: 1},
+		{StitchID: "3"},
+		{StitchID: "5"},
+		{StitchID: "5"},
+		{StitchID: "1"},
 	}
 	expected := []Container{
-		{StitchID: 1},
-		{StitchID: 3},
-		{StitchID: 5},
-		{StitchID: 5},
+		{StitchID: "1"},
+		{StitchID: "3"},
+		{StitchID: "5"},
+		{StitchID: "5"},
 	}
 
 	sort.Sort(ContainerSlice(containers))

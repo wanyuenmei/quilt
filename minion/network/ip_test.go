@@ -18,11 +18,11 @@ func TestAllocateContainerIPs(t *testing.T) {
 	conn.Txn(db.AllTables...).Run(func(view db.Database) error {
 		dbc := view.InsertContainer()
 		dbc.IP = "10.0.0.2"
-		dbc.StitchID = 1
+		dbc.StitchID = "1"
 		view.Commit(dbc)
 
 		dbc = view.InsertContainer()
-		dbc.StitchID = 2
+		dbc.StitchID = "2"
 		view.Commit(dbc)
 
 		allocateContainerIPs(view)
@@ -36,10 +36,10 @@ func TestAllocateContainerIPs(t *testing.T) {
 
 	dbc := dbcs[0]
 	dbc.ID = 0
-	assert.Equal(t, db.Container{IP: "10.0.0.2", StitchID: 1}, dbc)
+	assert.Equal(t, db.Container{IP: "10.0.0.2", StitchID: "1"}, dbc)
 
 	dbc = dbcs[1]
-	assert.Equal(t, 2, dbc.StitchID)
+	assert.Equal(t, "2", dbc.StitchID)
 	assert.True(t, ipdef.QuiltSubnet.Contains(net.ParseIP(dbc.IP)))
 }
 
@@ -49,13 +49,13 @@ func TestUpdateLabelIPs(t *testing.T) {
 	conn.Txn(db.AllTables...).Run(func(view db.Database) error {
 		dbc := view.InsertContainer()
 		dbc.Labels = []string{"red", "blue"}
-		dbc.StitchID = 1
+		dbc.StitchID = "1"
 		dbc.IP = "1.1.1.1"
 		view.Commit(dbc)
 
 		dbc = view.InsertContainer()
 		dbc.Labels = []string{"red"}
-		dbc.StitchID = 2
+		dbc.StitchID = "2"
 		dbc.IP = "2.2.2.2"
 		view.Commit(dbc)
 

@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
@@ -20,7 +19,7 @@ import (
 // Exec contains the options for running commands in containers.
 type Exec struct {
 	privateKey      string
-	targetContainer int
+	targetContainer string
 	command         string
 	allocatePTY     bool
 
@@ -73,12 +72,7 @@ func (eCmd *Exec) Parse(args []string) error {
 		return errors.New("must specify a target container and command")
 	}
 
-	targetContainer, err := strconv.Atoi(args[0])
-	if err != nil {
-		return fmt.Errorf("target container must be a number: %s", args[0])
-	}
-
-	eCmd.targetContainer = targetContainer
+	eCmd.targetContainer = args[0]
 	eCmd.command = strings.Join(args[1:], " ")
 	return nil
 }

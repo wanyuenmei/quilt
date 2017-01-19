@@ -173,7 +173,7 @@ func updateContainers(lContainers []db.Container,
 	var allContainers []db.Container
 
 	// Map StitchID to db.Container for a hash join.
-	cMap := make(map[int]db.Container)
+	cMap := make(map[string]db.Container)
 	for _, wc := range wContainers {
 		cMap[wc.StitchID] = wc
 	}

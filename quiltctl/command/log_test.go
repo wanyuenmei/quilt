@@ -18,34 +18,33 @@ func TestLogFlags(t *testing.T) {
 	t.Parallel()
 
 	checkLogParsing(t, []string{"1"}, Log{
-		targetContainer: 1,
+		targetContainer: "1",
 	}, nil)
 	checkLogParsing(t, []string{"-i", "key", "1"}, Log{
-		targetContainer: 1,
+		targetContainer: "1",
 		privateKey:      "key",
 	}, nil)
 	checkLogParsing(t, []string{"-f", "1"}, Log{
-		targetContainer: 1,
+		targetContainer: "1",
 		shouldTail:      true,
 	}, nil)
 	checkLogParsing(t, []string{"-t", "1"}, Log{
-		targetContainer: 1,
+		targetContainer: "1",
 		showTimestamps:  true,
 	}, nil)
 	checkLogParsing(t, []string{"--since=07/27/2016", "1"}, Log{
-		targetContainer: 1,
+		targetContainer: "1",
 		sinceTimestamp:  "07/27/2016",
 	}, nil)
-	checkLogParsing(t, []string{}, Log{
-		targetContainer: 0,
-	}, errors.New("must specify a target container"))
+	checkLogParsing(t, []string{}, Log{},
+		errors.New("must specify a target container"))
 }
 
 func TestLog(t *testing.T) {
 	t.Parallel()
 
 	workerHost := "worker"
-	targetContainer := 1
+	targetContainer := "1"
 
 	mockGetter := new(testutils.Getter)
 	mockGetter.On("Client", mock.Anything).Return(&clientMock.Client{}, nil)

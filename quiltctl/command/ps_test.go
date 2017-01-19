@@ -125,7 +125,7 @@ func TestQueryWorkersSuccess(t *testing.T) {
 
 	containers := []db.Container{
 		{
-			StitchID: 1,
+			StitchID: "1",
 		},
 	}
 
@@ -153,7 +153,7 @@ func TestQueryWorkersFailure(t *testing.T) {
 
 	containers := []db.Container{
 		{
-			StitchID: 1,
+			StitchID: "1",
 		},
 	}
 
@@ -205,13 +205,13 @@ func TestUpdateContainers(t *testing.T) {
 
 	lContainers := []db.Container{
 		{
-			StitchID: 1,
+			StitchID: "1",
 		},
 	}
 
 	wContainers := []db.Container{
 		{
-			StitchID: 1,
+			StitchID: "1",
 			Created:  created,
 		},
 	}
@@ -223,7 +223,7 @@ func TestUpdateContainers(t *testing.T) {
 
 	// Test container in leader, not in worker.
 	newContainer := db.Container{
-		StitchID: 2,
+		StitchID: "2",
 	}
 	lContainers = append(lContainers, newContainer)
 	expect = append(expect, newContainer)

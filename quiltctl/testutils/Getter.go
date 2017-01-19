@@ -32,11 +32,11 @@ func (_m *Getter) Client(_a0 string) (client.Client, error) {
 }
 
 // ContainerClient provides a mock function with given fields: _a0, _a1
-func (_m *Getter) ContainerClient(_a0 client.Client, _a1 int) (client.Client, error) {
+func (_m *Getter) ContainerClient(_a0 client.Client, _a1 string) (client.Client, error) {
 	ret := _m.Called(_a0, _a1)
 
 	var r0 client.Client
-	if rf, ok := ret.Get(0).(func(client.Client, int) client.Client); ok {
+	if rf, ok := ret.Get(0).(func(client.Client, string) client.Client); ok {
 		r0 = rf(_a0, _a1)
 	} else {
 		if ret.Get(0) != nil {
@@ -45,7 +45,7 @@ func (_m *Getter) ContainerClient(_a0 client.Client, _a1 int) (client.Client, er
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(client.Client, int) error); ok {
+	if rf, ok := ret.Get(1).(func(client.Client, string) error); ok {
 		r1 = rf(_a0, _a1)
 	} else {
 		r1 = ret.Error(1)

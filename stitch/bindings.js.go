@@ -50,6 +50,10 @@ Deployment.prototype.toQuiltRepresentation = function() {
         // Collect the containers IDs, and add them to the container map.
         var ids = [];
         service.containers.forEach(function(container) {
+            // XXX: This is a temporary hack to facilitate representing Stitch IDs
+            // as strings. It should be removed once we properly hash the container
+            // attributes into a string.
+            container.id = container.id.toString()
             ids.push(container.id);
             containerMap[container.id] = container;
         });

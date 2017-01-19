@@ -18,19 +18,15 @@ func TestLoginParsing(t *testing.T) {
 	checkLoginParsing(t, []string{}, Login{}, "must specify a target container")
 	checkLoginParsing(t, []string{"-i", "key"}, Login{},
 		"must specify a target container")
-	checkLoginParsing(t, []string{"a"}, Login{},
-		"target container must be a number: a")
-	checkLoginParsing(t, []string{"-i", "key", "b"}, Login{},
-		"target container must be a number: b")
 
 	expArgs := Login{
-		targetContainer: 12,
+		targetContainer: "12",
 	}
 	checkLoginParsing(t, []string{"12"}, expArgs, "")
 
 	expArgs = Login{
 		privateKey:      "key",
-		targetContainer: 13,
+		targetContainer: "13",
 	}
 	checkLoginParsing(t, []string{"-i", "key", "13"}, expArgs, "")
 }
@@ -98,7 +94,7 @@ func TestLoginRunErrors(t *testing.T) {
 	// Fail to open ssh connection
 	mockLocalClient = &mocks.Client{}
 
-	containers = []db.Container{{StitchID: 777}}
+	containers = []db.Container{{StitchID: "777"}}
 	mockContainerClient = &mocks.Client{ContainerReturn: containers}
 	mockSSHGetter = func(host string, keyPath string) (ssh.Client, error) {
 		return nil, assert.AnError
@@ -113,7 +109,7 @@ func TestLoginRunErrors(t *testing.T) {
 		common:          &commonFlags{},
 		clientGetter:    mockClientGetter,
 		sshGetter:       mockSSHGetter,
-		targetContainer: 777,
+		targetContainer: "777",
 	}
 	assert.Equal(t, 1, cmd.Run())
 	mockClientGetter.AssertExpectations(t)
@@ -136,7 +132,7 @@ func TestLoginRunSuccess(t *testing.T) {
 
 	mockLocalClient := &mocks.Client{}
 
-	containers := []db.Container{{StitchID: 100}}
+	containers := []db.Container{{StitchID: "100"}}
 	mockContainerClient := &mocks.Client{ContainerReturn: containers}
 
 	sshClient := new(testutils.MockSSHClient)
@@ -148,14 +144,14 @@ func TestLoginRunSuccess(t *testing.T) {
 
 	mockClientGetter := new(testutils.Getter)
 	mockClientGetter.On("Client", mock.Anything).Return(mockLocalClient, nil)
-	mockClientGetter.On("ContainerClient", mockLocalClient, 100).
+	mockClientGetter.On("ContainerClient", mockLocalClient, "100").
 		Return(mockContainerClient, nil)
 
 	cmd := &Login{
 		common:          &commonFlags{},
 		clientGetter:    mockClientGetter,
 		sshGetter:       mockSSHGetter,
-		targetContainer: 100,
+		targetContainer: "100",
 	}
 	assert.Equal(t, 0, cmd.Run())
 	mockClientGetter.AssertExpectations(t)

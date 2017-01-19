@@ -62,7 +62,7 @@ type Getter interface {
 
 	// ContainerClient obtains a client connected to the host running the given
 	// container.
-	ContainerClient(Client, int) (Client, error)
+	ContainerClient(Client, string) (Client, error)
 
 	// LeaderClient obtains a client connected to cluster leader.
 	LeaderClient(Client) (Client, error)

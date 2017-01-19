@@ -66,7 +66,7 @@ func TestUnmarshalContainer(t *testing.T) {
 
 	apiClient := mockAPIClient{
 		mockResponse: `[{"ID":1,"Pid":0,"IP":"","Mac":"","Minion":"",` +
-			`"DockerID":"docker-id","StitchID":0,"Image":"image",` +
+			`"DockerID":"docker-id","StitchID":"","Image":"image",` +
 			`"Command":["cmd","arg"],"Labels":["labelA","labelB"],` +
 			`"Env":null}]`,
 	}

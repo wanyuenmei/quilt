@@ -1,9 +1,5 @@
 package stitch
 
-import (
-	"fmt"
-)
-
 // A Node in the communiction Graph.
 type Node struct {
 	Name        string
@@ -42,7 +38,7 @@ func InitializeGraph(spec Stitch) (Graph, error) {
 
 	for _, label := range spec.Labels {
 		for _, cid := range label.IDs {
-			g.addNode(fmt.Sprintf("%d", cid), label.Name, label.Annotations)
+			g.addNode(cid, label.Name, label.Annotations)
 		}
 	}
 	g.addNode(PublicInternetLabel, PublicInternetLabel, []string{})

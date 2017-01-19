@@ -100,7 +100,7 @@ func TestNoLeader(t *testing.T) {
 func TestGetContainerClient(t *testing.T) {
 	t.Parallel()
 
-	targetContainer := 1
+	targetContainer := "1"
 	workerHost := "worker"
 	leaderHost := "leader"
 	passedClient := &mocks.Client{}
@@ -115,7 +115,7 @@ func TestGetContainerClient(t *testing.T) {
 							Minion:   workerHost,
 						},
 						{
-							StitchID: 5,
+							StitchID: "5",
 							Minion:   "bad",
 						},
 					},

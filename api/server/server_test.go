@@ -86,7 +86,7 @@ func TestInvalidImage(t *testing.T) {
 func testInvalidImage(t *testing.T, s server, img string) {
 	deployment := fmt.Sprintf(`
 	{"Containers":[
-		{"ID": 1,
+		{"ID": "1",
                 "Image":"%s",
                 "Command":[
                         "sleep",

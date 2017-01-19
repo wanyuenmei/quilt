@@ -17,7 +17,7 @@ type Container struct {
 	IP         string            `json:",omitempty"`
 	Minion     string            `json:",omitempty"`
 	EndpointID string            `json:",omitempty"`
-	StitchID   int               `json:",omitempty"`
+	StitchID   string            `json:",omitempty"`
 	DockerID   string            `json:",omitempty"`
 	Image      string            `json:",omitempty"`
 	Status     string            `json:",omitempty"`
@@ -77,8 +77,8 @@ func (c Container) String() string {
 		tags = append(tags, fmt.Sprintf("Minion: %s", c.Minion))
 	}
 
-	if c.StitchID != 0 {
-		tags = append(tags, fmt.Sprintf("StitchID: %d", c.StitchID))
+	if c.StitchID != "" {
+		tags = append(tags, fmt.Sprintf("StitchID: %s", c.StitchID))
 	}
 
 	if c.IP != "" {

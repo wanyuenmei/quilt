@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os/exec"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -353,16 +352,16 @@ func (tester networkTester) test(container db.Container) testResult {
 
 // ping `target` from within container `id` with 3 packets, with a timeout of
 // 1 second for each packet.
-func ping(id int, target string) (string, bool) {
+func ping(id string, target string) (string, bool) {
 	outBytes, err := exec.Command(
-		"quilt", "exec", strconv.Itoa(id), "ping", "-c", "3", "-W", "1", target).
+		"quilt", "exec", id, "ping", "-c", "3", "-W", "1", target).
 		CombinedOutput()
 	return string(outBytes), err == nil
 }
 
-func lookup(id int, hostname string) (string, error) {
+func lookup(id string, hostname string) (string, error) {
 	outBytes, err := exec.Command(
-		"quilt", "exec", strconv.Itoa(id), "getent", "hosts", hostname).
+		"quilt", "exec", id, "getent", "hosts", hostname).
 		CombinedOutput()
 	if err != nil {
 		return "", err

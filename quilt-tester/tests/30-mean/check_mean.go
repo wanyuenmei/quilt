@@ -3,7 +3,6 @@ package main
 import (
 	"net/http"
 	"os/exec"
-	"strconv"
 	"strings"
 
 	"github.com/NetSys/quilt/api"
@@ -47,7 +46,7 @@ func main() {
 func logContainers(containers []db.Container) bool {
 	var failed bool
 	for _, c := range containers {
-		cmd := exec.Command("quilt", "logs", strconv.Itoa(c.StitchID))
+		cmd := exec.Command("quilt", "logs", c.StitchID)
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			log.WithError(err).Errorf("Failed to log: %s", c)

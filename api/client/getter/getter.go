@@ -65,7 +65,7 @@ func (getter clientGetterImpl) LeaderClient(localClient client.Client) (
 }
 
 func (getter clientGetterImpl) ContainerClient(localClient client.Client,
-	stitchID int) (client.Client, error) {
+	stitchID string) (client.Client, error) {
 
 	leaderClient, err := getter.LeaderClient(localClient)
 	if err != nil {

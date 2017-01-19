@@ -71,19 +71,19 @@ func TestContainerOutput(t *testing.T) {
 	t.Parallel()
 
 	containers := []db.Container{
-		{ID: 1, StitchID: 3, Minion: "3.3.3.3", IP: "1.2.3.4",
+		{ID: 1, StitchID: "3", Minion: "3.3.3.3", IP: "1.2.3.4",
 			Image: "image1", Command: []string{"cmd", "1"},
 			Status: "running"},
-		{ID: 2, StitchID: 1, Minion: "1.1.1.1", Image: "image2",
+		{ID: 2, StitchID: "1", Minion: "1.1.1.1", Image: "image2",
 			Labels: []string{"label1", "label2"}, Status: "scheduled"},
-		{ID: 3, StitchID: 4, Minion: "1.1.1.1", Image: "image3",
+		{ID: 3, StitchID: "4", Minion: "1.1.1.1", Image: "image3",
 			Command: []string{"cmd"},
 			Labels:  []string{"label1"},
 			Status:  "scheduled"},
-		{ID: 4, StitchID: 7, Minion: "2.2.2.2", Image: "image1",
+		{ID: 4, StitchID: "7", Minion: "2.2.2.2", Image: "image1",
 			Command: []string{"cmd", "3", "4"},
 			Labels:  []string{"label1"}},
-		{ID: 5, StitchID: 8, Image: "image1"},
+		{ID: 5, StitchID: "8", Image: "image1"},
 	}
 
 	machines := []db.Machine{
@@ -125,7 +125,7 @@ _______________________________________________________________________________
 	mockCreatedString = strings.Replace(mockCreatedString, " ", "_", -1)
 
 	containers = []db.Container{
-		{ID: 1, StitchID: 3, Minion: "3.3.3.3", IP: "1.2.3.4",
+		{ID: 1, StitchID: "3", Minion: "3.3.3.3", IP: "1.2.3.4",
 			Image: "image1", Command: []string{"cmd", "1"},
 			Status: "running", Created: mockTime.UTC()},
 	}
@@ -152,7 +152,7 @@ _______________________________________________________________________________
 	mockCreatedString = strings.Replace(mockCreatedString, " ", "_", -1)
 
 	containers = []db.Container{
-		{ID: 1, StitchID: 3, Minion: "3.3.3.3", IP: "1.2.3.4",
+		{ID: 1, StitchID: "3", Minion: "3.3.3.3", IP: "1.2.3.4",
 			Image: "image1", Command: []string{"cmd", "1"},
 			Status: "running", Created: mockTime.UTC()},
 	}

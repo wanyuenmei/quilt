@@ -4,7 +4,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"strconv"
 
 	"github.com/NetSys/quilt/api/client"
 	"github.com/NetSys/quilt/api/client/getter"
@@ -21,7 +20,7 @@ type Log struct {
 	showTimestamps bool
 	shouldTail     bool
 
-	targetContainer int
+	targetContainer string
 
 	sshGetter    ssh.Getter
 	clientGetter client.Getter
@@ -65,12 +64,7 @@ func (lCmd *Log) Parse(args []string) error {
 		return errors.New("must specify a target container")
 	}
 
-	targetContainer, err := strconv.Atoi(args[0])
-	if err != nil {
-		return fmt.Errorf("target container must be a number: %s", args[0])
-	}
-
-	lCmd.targetContainer = targetContainer
+	lCmd.targetContainer = args[0]
 	return nil
 }
 

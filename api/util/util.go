@@ -9,7 +9,7 @@ import (
 
 // GetContainer retrieves the container tracked by the given client with the
 // given stitchID.
-func GetContainer(c client.Client, stitchID int) (db.Container, error) {
+func GetContainer(c client.Client, stitchID string) (db.Container, error) {
 	containers, err := c.QueryContainers()
 	if err != nil {
 		return db.Container{}, err
@@ -21,5 +21,5 @@ func GetContainer(c client.Client, stitchID int) (db.Container, error) {
 		}
 	}
 
-	return db.Container{}, fmt.Errorf("no container with stitchID %d", stitchID)
+	return db.Container{}, fmt.Errorf("no container with stitchID %q", stitchID)
 }

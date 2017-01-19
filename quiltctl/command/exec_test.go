@@ -32,7 +32,7 @@ func TestExecPTY(t *testing.T) {
 		return true
 	}
 	workerHost := "worker"
-	targetContainer := 1
+	targetContainer := "1"
 
 	mockGetter := new(testutils.Getter)
 	mockGetter.On("Client", mock.Anything).Return(&clientMock.Client{}, nil)
@@ -79,7 +79,7 @@ func TestExecNoPTY(t *testing.T) {
 	}
 
 	workerHost := "worker"
-	targetContainer := 1
+	targetContainer := "1"
 
 	mockGetter := new(testutils.Getter)
 	mockGetter.On("Client", mock.Anything).Return(&clientMock.Client{}, nil)
@@ -131,24 +131,24 @@ func TestExecFlags(t *testing.T) {
 
 	checkExecParsing(t, []string{"1", "sh"},
 		Exec{
-			targetContainer: 1,
+			targetContainer: "1",
 			command:         "sh",
 		}, nil)
 	checkExecParsing(t, []string{"-i", "key", "1", "sh"},
 		Exec{
-			targetContainer: 1,
+			targetContainer: "1",
 			privateKey:      "key",
 			command:         "sh",
 		}, nil)
 	checkExecParsing(t, []string{"1", "cat /etc/hosts"},
 		Exec{
-			targetContainer: 1,
+			targetContainer: "1",
 			command:         "cat /etc/hosts",
 		}, nil)
 	checkExecParsing(t, []string{"-t", "1", "cat /etc/hosts"},
 		Exec{
 			allocatePTY:     true,
-			targetContainer: 1,
+			targetContainer: "1",
 			command:         "cat /etc/hosts",
 		}, nil)
 	checkExecParsing(t, []string{"1"}, Exec{},
