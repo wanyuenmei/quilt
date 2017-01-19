@@ -1,5 +1,7 @@
 package client
 
+//go:generate mockery -name=Getter -outpkg=testutils -output=../../quiltctl/testutils
+
 import (
 	"encoding/json"
 	"fmt"
