@@ -60,7 +60,7 @@ func TestPsErrors(t *testing.T) {
 	mockGetter.On("LeaderClient", mock.Anything).Return(nil, mockErr)
 
 	cmd = &Ps{&commonFlags{}, mockGetter}
-	assert.EqualError(t, cmd.run(), "unable to connect to a cluster leader: error")
+	assert.NoError(t, cmd.run())
 	mockGetter.AssertExpectations(t)
 
 	// Error querying containers

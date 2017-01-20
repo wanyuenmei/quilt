@@ -97,7 +97,8 @@ func (pCmd *Ps) run() error {
 	fmt.Println()
 
 	if leadErr != nil {
-		return fmt.Errorf("unable to connect to a cluster leader: %s", leadErr)
+		log.WithError(leadErr).Debug("unable to connect to a cluster leader")
+		return nil
 	}
 	if err := <-connectionErr; err != nil {
 		return fmt.Errorf("unable to query connections: %s", err)
