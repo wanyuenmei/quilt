@@ -123,16 +123,18 @@ To generate the protobufs simply call:
     make generate
 
 ## Dependencies
-We use [Godep](https://github.com/tools/godep) as dependency vendoring tool. If you are
-using Go 1.6 or later versions, to add or to update dependencies, check out
-[here](https://github.com/tools/godep#add-a-dependency). If you are using Go 1.5, to
-add a new dependency, make sure `GO15VENDOREXPERIMENT` is set to 1, then run:
+We use [govendor](https://github.com/kardianos/govendor) for dependency
+management. If you are using Go 1.5 make sure `GO15VENDOREXPERIMENT` is set to 1.
 
-1. `godep restore` to install the package versions specified in `Godeps/Godeps.json`
-to your `$GOPATH`
-2. Run `go get foo/bar`
-3. Edit your code to import foo/bar
-4. Run `godep save ./...`
+To add a new dependency:
+
+1. Run `go get foo/bar`
+2. Edit your code to import `foo/bar`
+3. Run `govendor add +external`
+
+To update a dependency:
+
+`govendor update +vendor`
 
 ## Developing the Minion
 Whenever you develop code in `minion`, make sure you run your personal minion
