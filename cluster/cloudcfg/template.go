@@ -3,6 +3,9 @@ package cloudcfg
 var cfgTemplate = `#!/bin/bash
 
 initialize_ovs() {
+	echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+	sysctl --system
+
 	cat <<- EOF > /etc/systemd/system/ovs.service
 	[Unit]
 	Description=OVS
@@ -32,7 +35,7 @@ initialize_docker() {
 	[Service]
 	# The below empty ExecStart deletes the official one installed by docker daemon.
 	ExecStart=
-	ExecStart=/usr/bin/docker daemon --bridge=none -H unix:///var/run/docker.sock
+	ExecStart=/usr/bin/docker daemon --ip-forward=false --bridge=none -H unix:///var/run/docker.sock
 
 	[Install]
 	WantedBy=multi-user.target
