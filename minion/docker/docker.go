@@ -101,9 +101,9 @@ func New(sock string) Client {
 
 // Run creates and starts a new container in accordance RunOptions.
 func (dk Client) Run(opts RunOptions) (string, error) {
-	env := map[string]struct{}{}
+	env := []string{}
 	for k, v := range opts.Env {
-		env[k+"="+v] = struct{}{}
+		env = append(env, k+"="+v)
 	}
 
 	hc := &dkc.HostConfig{
@@ -350,16 +350,11 @@ func (dk Client) IsRunning(name string) (bool, error) {
 }
 
 func (dk Client) create(name, image string, args []string, labels map[string]string,
-	env map[string]struct{}, hc *dkc.HostConfig, nc *dkc.NetworkingConfig) (string,
+	env []string, hc *dkc.HostConfig, nc *dkc.NetworkingConfig) (string,
 	error) {
 
 	if err := dk.Pull(image); err != nil {
 		return "", err
-	}
-
-	envList := make([]string, len(env))
-	for k := range env {
-		envList = append(envList, k)
 	}
 
 	container, err := dk.CreateContainer(dkc.CreateContainerOptions{
@@ -368,7 +363,7 @@ func (dk Client) create(name, image string, args []string, labels map[string]str
 			Image:  string(image),
 			Cmd:    args,
 			Labels: labels,
-			Env:    envList},
+			Env:    env},
 		HostConfig:       hc,
 		NetworkingConfig: nc,
 	})

@@ -120,9 +120,7 @@ func TestCreateGet(t *testing.T) {
 	assert.NotNil(t, err)
 
 	args := []string{"arg1"}
-	env := map[string]struct{}{
-		"envA=B": {},
-	}
+	env := []string{"envA=B"}
 	labels := map[string]string{"label": "foo"}
 	id, err := dk.create("name", "image", args, labels, env, nil, nil)
 	assert.Nil(t, err)
