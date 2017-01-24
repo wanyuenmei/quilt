@@ -56,4 +56,5 @@ func TestConfigs(t *testing.T) {
 	testConfig("./redis/redis-example.js", quiltPath)
 	testConfig("./mean/example.js", quiltPath)
 	testConfig("./elasticsearch/main.js", quiltPath)
+	testConfig("./kibana/main.js", quiltPath)
 }
