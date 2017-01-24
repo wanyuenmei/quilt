@@ -116,6 +116,9 @@ docker-build-quilt:
 		&& CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build . \
 	    && ${DOCKER} build -t ${REPO}/quilt .
 
+docker-push-quilt:
+	${DOCKER} push ${REPO}/quilt
+
 docker-build-tester: tests
 	cd -P quilt-tester \
 	    && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
