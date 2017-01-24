@@ -55,4 +55,5 @@ func TestConfigs(t *testing.T) {
 	testConfig("./zookeeper/zookeeper-example.js", quiltPath)
 	testConfig("./redis/redis-example.js", quiltPath)
 	testConfig("./mean/example.js", quiltPath)
+	testConfig("./elasticsearch/main.js", quiltPath)
 }
