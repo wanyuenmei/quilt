@@ -32,7 +32,8 @@ func main() {
 	for _, machine := range machines {
 		fmt.Println(machine)
 		logsOutput, err := exec.Command("quilt", "ssh", strconv.Itoa(machine.ID),
-			"docker", "logs", "minion").CombinedOutput()
+			"sudo", "journalctl", "-o", "cat", "-u", "minion").
+			CombinedOutput()
 		if err != nil {
 			log.WithError(err).Error("Unable to get minion logs")
 			failed = true
