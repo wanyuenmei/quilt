@@ -42,7 +42,10 @@ func main() {
 		outputStr := string(logsOutput)
 		fmt.Println(outputStr)
 
-		if strings.Contains(outputStr, "ERROR") ||
+		// "goroutine 0" is the main goroutine, and is thus always printed in
+		// stacktraces.
+		if strings.Contains(outputStr, "goroutine 0") ||
+			strings.Contains(outputStr, "ERROR") ||
 			strings.Contains(outputStr, "WARN") {
 			failed = true
 		}
