@@ -12,11 +12,12 @@ install:
     - make go-get
 
 script:
-    - make all check lint format-check coverage docker-build-quilt docker-build-tester
+    - make all check lint format-check coverage docker-build-quilt
 
 after_success:
     - bash <(curl -s https://codecov.io/bash)
     - if [ "$TRAVIS_BRANCH" == "master" ] && [ "$TRAVIS_PULL_REQUEST" == "false" ]; then
+          make docker-build-tester
           docker login -e="$DOCKER_EMAIL" -u="$DOCKER_USERNAME" -p="$DOCKER_PASSWORD";
           docker push quilt/quilt;
           docker push quilt/tester;
