@@ -18,6 +18,7 @@ build_deps="${linux} build-essential libssl-dev python python-six wget" \
 && apt-get remove --purge -y ${build_deps} \
 && apt-get autoremove -y --purge \
 && apt-get install -y --no-install-recommends openssl ca-certificates kmod \
+      iproute2 iptables\
 && rm -rf /var/lib/apt/lists/* \
 && rm -rf /build \
 && ovsdb-tool create /etc/openvswitch/conf.db /usr/share/openvswitch/vswitch.ovsschema \
