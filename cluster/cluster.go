@@ -140,8 +140,18 @@ func (clst cluster) updateCloud(machines []machine.Machine, act action) {
 		return
 	}
 
+	actionString := ""
+	switch act {
+	case boot:
+		actionString = "boot"
+	case stop:
+		actionString = "stop"
+	case updateIPs:
+		actionString = "update floating IPs of"
+	}
+
 	log.WithField("count", len(machines)).
-		Infof("Attempt to %s machines.", act)
+		Infof("Attempt to %s machines.", actionString)
 
 	noFailures := true
 	groupedMachines := groupBy(machines)
