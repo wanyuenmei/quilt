@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
@@ -82,8 +83,9 @@ func (p *fakeProvider) List() ([]machine.Machine, error) {
 func (p *fakeProvider) Boot(bootSet []machine.Machine) error {
 	for _, bootSet := range bootSet {
 		p.idCounter++
-		bootSet.ID = string(p.idCounter)
-		p.machines[string(p.idCounter)] = bootSet
+		idStr := strconv.Itoa(p.idCounter)
+		bootSet.ID = idStr
+		p.machines[idStr] = bootSet
 		p.bootRequests = append(p.bootRequests, bootRequest{size: bootSet.Size,
 			cloudConfig: p.cloudConfig})
 	}
