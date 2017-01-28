@@ -25,15 +25,16 @@ type MockClient struct {
 	createdExecs map[string]dkc.CreateExecOptions
 	Executions   map[string][]string
 
-	CreateError     bool
-	NetworkError    bool
-	CreateExecError bool
-	InspectError    bool
-	ListError       bool
-	PullError       bool
-	RemoveError     bool
-	StartError      bool
-	StartExecError  bool
+	CreateError        bool
+	CreateNetworkError bool
+	ListNetworksError  bool
+	CreateExecError    bool
+	InspectError       bool
+	ListError          bool
+	PullError          bool
+	RemoveError        bool
+	StartError         bool
+	StartExecError     bool
 }
 
 // NewMock creates a mock docker client suitable for use in unit tests, and a MockClient
@@ -140,7 +141,7 @@ func (dk MockClient) CreateNetwork(opts dkc.CreateNetworkOptions) (*dkc.Network,
 	dk.Lock()
 	defer dk.Unlock()
 
-	if dk.NetworkError {
+	if dk.CreateNetworkError {
 		return nil, errors.New("create network error")
 	}
 
@@ -151,6 +152,22 @@ func (dk MockClient) CreateNetwork(opts dkc.CreateNetworkOptions) (*dkc.Network,
 	}
 	dk.Networks[opts.Driver] = network
 	return network, nil
+}
+
+// ListNetworks lists all networks.
+func (dk MockClient) ListNetworks() ([]dkc.Network, error) {
+	dk.Lock()
+	defer dk.Unlock()
+
+	if dk.ListNetworksError {
+		return nil, errors.New("list networks error")
+	}
+
+	var networks []dkc.Network
+	for _, nw := range dk.Networks {
+		networks = append(networks, *nw)
+	}
+	return networks, nil
 }
 
 // InspectContainer returns details of the specified container.

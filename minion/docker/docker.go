@@ -79,6 +79,7 @@ type client interface {
 	InspectContainer(id string) (*dkc.Container, error)
 	CreateContainer(dkc.CreateContainerOptions) (*dkc.Container, error)
 	CreateNetwork(dkc.CreateNetworkOptions) (*dkc.Network, error)
+	ListNetworks() ([]dkc.Network, error)
 }
 
 // New creates client to the docker daemon.
@@ -140,10 +141,18 @@ func (dk Client) Run(opts RunOptions) (string, error) {
 	return id, nil
 }
 
-// ConfigureNetwork makes a request to docker to create a network running on driver with
-// the given subnet.
+// ConfigureNetwork makes a request to docker to create a network running on driver.
 func (dk Client) ConfigureNetwork(driver string) error {
-	_, err := dk.CreateNetwork(dkc.CreateNetworkOptions{
+	networks, err := dk.ListNetworks()
+	if err == nil {
+		for _, nw := range networks {
+			if nw.Name == driver {
+				return nil
+			}
+		}
+	}
+
+	_, err = dk.CreateNetwork(dkc.CreateNetworkOptions{
 		Name:   driver,
 		Driver: driver,
 		IPAM: dkc.IPAMOptions{
@@ -153,6 +162,7 @@ func (dk Client) ConfigureNetwork(driver string) error {
 			}},
 		},
 	})
+
 	return err
 }
 

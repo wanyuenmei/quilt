@@ -236,6 +236,10 @@ func TestConfigureNetwork(t *testing.T) {
 				Subnet:  ipdef.QuiltSubnet.String(),
 				Gateway: ipdef.GatewayIP.String()}}}}
 	assert.Equal(t, exp, md.Networks["quilt"])
+
+	md.CreateNetworkError = true
+	err = dk.ConfigureNetwork("quilt")
+	assert.NoError(t, err)
 }
 
 func TestRemove(t *testing.T) {
