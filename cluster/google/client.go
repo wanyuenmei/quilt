@@ -4,13 +4,9 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"sync"
 
 	compute "google.golang.org/api/compute/v1"
 )
-
-var once sync.Once
-var service *compute.Service
 
 //go:generate mockery -inpkg -testonly -name=client
 type client interface {
@@ -37,17 +33,13 @@ type clientImpl struct {
 }
 
 func newClient() (*clientImpl, error) {
-	var err error
-	once.Do(func() {
-		keyfile := filepath.Join(os.Getenv("HOME"), ".gce", "quilt.json")
-		err = os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", keyfile)
-		if err != nil {
-			panic(err)
-		}
+	keyfile := filepath.Join(os.Getenv("HOME"), ".gce", "quilt.json")
+	err := os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", keyfile)
+	if err != nil {
+		panic(err)
+	}
 
-		service, err = newComputeService(context.Background())
-	})
-
+	service, err := newComputeService(context.Background())
 	if err != nil {
 		return nil, err
 	}
