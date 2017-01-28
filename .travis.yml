@@ -12,6 +12,7 @@ install:
     - make go-get
 
 script:
+    - govendor test -i +local
     - make all check lint format-check coverage docker-build-quilt
 
 after_success:
