@@ -90,16 +90,18 @@ generate:
 providers:
 	python3 scripts/gce-descriptions > cluster/machine/google.go
 
-go-get:
+# This is what's strictly required for `make check lint` to run.
+get-build-tools:
+	go get -v -u \
+	    github.com/client9/misspell/cmd/misspell \
+	    github.com/golang/lint/golint \
+	    github.com/gordonklaus/ineffassign \
+	    github.com/kardianos/govendor
+
+# This additionally contains the tools needed for `go generate` to work.
+go-get: get-build-tools
 	go get -v -u \
 	    github.com/golang/protobuf/{proto,protoc-gen-go} \
-	    github.com/client9/misspell/cmd/misspell \
-	    github.com/gordonklaus/ineffassign \
-	    github.com/davecgh/go-spew/spew \
-	    github.com/golang/lint/golint \
-	    github.com/mattn/goveralls \
-	    github.com/modocache/gover \
-	    github.com/kardianos/govendor \
 	    github.com/vektra/mockery/.../
 
 tests:

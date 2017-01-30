@@ -9,7 +9,7 @@ go:
 - 1.7
 
 install:
-    - make go-get
+    - make get-build-tools
 
 script:
     - govendor test -i +local
