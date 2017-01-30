@@ -6,17 +6,17 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strconv"
 
 	log "github.com/Sirupsen/logrus"
 
 	"github.com/NetSys/quilt/api/client"
 	"github.com/NetSys/quilt/api/client/getter"
+	"github.com/NetSys/quilt/db"
 )
 
 // SSH contains the options for SSHing into machines.
 type SSH struct {
-	targetMachine int
+	targetMachine string
 	sshArgs       []string
 
 	common       *commonFlags
@@ -53,12 +53,7 @@ func (sCmd *SSH) Parse(args []string) error {
 		return errors.New("must specify a target machine")
 	}
 
-	targetMachine, err := strconv.Atoi(args[0])
-	if err != nil {
-		return fmt.Errorf("target machine must be a number: %s", args[0])
-	}
-
-	sCmd.targetMachine = targetMachine
+	sCmd.targetMachine = args[0]
 	sCmd.sshArgs = args[1:]
 	return nil
 }
@@ -72,36 +67,43 @@ func (sCmd *SSH) Run() int {
 	}
 	defer c.Close()
 
-	machines, err := c.QueryMachines()
+	tgtMach, err := getMachine(c, sCmd.targetMachine)
 	if err != nil {
-		log.WithError(err).Error("Unable to query machines.")
+		log.WithError(err).Error("Unable to find machine")
 		return 1
 	}
 
-	var host string
-	for _, m := range machines {
-		if m.ID == sCmd.targetMachine {
-			host = m.PublicIP
-			break
-		}
-	}
-
-	if host == "" {
-		missingMachineMsg :=
-			fmt.Sprintf("Unable to find machine `%d`.\n", sCmd.targetMachine)
-		missingMachineMsg += "Available machines:\n"
-		for _, m := range machines {
-			missingMachineMsg += fmt.Sprintf("%v\n", m)
-		}
-		log.Error(missingMachineMsg)
-		return 1
-	}
-
-	if err = runSSHCommand(host, sCmd.sshArgs).Run(); err != nil {
+	if err = runSSHCommand(tgtMach.PublicIP, sCmd.sshArgs).Run(); err != nil {
 		log.WithError(err).Error("Error executing the SSH command")
 		return 1
 	}
 	return 0
+}
+
+func getMachine(c client.Client, id string) (db.Machine, error) {
+	machines, err := c.QueryMachines()
+	if err != nil {
+		return db.Machine{}, err
+	}
+
+	var choice *db.Machine
+	for _, m := range machines {
+		if len(id) > len(m.StitchID) || m.StitchID[:len(id)] != id {
+			continue
+		}
+		if choice != nil {
+			return db.Machine{}, fmt.Errorf("ambiguous stitchIDs %s and %s",
+				choice.StitchID, m.StitchID)
+		}
+		copy := m
+		choice = &copy
+	}
+
+	if choice == nil {
+		return db.Machine{}, fmt.Errorf("no machine with stitchID %q", id)
+	}
+
+	return *choice, nil
 }
 
 // Stored in a variable so we can mock it out for unit tests.

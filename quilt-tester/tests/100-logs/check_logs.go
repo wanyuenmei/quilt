@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/NetSys/quilt/api"
@@ -31,7 +30,7 @@ func main() {
 	failed := false
 	for _, machine := range machines {
 		fmt.Println(machine)
-		logsOutput, err := exec.Command("quilt", "ssh", strconv.Itoa(machine.ID),
+		logsOutput, err := exec.Command("quilt", "ssh", machine.StitchID,
 			"sudo", "journalctl", "-o", "cat", "-u", "minion").
 			CombinedOutput()
 		if err != nil {

@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os/exec"
-	"strconv"
 	"strings"
 	"time"
 
@@ -35,13 +34,14 @@ func main() {
 
 	extraContainers := false
 	for _, m := range machines {
-		containersRaw, err := exec.Command("quilt", "ssh", strconv.Itoa(m.ID),
+		containersRaw, err := exec.Command("quilt", "ssh", m.StitchID,
 			"docker", "ps", "--format", "{{.Names}}").Output()
 		if err != nil {
 			log.WithError(err).Fatal("FAILED, couldn't run docker ps")
 		}
 
-		fmt.Printf("Containers on machine %d:\n%s\n", m.ID, string(containersRaw))
+		fmt.Printf("Containers on machine %s:\n", m.StitchID)
+		fmt.Println(string(containersRaw))
 		names := strings.Split(strings.TrimSpace(string(containersRaw)), "\n")
 		extraContainers = extraContainers || len(filterQuiltContainers(names)) > 0
 	}

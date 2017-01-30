@@ -31,7 +31,7 @@ func TestMachineOutput(t *testing.T) {
 	t.Parallel()
 
 	machines := []db.Machine{{
-		ID:       1,
+		StitchID: "1",
 		Role:     db.Master,
 		Provider: "Amazon",
 		Region:   "us-west-1",
@@ -87,9 +87,9 @@ func TestContainerOutput(t *testing.T) {
 	}
 
 	machines := []db.Machine{
-		{ID: 5, PublicIP: "7.7.7.7", PrivateIP: "1.1.1.1"},
-		{ID: 6, PrivateIP: "2.2.2.2"},
-		{ID: 7, PrivateIP: ""},
+		{StitchID: "5", PublicIP: "7.7.7.7", PrivateIP: "1.1.1.1"},
+		{StitchID: "6", PrivateIP: "2.2.2.2"},
+		{StitchID: "7", PrivateIP: ""},
 	}
 
 	connections := []db.Connection{
@@ -104,16 +104,16 @@ func TestContainerOutput(t *testing.T) {
 	/* By replacing space with underscore, we make the spaces explicit and whitespace
 	* errors easier to debug. */
 	result = strings.Replace(result, " ", "_", -1)
-	expected := `ID____MACHINE______CONTAINER_________LABELS` +
+	expected := `ID____MACHINE____CONTAINER_________LABELS` +
 		`____________STATUS_______CREATED____PUBLIC_IP
-3__________________image1_cmd_1________________________running_________________
-_______________________________________________________________________________
-1_____Machine-5____image2____________label1,_label2____scheduled_______________7.7.7.7:80
-4_____Machine-5____image3_cmd________label1____________scheduled_______________7.7.7.7:80
-_______________________________________________________________________________
-7_____Machine-6____image1_cmd_3_4____label1____________scheduled_______________
-_______________________________________________________________________________
-8_____Machine-7____image1______________________________________________________
+3________________image1_cmd_1________________________running_________________
+_____________________________________________________________________________
+1_____5__________image2____________label1,_label2____scheduled_______________7.7.7.7:80
+4_____5__________image3_cmd________label1____________scheduled_______________7.7.7.7:80
+_____________________________________________________________________________
+7_____6__________image1_cmd_3_4____label1____________scheduled_______________
+_____________________________________________________________________________
+8_____7__________image1______________________________________________________
 `
 
 	assert.Equal(t, expected, result)
@@ -172,12 +172,6 @@ _______________________________________________________________________________
 	assert.Equal(t, expected, result)
 }
 
-func TestMachineStr(t *testing.T) {
-	t.Parallel()
-	assert.Equal(t, "", machineStr(0))
-	assert.Equal(t, "Machine-10", machineStr(10))
-}
-
 func TestContainerStr(t *testing.T) {
 	t.Parallel()
 	assert.Equal(t, "", containerStr("", nil))
@@ -211,37 +205,6 @@ func TestGetFlags(t *testing.T) {
 	checkGetParsing(t, []string{"-import", expImport}, expImport, nil)
 	checkGetParsing(t, []string{expImport}, expImport, nil)
 	checkGetParsing(t, []string{}, "", errors.New("no import specified"))
-}
-
-func checkSSHParsing(t *testing.T, args []string, expMachine int,
-	expSSHArgs []string, expErr error) {
-
-	sshCmd := NewSSHCommand()
-	err := parseHelper(sshCmd, args)
-
-	assert.Equal(t, expErr, err)
-	assert.Equal(t, expMachine, sshCmd.targetMachine)
-	assert.Equal(t, expSSHArgs, sshCmd.sshArgs)
-}
-
-func TestSSHFlags(t *testing.T) {
-	t.Parallel()
-
-	checkSSHParsing(t, []string{"1"}, 1, []string{}, nil)
-	sshArgs := []string{"-i", "~/.ssh/key"}
-	checkSSHParsing(t, append([]string{"1"}, sshArgs...), 1, sshArgs, nil)
-	checkSSHParsing(t, []string{}, 0, nil,
-		errors.New("must specify a target machine"))
-}
-
-func TestSSHCommandCreation(t *testing.T) {
-	t.Parallel()
-
-	exp := []string{"ssh", "quilt@host", "-o", "StrictHostKeyChecking=no",
-		"-o", "UserKnownHostsFile=/dev/null", "-i", "~/.ssh/quilt"}
-	res := runSSHCommand("host", []string{"-i", "~/.ssh/quilt"})
-
-	assert.Equal(t, exp, res.Args)
 }
 
 func parseHelper(cmd SubCommand, args []string) error {

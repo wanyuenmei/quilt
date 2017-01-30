@@ -108,24 +108,24 @@ func writeContainers(fd io.Writer, containers []db.Container, machines []db.Mach
 		}
 	}
 
-	ipIDMap := map[string]int{}
-	idMachineMap := map[int]db.Machine{}
+	ipIDMap := map[string]string{}
+	idMachineMap := map[string]db.Machine{}
 	for _, m := range machines {
-		ipIDMap[m.PrivateIP] = m.ID
-		idMachineMap[m.ID] = m
+		ipIDMap[m.PrivateIP] = m.StitchID
+		idMachineMap[m.StitchID] = m
 	}
 
-	machineDBC := map[int][]db.Container{}
+	machineDBC := map[string][]db.Container{}
 	for _, dbc := range containers {
 		id := ipIDMap[dbc.Minion]
 		machineDBC[id] = append(machineDBC[id], dbc)
 	}
 
-	var machineIDs []int
+	var machineIDs []string
 	for key := range machineDBC {
 		machineIDs = append(machineIDs, key)
 	}
-	sort.Ints(machineIDs)
+	sort.Strings(machineIDs)
 
 	for i, machineID := range machineIDs {
 		if i > 0 {
@@ -145,7 +145,6 @@ func writeContainers(fd io.Writer, containers []db.Container, machines []db.Mach
 				}
 			}
 
-			machine := machineStr(machineID)
 			container := containerStr(dbc.Image, dbc.Command)
 			labels := strings.Join(dbc.Labels, ", ")
 			status := dbc.Status
@@ -163,18 +162,12 @@ func writeContainers(fd io.Writer, containers []db.Container, machines []db.Mach
 				publicPorts)
 
 			fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\t%v\n",
-				util.ShortUUID(dbc.StitchID), machine, container, labels,
-				status, created, publicIP)
+				util.ShortUUID(dbc.StitchID), util.ShortUUID(machineID),
+				container, labels, status, created, publicIP)
 		}
 	}
 }
 
-func machineStr(machineID int) string {
-	if machineID == 0 {
-		return ""
-	}
-	return fmt.Sprintf("Machine-%d", machineID)
-}
 func containerStr(image string, args []string) string {
 	if image == "" {
 		return ""

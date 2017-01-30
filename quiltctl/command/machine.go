@@ -12,6 +12,7 @@ import (
 	"github.com/NetSys/quilt/api/client"
 	"github.com/NetSys/quilt/api/client/getter"
 	"github.com/NetSys/quilt/db"
+	"github.com/NetSys/quilt/util"
 )
 
 // Machine contains the options for querying machines.
@@ -69,7 +70,7 @@ func writeMachines(fd io.Writer, machines []db.Machine) {
 
 	for _, m := range db.SortMachines(machines) {
 		fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\t%v\n",
-			m.ID, m.Role, m.Provider, m.Region, m.Size, m.PublicIP,
-			m.Connected)
+			util.ShortUUID(m.StitchID), m.Role, m.Provider, m.Region, m.Size,
+			m.PublicIP, m.Connected)
 	}
 }
