@@ -127,9 +127,9 @@ func TestList(t *testing.T) {
 		&ec2.DescribeAddressesOutput{}, nil,
 	)
 
-	amazonCluster := newAmazon(testNamespace)
+	amazonCluster := newAmazon(testNamespace, DefaultRegion)
 	amazonCluster.newClient = func(region string) client {
-		if region == "us-west-1" {
+		if region == DefaultRegion {
 			return mc
 		}
 		return emptyClient
@@ -145,19 +145,19 @@ func TestList(t *testing.T) {
 			PublicIP:  "publicIP",
 			PrivateIP: "privateIP",
 			Size:      "size",
-			Region:    "us-west-1",
+			Region:    DefaultRegion,
 		},
 		{
 			ID:         "spot2",
 			Provider:   db.Amazon,
-			Region:     "us-west-1",
+			Region:     DefaultRegion,
 			Size:       "size2",
 			FloatingIP: "xx.xxx.xxx.xxx",
 		},
 		{
 			ID:       "spot3",
 			Provider: db.Amazon,
-			Region:   "us-west-1",
+			Region:   DefaultRegion,
 		},
 	}, spots)
 }
@@ -212,7 +212,7 @@ func TestNewACLs(t *testing.T) {
 		&ec2.DescribeInstancesOutput{}, nil,
 	)
 
-	cluster := newAmazon(testNamespace)
+	cluster := newAmazon(testNamespace, DefaultRegion)
 	cluster.newClient = func(region string) client {
 		return mc
 	}
@@ -411,19 +411,19 @@ func TestBoot(t *testing.T) {
 		}, nil,
 	)
 
-	amazonCluster := newAmazon(testNamespace)
+	amazonCluster := newAmazon(testNamespace, DefaultRegion)
 	amazonCluster.newClient = func(region string) client {
 		return mc
 	}
 
 	err := amazonCluster.Boot([]machine.Machine{
 		{
-			Region:   "us-west-1",
+			Region:   DefaultRegion,
 			Size:     "m4.large",
 			DiskSize: 32,
 		},
 		{
-			Region:   "us-west-1",
+			Region:   DefaultRegion,
 			Size:     "m4.large",
 			DiskSize: 32,
 		},
@@ -435,7 +435,7 @@ func TestBoot(t *testing.T) {
 		&ec2.RequestSpotInstancesInput{
 			SpotPrice: aws.String(spotPrice),
 			LaunchSpecification: &ec2.RequestSpotLaunchSpecification{
-				ImageId:      aws.String(amis["us-west-1"]),
+				ImageId:      aws.String(amis[DefaultRegion]),
 				InstanceType: aws.String("m4.large"),
 				UserData: aws.String(base64.StdEncoding.EncodeToString(
 					[]byte(cfg))),
@@ -502,18 +502,18 @@ func TestStop(t *testing.T) {
 		&ec2.DescribeAddressesOutput{}, nil,
 	)
 
-	amazonCluster := newAmazon(testNamespace)
+	amazonCluster := newAmazon(testNamespace, DefaultRegion)
 	amazonCluster.newClient = func(region string) client {
 		return mc
 	}
 
 	err := amazonCluster.Stop([]machine.Machine{
 		{
-			Region: "us-west-1",
+			Region: DefaultRegion,
 			ID:     toStopIDs[0],
 		},
 		{
-			Region: "us-west-1",
+			Region: DefaultRegion,
 			ID:     toStopIDs[1],
 		},
 	})
@@ -621,12 +621,12 @@ func TestWaitBoot(t *testing.T) {
 		}, nil,
 	)
 
-	amazonCluster := newAmazon(testNamespace)
+	amazonCluster := newAmazon(testNamespace, DefaultRegion)
 	amazonCluster.newClient = func(region string) client {
 		return mc
 	}
 
-	exp := []awsID{{"spot1", "us-west-1"}, {"spot2", "us-west-1"}}
+	exp := []awsID{{"spot1", DefaultRegion}, {"spot2", DefaultRegion}}
 	err := amazonCluster.wait(exp, true)
 	assert.Error(t, err, "timed out")
 
@@ -740,12 +740,12 @@ func TestWaitStop(t *testing.T) {
 		}, nil,
 	)
 
-	amazonCluster := newAmazon(testNamespace)
+	amazonCluster := newAmazon(testNamespace, DefaultRegion)
 	amazonCluster.newClient = func(region string) client {
 		return mc
 	}
 
-	exp := []awsID{{"spot1", "us-west-1"}, {"spot2", "us-west-1"}}
+	exp := []awsID{{"spot1", DefaultRegion}, {"spot2", DefaultRegion}}
 	err := amazonCluster.wait(exp, false)
 	assert.Error(t, err, "timed out")
 
@@ -772,7 +772,7 @@ func TestUpdateFloatingIPs(t *testing.T) {
 	t.Parallel()
 
 	mockClient := new(mockClient)
-	amazonCluster := newAmazon("")
+	amazonCluster := newAmazon(testNamespace, DefaultRegion)
 	amazonCluster.newClient = func(region string) client {
 		return mockClient
 	}

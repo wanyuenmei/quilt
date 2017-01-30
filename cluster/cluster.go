@@ -31,10 +31,15 @@ type provider interface {
 // Store the providers in a variable so we can change it in the tests
 var allProviders = []db.Provider{db.Amazon, db.Google, db.Vagrant}
 
+type instance struct {
+	provider db.Provider
+	region   string
+}
+
 type cluster struct {
 	namespace string
 	conn      db.Conn
-	providers map[db.Provider]provider
+	providers map[instance]provider
 }
 
 var myIP = util.MyIP
@@ -84,15 +89,18 @@ func newCluster(conn db.Conn, namespace string) *cluster {
 	clst := &cluster{
 		namespace: namespace,
 		conn:      conn,
-		providers: make(map[db.Provider]provider),
+		providers: make(map[instance]provider),
 	}
 
 	for _, p := range allProviders {
-		prvdr, err := newProvider(p, namespace)
-		if err != nil {
-			log.Debugf("Failed to connect to provider %s: %s", p, err)
-		} else {
-			clst.providers[p] = prvdr
+		for _, r := range validRegions(p) {
+			prvdr, err := newProvider(p, namespace, r)
+			if err != nil {
+				log.Debugf("Failed to connect to provider %s in %s: %s",
+					p, r, err)
+			} else {
+				clst.providers[instance{p, r}] = prvdr
+			}
 		}
 	}
 
@@ -155,11 +163,12 @@ func (clst cluster) updateCloud(machines []machine.Machine, act action) {
 
 	noFailures := true
 	groupedMachines := groupBy(machines)
-	for p, providerMachines := range groupedMachines {
-		providerInst, ok := clst.providers[p]
+	for i, providerMachines := range groupedMachines {
+		providerInst, ok := clst.providers[i]
 		if !ok {
 			noFailures = false
-			log.Warnf("Provider %s is unavailable.", p)
+			log.Warnf("Provider %s is unavailable in %s.", i.provider,
+				i.region)
 			continue
 		}
 		var err error
@@ -178,13 +187,14 @@ func (clst cluster) updateCloud(machines []machine.Machine, act action) {
 			switch act {
 			case boot:
 				log.WithError(err).Warnf(
-					"Unable to boot machines on %s.", p)
+					"Unable to boot machines on %s.", i.provider)
 			case stop:
 				log.WithError(err).Warnf(
-					"Unable to stop machines on %s", p)
+					"Unable to stop machines on %s", i.provider)
 			case updateIPs:
 				log.WithError(err).Warnf(
-					"Unable to update floating IPs on %s", p)
+					"Unable to update floating IPs on %s",
+					i.provider)
 			}
 		}
 	}
@@ -224,7 +234,6 @@ func (clst cluster) join() (joinResult, error) {
 
 	err = clst.conn.Txn(db.ACLTable, db.ClusterTable,
 		db.MachineTable).Run(func(view db.Database) error {
-
 		namespace, err := view.GetClusterNamespace()
 		if err != nil {
 			log.WithError(err).Error("Failed to get namespace")
@@ -306,7 +315,7 @@ func (clst cluster) syncACLs(adminACLs []string, appACLs []db.PortRange,
 	}
 
 	// Providers with at least one machine.
-	prvdrSet := map[db.Provider]struct{}{}
+	prvdrSet := map[instance]struct{}{}
 	for _, m := range machines {
 		if m.PublicIP != "" {
 			// XXX: Look into the minimal set of necessary ports.
@@ -316,19 +325,20 @@ func (clst cluster) syncACLs(adminACLs []string, appACLs []db.PortRange,
 				MaxPort: 65535,
 			})
 		}
-		prvdrSet[m.Provider] = struct{}{}
+		prvdrSet[instance{m.Provider, m.Region}] = struct{}{}
 	}
 
-	for name, prvdr := range clst.providers {
-		// For this providers with no specified machines, we remove all ACLs.
+	for inst, prvdr := range clst.providers {
+		// For providers with no specified machines, we remove all ACLs.
 		// Otherwise we set acls to what's specified.
 		var setACLs []acl.ACL
-		if _, ok := prvdrSet[name]; ok {
+		if _, ok := prvdrSet[inst]; ok {
 			setACLs = acls
 		}
 
 		if err := prvdr.SetACLs(setACLs); err != nil {
-			log.WithError(err).Warnf("Could not update ACLs on %s.", name)
+			log.WithError(err).Warnf("Could not update ACLs on %s in %s.",
+				inst.provider, inst.region)
 		}
 	}
 }
@@ -418,24 +428,22 @@ func (clst cluster) get() ([]machine.Machine, error) {
 	return cloudMachines, nil
 }
 
-func groupBy(machines []machine.Machine) map[db.Provider][]machine.Machine {
-	machineMap := make(map[db.Provider][]machine.Machine)
+func groupBy(machines []machine.Machine) map[instance][]machine.Machine {
+	machineMap := map[instance][]machine.Machine{}
 	for _, m := range machines {
-		if _, ok := machineMap[m.Provider]; !ok {
-			machineMap[m.Provider] = []machine.Machine{}
-		}
-		machineMap[m.Provider] = append(machineMap[m.Provider], m)
+		i := instance{m.Provider, m.Region}
+		machineMap[i] = append(machineMap[i], m)
 	}
 
 	return machineMap
 }
 
-func newProviderImpl(p db.Provider, namespace string) (provider, error) {
+func newProviderImpl(p db.Provider, namespace, region string) (provider, error) {
 	switch p {
 	case db.Amazon:
-		return amazon.New(namespace)
+		return amazon.New(namespace, region)
 	case db.Google:
-		return google.New(namespace)
+		return google.New(namespace, region)
 	case db.Vagrant:
 		return vagrant.New(namespace)
 	default:
@@ -443,5 +451,28 @@ func newProviderImpl(p db.Provider, namespace string) (provider, error) {
 	}
 }
 
-// Stored in a variable so it may be mocked out
+func validRegionsImpl(p db.Provider) []string {
+	switch p {
+	case db.Amazon:
+		return amazon.Regions
+	case db.Google:
+		return google.Zones
+	case db.Vagrant:
+		return []string{""} // Vagrant has no regions
+	default:
+		panic("Unimplemented")
+	}
+}
+
+func groupByRegion(machines []machine.Machine) map[string][]machine.Machine {
+	groups := map[string][]machine.Machine{}
+	for _, m := range machines {
+		groups[m.Region] = append(groups[m.Region], m)
+	}
+
+	return groups
+}
+
+// Stored in variables so they may be mocked out
 var newProvider = newProviderImpl
+var validRegions = validRegionsImpl

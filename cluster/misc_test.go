@@ -55,7 +55,7 @@ func TestNewProviderFailure(t *testing.T) {
 			t.Error("provider.New did not panic on invalid provider")
 		}
 	}()
-	newProviderImpl("FakeAmazon", "namespace")
+	newProviderImpl("FakeAmazon", testRegion, "namespace")
 }
 
 func TestGroupBy(t *testing.T) {
@@ -64,11 +64,11 @@ func TestGroupBy(t *testing.T) {
 		{Provider: db.Google},
 	}
 	grouped := groupBy(machines)
-	m := grouped[db.Amazon]
+	m := grouped[instance{db.Amazon, ""}]
 	if len(m) != 1 || m[0].Provider != machines[1].Provider {
 		t.Errorf("wrong Amazon machines: %v", m)
 	}
-	m = grouped[db.Google]
+	m = grouped[instance{db.Google, ""}]
 	if len(m) != 3 {
 		t.Errorf("wrong Google machines: %v", m)
 	} else {
@@ -78,7 +78,7 @@ func TestGroupBy(t *testing.T) {
 			}
 		}
 	}
-	m = grouped[db.Vagrant]
+	m = grouped[instance{db.Vagrant, ""}]
 	if len(m) != 0 {
 		t.Errorf("unexpected Vagrant machines: %v", m)
 	}

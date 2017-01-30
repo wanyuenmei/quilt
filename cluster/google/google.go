@@ -40,6 +40,9 @@ import (
 // region preference.
 const DefaultRegion = "us-east1-b"
 
+// Zones is the list of supported GCE zones
+var Zones = []string{"us-central1-a", "us-east1-b", "europe-west1-b"}
+
 // ephemeralIPName is a constant for what we label NATs with ephemeral IPs in GCE.
 const ephemeralIPName = "External NAT"
 
@@ -53,8 +56,6 @@ const (
 	global
 )
 
-var supportedZones = []string{"us-central1-a", "us-east1-b", "europe-west1-b"}
-
 // The Cluster objects represents a connection to GCE.
 type Cluster struct {
 	gce client
@@ -64,6 +65,7 @@ type Cluster struct {
 	baseURL   string // gce project specific url prefix
 	ipv4Range string // ipv4 range of the internal network
 	intFW     string // gce internal firewall name
+	zone      string // gce boot region
 
 	ns string // cluster namespace
 	id int    // the id of the cluster, used externally
@@ -73,7 +75,7 @@ type Cluster struct {
 //
 // Clusters are differentiated (namespace) by setting the description and
 // filtering off of that.
-func New(namespace string) (*Cluster, error) {
+func New(namespace, zone string) (*Cluster, error) {
 	gce, err := newClient()
 	if err != nil {
 		log.WithError(err).Error("Failed to initialize GCE client")
@@ -85,6 +87,7 @@ func New(namespace string) (*Cluster, error) {
 		projID:    "declarative-infrastructure",
 		ns:        namespace,
 		ipv4Range: "192.168.0.0/16",
+		zone:      zone,
 	}
 	clst.baseURL = fmt.Sprintf("%s/%s", computeBaseURL, clst.projID)
 	clst.intFW = fmt.Sprintf("%s-internal", clst.ns)
@@ -109,34 +112,32 @@ func (clst *Cluster) List() ([]machine.Machine, error) {
 	// XXX: This doesn't use the instance group listing functionality because
 	// listing that way doesn't get you information about the instances
 	var mList []machine.Machine
-	for _, zone := range supportedZones {
-		list, err := clst.gce.ListInstances(clst.projID, zone, apiOptions{
-			filter: fmt.Sprintf("description eq %s", clst.ns),
+	list, err := clst.gce.ListInstances(clst.projID, clst.zone, apiOptions{
+		filter: fmt.Sprintf("description eq %s", clst.ns),
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, item := range list.Items {
+		// XXX: This make some iffy assumptions about NetworkInterfaces
+		machineSplitURL := strings.Split(item.MachineType, "/")
+		mtype := machineSplitURL[len(machineSplitURL)-1]
+
+		accessConfig := item.NetworkInterfaces[0].AccessConfigs[0]
+		floatingIP := ""
+		if accessConfig.Name == floatingIPName {
+			floatingIP = accessConfig.NatIP
+		}
+
+		mList = append(mList, machine.Machine{
+			ID:         item.Name,
+			PublicIP:   accessConfig.NatIP,
+			FloatingIP: floatingIP,
+			PrivateIP:  item.NetworkInterfaces[0].NetworkIP,
+			Size:       mtype,
+			Region:     clst.zone,
+			Provider:   db.Google,
 		})
-		if err != nil {
-			return nil, err
-		}
-		for _, item := range list.Items {
-			// XXX: This make some iffy assumptions about NetworkInterfaces
-			machineSplitURL := strings.Split(item.MachineType, "/")
-			mtype := machineSplitURL[len(machineSplitURL)-1]
-
-			accessConfig := item.NetworkInterfaces[0].AccessConfigs[0]
-			floatingIP := ""
-			if accessConfig.Name == floatingIPName {
-				floatingIP = accessConfig.NatIP
-			}
-
-			mList = append(mList, machine.Machine{
-				ID:         item.Name,
-				PublicIP:   accessConfig.NatIP,
-				FloatingIP: floatingIP,
-				PrivateIP:  item.NetworkInterfaces[0].NetworkIP,
-				Size:       mtype,
-				Region:     zone,
-				Provider:   db.Google,
-			})
-		}
 	}
 	return mList, nil
 }
@@ -147,7 +148,7 @@ func (clst *Cluster) Boot(bootSet []machine.Machine) error {
 	var names []string
 	for _, m := range bootSet {
 		name := "quilt-" + uuid.NewV4().String()
-		_, err := clst.instanceNew(name, m.Size, m.Region,
+		_, err := clst.instanceNew(name, m.Size,
 			cloudcfg.Ubuntu(m.SSHKeys, "xenial"))
 		if err != nil {
 			log.WithFields(log.Fields{
@@ -281,14 +282,14 @@ func (clst *Cluster) operationWait(ops []*compute.Operation, domain int) error {
 //
 // XXX: all kinds of hardcoded junk in here
 // XXX: currently only defines the bare minimum
-func (clst *Cluster) instanceNew(name string, size string, zone string,
+func (clst *Cluster) instanceNew(name string, size string,
 	cloudConfig string) (*compute.Operation, error) {
 	instance := &compute.Instance{
 		Name:        name,
 		Description: clst.ns,
 		MachineType: fmt.Sprintf("%s/zones/%s/machineTypes/%s",
 			clst.baseURL,
-			zone,
+			clst.zone,
 			size),
 		Disks: []*compute.AttachedDisk{
 			{
@@ -322,7 +323,7 @@ func (clst *Cluster) instanceNew(name string, size string, zone string,
 		},
 	}
 
-	return clst.gce.InsertInstance(clst.projID, zone, instance)
+	return clst.gce.InsertInstance(clst.projID, clst.zone, instance)
 }
 
 func (clst *Cluster) parseACLs(fws []*compute.Firewall) (acls []acl.ACL) {

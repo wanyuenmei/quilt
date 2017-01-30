@@ -18,12 +18,12 @@ type GoogleTestSuite struct {
 }
 
 func (s *GoogleTestSuite) SetupTest() {
-	supportedZones = []string{"zone-1"}
 	s.gce = &mockClient{}
 	s.clst = &Cluster{
 		gce:    s.gce,
 		projID: "project",
 		ns:     "namespace",
+		zone:   "zone-1",
 	}
 }
 
