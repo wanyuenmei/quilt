@@ -153,10 +153,15 @@ func TestSort(t *testing.T) {
 		})
 		assert.Equal(t, 3, len(machines))
 
+		machines[0].StitchID = ""
+		view.Commit(machines[0])
+
+		machines[2].StitchID = ""
 		machines[2].PublicIP = "a"
 		machines[2].PrivateIP = "b"
 		view.Commit(machines[2])
 
+		machines[1].StitchID = ""
 		machines[1].PrivateIP = "c"
 		view.Commit(machines[1])
 
@@ -171,23 +176,6 @@ func TestSort(t *testing.T) {
 			return m.Role == db.Master
 		})
 		assert.Equal(t, 2, len(machines))
-
-		for _, m := range machines {
-			assert.False(t, m.PublicIP == "" && m.PrivateIP == "")
-		}
-
-		return nil
-	})
-
-	updateStitch(t, conn, prog(t, pre+`
-	deployment.deploy(baseMachine.asMaster().replicate(1));
-	deployment.deploy(baseMachine.asWorker().replicate(1));`))
-	conn.Txn(db.AllTables...).Run(func(view db.Database) error {
-		machines := view.SelectFromMachine(func(m db.Machine) bool {
-			return m.Role == db.Master
-		})
-
-		assert.Equal(t, 1, len(machines))
 
 		for _, m := range machines {
 			assert.False(t, m.PublicIP == "" && m.PrivateIP == "")

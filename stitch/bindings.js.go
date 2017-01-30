@@ -27,41 +27,46 @@ function Deployment(deploymentOpts) {
     this.invariants = [];
 }
 
-function containerKey(c) {
-    var keyObj = c.clone();
+// key creates a string key for objects that container a _refID, namely Containers
+// and Machines.
+function key(obj) {
+    var keyObj = obj.clone();
     keyObj._refID = "";
     return JSON.stringify(keyObj);
 }
 
-// setQuiltIDs deterministically sets the id field of the containers based on
-// the container attributes. Deployments with multiple containers with the same
-// attributes are handled by also hashing an index.
-function setQuiltIDs(containers) {
-    // The refIDs for each container deployment.
-    var containerCount = {};
-    containers.forEach(function(c) {
-        var k = containerKey(c);
-        if (!containerCount[k]) {
-            containerCount[k] = [];
+// setQuiltIDs deterministically sets the id field of objects based on
+// their attributes. The _refID field is required to differentiate between multiple
+// references to the same object, and multiple instantiations with the exact
+// same attributes.
+function setQuiltIDs(objs) {
+    // The refIDs for each identical instance.
+    var refIDs = {};
+    objs.forEach(function(obj) {
+        var k = key(obj);
+        if (!refIDs[k]) {
+            refIDs[k] = [];
         }
-        containerCount[k].push(c._refID);
+        refIDs[k].push(obj._refID);
     });
 
-    // If multiple services contain the same instance of a container, there will
-    // be duplicate refIDs.
-    Object.keys(containerCount).forEach(function(k) {
-        containerCount[k] = _.uniq(containerCount[k]).sort();
+    // If there are multiple references to the same object, there will be duplicate
+    // refIDs.
+    Object.keys(refIDs).forEach(function(k) {
+        refIDs[k] = _.uniq(refIDs[k]).sort();
     });
 
-    containers.forEach(function(c) {
-        var k = containerKey(c);
-        c.id = hash(k + containerCount[k].indexOf(c._refID));
+    objs.forEach(function(obj) {
+        var k = key(obj);
+        obj.id = hash(k + refIDs[k].indexOf(obj._refID));
     });
 }
 
 // Convert the deployment to the QRI deployment format.
 Deployment.prototype.toQuiltRepresentation = function() {
     this.vet();
+
+    setQuiltIDs(this.machines);
 
     var containers = [];
     this.services.forEach(function(serv) {
@@ -345,6 +350,8 @@ function boxRange(x) {
 }
 
 function Machine(optionalArgs) {
+    this._refID = _.uniqueId();
+
     this.provider = optionalArgs.provider || "";
     this.role = optionalArgs.role || "";
     this.region = optionalArgs.region || "";

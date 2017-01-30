@@ -105,6 +105,7 @@ func toDBMachine(machines []stitch.Machine, maxPrice float64) []db.Machine {
 			m.DiskSize = defaultDiskSize
 		}
 
+		m.StitchID = stitchm.ID
 		m.SSHKeys = stitchm.SSHKeys
 		m.Region = stitchm.Region
 		m.FloatingIP = stitchm.FloatingIP
@@ -134,6 +135,9 @@ func machineTxn(view db.Database, stitch stitch.Stitch) {
 		dbMachine := right.(db.Machine)
 
 		switch {
+		case dbMachine.StitchID != "" &&
+			dbMachine.StitchID != stitchMachine.StitchID:
+			return -1
 		case dbMachine.Provider != stitchMachine.Provider:
 			return -1
 		case dbMachine.Region != stitchMachine.Region:
@@ -173,6 +177,7 @@ func machineTxn(view db.Database, stitch stitch.Stitch) {
 		stitchMachine := pair.L.(db.Machine)
 		dbMachine := pair.R.(db.Machine)
 
+		dbMachine.StitchID = stitchMachine.StitchID
 		dbMachine.Role = stitchMachine.Role
 		dbMachine.Size = stitchMachine.Size
 		dbMachine.DiskSize = stitchMachine.DiskSize

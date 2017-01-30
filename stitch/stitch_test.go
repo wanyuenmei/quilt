@@ -27,6 +27,7 @@ func TestMachine(t *testing.T) {
 	})])`,
 		[]Machine{
 			{
+				ID:       "abef9486d86c626156a54c2afb542cb469c412fb",
 				Role:     "Worker",
 				Provider: "Amazon",
 				Region:   "us-west-2",
@@ -41,11 +42,13 @@ func TestMachine(t *testing.T) {
 		deployment.deploy(baseMachine.asMaster().replicate(2));`,
 		[]Machine{
 			{
+				ID:       "3b863122cff01d0e3a21e39df480a98950e40eca",
 				Role:     "Master",
 				Provider: "Amazon",
 				SSHKeys:  []string{},
 			},
 			{
+				ID:       "44b523a5a320f15bd45104776308c416b6a00832",
 				Role:     "Master",
 				Provider: "Amazon",
 				SSHKeys:  []string{},
@@ -59,11 +62,13 @@ func TestMachine(t *testing.T) {
 		deployment.deploy(machines);`,
 		[]Machine{
 			{
+				ID:       "d614f26d7c29e10daae511e6187d8605ee2be23c",
 				Role:     "Master",
 				Provider: "Amazon",
 				SSHKeys:  []string{"key"},
 			},
 			{
+				ID:       "3b863122cff01d0e3a21e39df480a98950e40eca",
 				Role:     "Master",
 				Provider: "Amazon",
 				SSHKeys:  []string{},
@@ -78,6 +83,7 @@ func TestMachine(t *testing.T) {
 	deployment.deploy(baseMachine.asMaster());`,
 		[]Machine{
 			{
+				ID:         "b1b982307101a1ca4d5b5dde891bbe844d9c1df7",
 				Role:       "Master",
 				Provider:   "Amazon",
 				FloatingIP: "xxx.xxx.xxx.xxx",

@@ -77,6 +77,7 @@ type ConnectionSlice []Connection
 
 // A Machine specifies the type of VM that should be booted.
 type Machine struct {
+	ID         string   `json:",omitempty"`
 	Provider   string   `json:",omitempty"`
 	Role       string   `json:",omitempty"`
 	Size       string   `json:",omitempty"`

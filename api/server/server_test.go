@@ -36,7 +36,7 @@ func TestMachineResponse(t *testing.T) {
 		return nil
 	})
 
-	exp := `[{"ID":1,"Role":"Master","Provider":"Amazon","Region":"",` +
+	exp := `[{"ID":1,"StitchID":"","Role":"Master","Provider":"Amazon","Region":"",` +
 		`"Size":"size","DiskSize":0,"SSHKeys":null,"FloatingIP":"",` +
 		`"CloudID":"","PublicIP":"8.8.8.8","PrivateIP":"9.9.9.9",` +
 		`"Connected":false}]`
