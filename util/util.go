@@ -150,6 +150,12 @@ func StrStrMapEqual(x, y map[string]string) bool {
 	return true
 }
 
+// After returns whether the current time is after t. It is stored in a variable so it
+// can be mocked out for unit tests.
+var After = func(t time.Time) bool {
+	return time.Now().After(t)
+}
+
 // WaitFor waits until `pred` is satisfied, or `timeout` Duration has passed, checking
 // at every `interval`.
 func WaitFor(pred func() bool, interval time.Duration, timeout time.Duration) error {
@@ -158,7 +164,7 @@ func WaitFor(pred func() bool, interval time.Duration, timeout time.Duration) er
 		if pred() {
 			return nil
 		}
-		if time.Now().After(deadline) {
+		if After(deadline) {
 			return errors.New("timed out")
 		}
 		Sleep(interval)

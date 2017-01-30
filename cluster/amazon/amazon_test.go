@@ -535,6 +535,12 @@ func TestStop(t *testing.T) {
 func TestWaitBoot(t *testing.T) {
 	t.Parallel()
 	util.Sleep = func(time.Duration) {}
+	i := 0
+	util.After = func(t time.Time) bool {
+		i++
+		return i > 5
+	}
+
 	timeout = 10 * time.Second
 
 	instances := []*ec2.Instance{
@@ -641,7 +647,13 @@ func TestWaitBoot(t *testing.T) {
 func TestWaitStop(t *testing.T) {
 	t.Parallel()
 
-	sleep = func(t time.Duration) {}
+	util.Sleep = func(t time.Duration) {}
+	i := 0
+	util.After = func(t time.Time) bool {
+		i++
+		return i > 5
+	}
+
 	timeout = 10 * time.Second
 	instances := []*ec2.Instance{
 		{
