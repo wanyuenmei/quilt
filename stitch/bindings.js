@@ -65,7 +65,7 @@ Deployment.prototype.toQuiltRepresentation = function() {
             containers.push(c);
         });
     });
-    var quiltIDs = setQuiltIDs(containers);
+    setQuiltIDs(containers);
 
     // Map from container ID to container.
     var containerMap = {};
