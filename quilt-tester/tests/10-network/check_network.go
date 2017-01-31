@@ -354,14 +354,14 @@ func (tester networkTester) test(container db.Container) testResult {
 // 1 second for each packet.
 func ping(id string, target string) (string, bool) {
 	outBytes, err := exec.Command(
-		"quilt", "exec", id, "ping", "-c", "3", "-W", "1", target).
+		"quilt", "ssh", id, "ping", "-c", "3", "-W", "1", target).
 		CombinedOutput()
 	return string(outBytes), err == nil
 }
 
 func lookup(id string, hostname string) (string, error) {
 	outBytes, err := exec.Command(
-		"quilt", "exec", id, "getent", "hosts", hostname).
+		"quilt", "ssh", id, "getent", "hosts", hostname).
 		CombinedOutput()
 	if err != nil {
 		return "", err

@@ -4,22 +4,25 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"os"
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
+	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/NetSys/quilt/api/client"
 	"github.com/NetSys/quilt/api/client/getter"
+	"github.com/NetSys/quilt/api/util"
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/quiltctl/ssh"
 )
 
 // SSH contains the options for SSHing into machines.
 type SSH struct {
-	targetMachine string
-	privateKey    string
-	allocatePTY   bool
-	sshArgs       []string
+	target      string
+	privateKey  string
+	allocatePTY bool
+	args        []string
 
 	common       *commonFlags
 	clientGetter client.Getter
@@ -35,6 +38,19 @@ func NewSSHCommand() *SSH {
 	}
 }
 
+var sshUsage = `usage: quilt ssh <id> [command]
+
+Create a SSH session with the specified id.
+Either a container or machine ID can be supplied.
+If no command is supplied, a login shell is created.
+
+To login to machine 09ed35808a0b with a specific private key:
+quilt ssh -i ~/.ssh/quilt 09ed35808a0b
+
+To run a command on container 8879fd2dbcee:
+quilt ssh 8879fd2dbcee echo foo
+`
+
 // InstallFlags sets up parsing for command line flags.
 func (sCmd *SSH) InstallFlags(flags *flag.FlagSet) {
 	sCmd.common.InstallFlags(flags)
@@ -44,13 +60,7 @@ func (sCmd *SSH) InstallFlags(flags *flag.FlagSet) {
 		"attempt to allocate a pseudo-terminal")
 
 	flags.Usage = func() {
-		fmt.Println("usage: quilt ssh [-H=<daemon_host>] <machine_num> " +
-			"[ssh_options]")
-		fmt.Println("`ssh` creates a SSH session to the specified machine. " +
-			"The machine is identified the database ID produced by " +
-			"`quilt queryMachines`.")
-		fmt.Println("For example, to SSH to machine 5 with a specific " +
-			"private key: quilt ssh 5 -i ~/.ssh/quilt")
+		fmt.Println(sshUsage)
 		flags.PrintDefaults()
 	}
 }
@@ -58,16 +68,22 @@ func (sCmd *SSH) InstallFlags(flags *flag.FlagSet) {
 // Parse parses the command line arguments for the ssh command.
 func (sCmd *SSH) Parse(args []string) error {
 	if len(args) == 0 {
-		return errors.New("must specify a target machine")
+		return errors.New("must specify a target")
 	}
 
-	sCmd.targetMachine = args[0]
-	sCmd.sshArgs = args[1:]
+	sCmd.target = args[0]
+	sCmd.args = args[1:]
 	return nil
 }
 
 // Run SSHs into the given machine.
-func (sCmd *SSH) Run() int {
+func (sCmd SSH) Run() int {
+	allocatePTY := sCmd.allocatePTY || len(sCmd.args) == 0
+	if allocatePTY && !isTerminal() {
+		log.Error("Cannot allocate pseudo-terminal without a terminal")
+		return 1
+	}
+
 	c, err := sCmd.clientGetter.Client(sCmd.common.host)
 	if err != nil {
 		log.Error(err)
@@ -75,30 +91,49 @@ func (sCmd *SSH) Run() int {
 	}
 	defer c.Close()
 
-	tgtMach, err := getMachine(c, sCmd.targetMachine)
-	if err != nil {
-		log.WithError(err).Error("Unable to find machine")
+	mach, machErr := getMachine(c, sCmd.target)
+	contHost, cont, contErr := getContainer(c, sCmd.clientGetter, sCmd.target)
+
+	resolvedMachine := machErr == nil
+	resolvedContainer := contErr == nil
+
+	switch {
+	case !resolvedMachine && !resolvedContainer:
+		log.WithFields(log.Fields{
+			"machine error":   machErr.Error(),
+			"container error": contErr.Error(),
+		}).Error("Failed to resolve target machine or container")
+		return 1
+	case resolvedMachine && resolvedContainer:
+		log.WithFields(log.Fields{
+			"machine":   mach,
+			"container": cont,
+		}).Error("Ambiguous ID")
 		return 1
 	}
 
-	sshClient, err := sCmd.sshGetter(tgtMach.PublicIP, sCmd.privateKey)
+	host := contHost
+	if resolvedMachine {
+		host = mach.PublicIP
+	}
+	sshClient, err := sCmd.sshGetter(host, sCmd.privateKey)
 	if err != nil {
-		log.WithError(err).Error("Error opening SSH connection")
+		log.WithError(err).Error("Failed to setup SSH connection")
 		return 1
 	}
 	defer sshClient.Close()
 
-	allocatePTY := sCmd.allocatePTY || len(sCmd.sshArgs) == 0
-	if allocatePTY && !isTerminal() {
-		log.Error("Cannot allocate pseudo-terminal without a terminal")
-		return 1
-	}
-
-	cmd := strings.Join(sCmd.sshArgs, " ")
-	if cmd == "" {
+	cmd := strings.Join(sCmd.args, " ")
+	shouldLogin := cmd == ""
+	switch {
+	case shouldLogin && resolvedMachine:
 		err = sshClient.Shell()
-	} else {
-		err = sshClient.Run(allocatePTY, cmd)
+	case !shouldLogin && resolvedMachine:
+		err = sshClient.Run(sCmd.allocatePTY, cmd)
+	case shouldLogin && resolvedContainer:
+		err = containerExec(sshClient, cont.DockerID, true, "sh")
+	case !shouldLogin && resolvedContainer:
+		err = containerExec(sshClient, cont.DockerID, sCmd.allocatePTY, cmd)
 	}
 
 	if err != nil {
@@ -108,7 +143,7 @@ func (sCmd *SSH) Run() int {
 			return exitErr.ExitStatus()
 		}
 
-		log.WithError(err).Info("Error running command over SSH")
+		log.WithError(err).Error("Error running command")
 		return 1
 	}
 
@@ -139,4 +174,42 @@ func getMachine(c client.Client, id string) (db.Machine, error) {
 	}
 
 	return *choice, nil
+}
+
+func getContainer(c client.Client, clientGetter client.Getter, id string) (
+	host string, cont db.Container, err error) {
+
+	containerClient, err := clientGetter.ContainerClient(c, id)
+	if err != nil {
+		return "", db.Container{}, err
+	}
+	defer containerClient.Close()
+
+	container, err := util.GetContainer(containerClient, id)
+	if err != nil {
+		return "", db.Container{}, err
+	}
+
+	return containerClient.Host(), container, nil
+}
+
+func containerExec(c ssh.Client, dockerID string, allocatePTY bool, cmd string) error {
+	var flags string
+	if allocatePTY {
+		flags = "-it"
+	}
+
+	command := strings.Join([]string{"docker exec", flags, dockerID, cmd}, " ")
+	return c.Run(allocatePTY, command)
+}
+
+var isTerminal = func() bool {
+	return terminal.IsTerminal(int(os.Stdout.Fd()))
+}
+
+// exitError is an interface to "golang.org/x/crypto/ssh".ExitError that allows for
+// mocking in unit tests.
+type exitError interface {
+	Error() string
+	ExitStatus() int
 }

@@ -24,9 +24,7 @@ func main() {
 			"[log-file=<log_output_file>] " +
 			"[daemon | inspect <stitch> | run <stitch> | minion | " +
 			"stop <namespace> | get <import_path> | " +
-			"machines | containers | ps | ssh <machine> | " +
-			"exec <container> <command> | " +
-			"login <container> | " +
+			"machines | containers | ps | ssh <id> [command] | " +
 			"logs <container>]")
 		fmt.Println("\nWhen provided a stitch, quilt takes responsibility\n" +
 			"for deploying it as specified.  Alternatively, quilt may be\n" +
