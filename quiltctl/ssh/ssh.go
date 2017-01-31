@@ -9,6 +9,9 @@ type Client interface {
 
 	// Close closes the SSH connection.
 	Close() error
+
+	// Shell creates a login shell.
+	Shell() error
 }
 
 // Getter is used to retrieve a Client.

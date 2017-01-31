@@ -4,29 +4,33 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"os"
-	"os/exec"
+	"strings"
 
 	log "github.com/Sirupsen/logrus"
 
 	"github.com/NetSys/quilt/api/client"
 	"github.com/NetSys/quilt/api/client/getter"
 	"github.com/NetSys/quilt/db"
+	"github.com/NetSys/quilt/quiltctl/ssh"
 )
 
 // SSH contains the options for SSHing into machines.
 type SSH struct {
 	targetMachine string
+	privateKey    string
+	allocatePTY   bool
 	sshArgs       []string
 
 	common       *commonFlags
 	clientGetter client.Getter
+	sshGetter    ssh.Getter
 }
 
 // NewSSHCommand creates a new SSH command instance.
 func NewSSHCommand() *SSH {
 	return &SSH{
 		clientGetter: getter.New(),
+		sshGetter:    ssh.New,
 		common:       &commonFlags{},
 	}
 }
@@ -34,6 +38,10 @@ func NewSSHCommand() *SSH {
 // InstallFlags sets up parsing for command line flags.
 func (sCmd *SSH) InstallFlags(flags *flag.FlagSet) {
 	sCmd.common.InstallFlags(flags)
+	flags.StringVar(&sCmd.privateKey, "i", "",
+		"the private key to use to connect to the host")
+	flags.BoolVar(&sCmd.allocatePTY, "t", false,
+		"attempt to allocate a pseudo-terminal")
 
 	flags.Usage = func() {
 		fmt.Println("usage: quilt ssh [-H=<daemon_host>] <machine_num> " +
@@ -73,10 +81,37 @@ func (sCmd *SSH) Run() int {
 		return 1
 	}
 
-	if err = runSSHCommand(tgtMach.PublicIP, sCmd.sshArgs).Run(); err != nil {
-		log.WithError(err).Error("Error executing the SSH command")
+	sshClient, err := sCmd.sshGetter(tgtMach.PublicIP, sCmd.privateKey)
+	if err != nil {
+		log.WithError(err).Error("Error opening SSH connection")
 		return 1
 	}
+	defer sshClient.Close()
+
+	allocatePTY := sCmd.allocatePTY || len(sCmd.sshArgs) == 0
+	if allocatePTY && !isTerminal() {
+		log.Error("Cannot allocate pseudo-terminal without a terminal")
+		return 1
+	}
+
+	cmd := strings.Join(sCmd.sshArgs, " ")
+	if cmd == "" {
+		err = sshClient.Shell()
+	} else {
+		err = sshClient.Run(allocatePTY, cmd)
+	}
+
+	if err != nil {
+		if exitErr, ok := err.(exitError); ok {
+			log.WithError(err).Debug(
+				"SSH command returned a nonzero exit code")
+			return exitErr.ExitStatus()
+		}
+
+		log.WithError(err).Info("Error running command over SSH")
+		return 1
+	}
+
 	return 0
 }
 
@@ -104,17 +139,4 @@ func getMachine(c client.Client, id string) (db.Machine, error) {
 	}
 
 	return *choice, nil
-}
-
-// Stored in a variable so we can mock it out for unit tests.
-var runSSHCommand = func(host string, args []string) *exec.Cmd {
-	baseArgs := []string{fmt.Sprintf("quilt@%s", host),
-		"-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null"}
-
-	cmd := exec.Command("ssh", append(baseArgs, args...)...)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	return cmd
 }

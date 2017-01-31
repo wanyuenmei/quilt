@@ -3,7 +3,7 @@ Maintainer Ethan J. Jackson
 
 RUN apt-get update \
 && apt-get install -y --no-install-recommends \
-   bash git python curl openssh-client \
+   bash git python curl \
 && rm -rf /var/lib/apt/lists/*
 
 Copy bin/* /bin/

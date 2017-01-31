@@ -101,6 +101,29 @@ func (c NativeClient) Run(requestPTY bool, command string) error {
 	return session.Run(command)
 }
 
+// Shell starts a login shell.
+func (c NativeClient) Shell() error {
+	s, err := c.NewSession()
+	if err != nil {
+		return err
+	}
+	defer s.Close()
+
+	s.Stdin = os.Stdin
+	s.Stdout = os.Stdout
+	s.Stderr = os.Stderr
+	pty := newPty(s)
+	if err := pty.Request(); err != nil {
+		return err
+	}
+	defer pty.Close()
+
+	if err := s.Shell(); err != nil {
+		return err
+	}
+	return s.Wait()
+}
+
 // pty encapsulates pseudo-terminal operations.
 type pty struct {
 	session        *ssh.Session
