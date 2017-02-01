@@ -12,7 +12,6 @@ import (
 	clientMock "github.com/NetSys/quilt/api/client/mocks"
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/quiltctl/ssh"
-	"github.com/NetSys/quilt/quiltctl/testutils"
 )
 
 type mockExitError struct {
@@ -34,7 +33,7 @@ func TestExecPTY(t *testing.T) {
 	workerHost := "worker"
 	targetContainer := "1"
 
-	mockGetter := new(testutils.Getter)
+	mockGetter := new(clientMock.Getter)
 	mockGetter.On("Client", mock.Anything).Return(&clientMock.Client{}, nil)
 	mockGetter.On("ContainerClient", mock.Anything, mock.Anything).Return(
 		&clientMock.Client{
@@ -47,7 +46,7 @@ func TestExecPTY(t *testing.T) {
 			HostReturn: workerHost,
 		}, nil)
 
-	mockSSHClient := new(testutils.MockSSHClient)
+	mockSSHClient := new(ssh.MockClient)
 	sshGetter := func(host, key string) (ssh.Client, error) {
 		assert.Equal(t, workerHost, host)
 		assert.Equal(t, "key", key)
@@ -81,7 +80,7 @@ func TestExecNoPTY(t *testing.T) {
 	workerHost := "worker"
 	targetContainer := "1"
 
-	mockGetter := new(testutils.Getter)
+	mockGetter := new(clientMock.Getter)
 	mockGetter.On("Client", mock.Anything).Return(&clientMock.Client{}, nil)
 	mockGetter.On("ContainerClient", mock.Anything, mock.Anything).Return(
 		&clientMock.Client{
@@ -94,7 +93,7 @@ func TestExecNoPTY(t *testing.T) {
 			HostReturn: workerHost,
 		}, nil)
 
-	mockSSHClient := new(testutils.MockSSHClient)
+	mockSSHClient := new(ssh.MockClient)
 	sshGetter := func(host, key string) (ssh.Client, error) {
 		assert.Equal(t, workerHost, host)
 		return mockSSHClient, nil
@@ -171,7 +170,7 @@ func checkExecParsing(t *testing.T, args []string, expArgs Exec, expErr error) {
 
 func TestExecHelperErrors(t *testing.T) {
 	// SSH ExitError
-	mockSSHClient := new(testutils.MockSSHClient)
+	mockSSHClient := new(ssh.MockClient)
 	mockSSHClient.On("Run", true, "docker exec -it id123 foo bar").
 		Return(mockExitError{10}).Once()
 
@@ -180,7 +179,7 @@ func TestExecHelperErrors(t *testing.T) {
 	mockSSHClient.AssertExpectations(t)
 
 	// Other SSH error
-	mockSSHClient = new(testutils.MockSSHClient)
+	mockSSHClient = new(ssh.MockClient)
 	mockSSHClient.On("Run", true, "docker exec -it id123 echo hello").
 		Return(assert.AnError).Once()
 
@@ -190,7 +189,7 @@ func TestExecHelperErrors(t *testing.T) {
 }
 
 func TestExecHelper(t *testing.T) {
-	mockSSHClient := new(testutils.MockSSHClient)
+	mockSSHClient := new(ssh.MockClient)
 	mockSSHClient.On("Run", false, "docker exec  id123 /bin/sh").Return(nil).Once()
 
 	exitCode := execHelper(mockSSHClient, "id123", "/bin/sh", false)

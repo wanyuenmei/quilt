@@ -11,7 +11,6 @@ import (
 	"github.com/NetSys/quilt/api"
 	clientMock "github.com/NetSys/quilt/api/client/mocks"
 	"github.com/NetSys/quilt/db"
-	"github.com/NetSys/quilt/quiltctl/testutils"
 )
 
 func TestPsFlags(t *testing.T) {
@@ -30,13 +29,13 @@ func TestPsErrors(t *testing.T) {
 	t.Parallel()
 
 	var cmd *Ps
-	var mockGetter *testutils.Getter
+	var mockGetter *clientMock.Getter
 	var mockClient, mockLeaderClient *clientMock.Client
 
 	mockErr := errors.New("error")
 
 	// Error connecting to local client
-	mockGetter = new(testutils.Getter)
+	mockGetter = new(clientMock.Getter)
 	mockGetter.On("Client", mock.Anything).Return(nil, mockErr)
 
 	cmd = &Ps{&commonFlags{}, mockGetter}
@@ -44,7 +43,7 @@ func TestPsErrors(t *testing.T) {
 	mockGetter.AssertExpectations(t)
 
 	// Error querying machines
-	mockGetter = new(testutils.Getter)
+	mockGetter = new(clientMock.Getter)
 	mockClient = &clientMock.Client{MachineErr: mockErr}
 	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
 	mockGetter.On("LeaderClient", mock.Anything).Return(nil, mockErr)
@@ -54,7 +53,7 @@ func TestPsErrors(t *testing.T) {
 	mockGetter.AssertExpectations(t)
 
 	// Error connecting to leader
-	mockGetter = new(testutils.Getter)
+	mockGetter = new(clientMock.Getter)
 	mockClient = new(clientMock.Client)
 	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
 	mockGetter.On("LeaderClient", mock.Anything).Return(nil, mockErr)
@@ -64,7 +63,7 @@ func TestPsErrors(t *testing.T) {
 	mockGetter.AssertExpectations(t)
 
 	// Error querying containers
-	mockGetter = new(testutils.Getter)
+	mockGetter = new(clientMock.Getter)
 	mockClient = new(clientMock.Client)
 	mockLeaderClient = &clientMock.Client{ContainerErr: mockErr}
 	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
@@ -75,7 +74,7 @@ func TestPsErrors(t *testing.T) {
 	mockGetter.AssertExpectations(t)
 
 	// Error querying connections from LeaderClient
-	mockGetter = new(testutils.Getter)
+	mockGetter = new(clientMock.Getter)
 	mockClient = new(clientMock.Client)
 	mockLeaderClient = &clientMock.Client{ConnectionErr: mockErr}
 	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
@@ -86,7 +85,7 @@ func TestPsErrors(t *testing.T) {
 	mockGetter.AssertExpectations(t)
 
 	// Error querying containers in queryWorkers(), but fine for Leader.
-	mockGetter = new(testutils.Getter)
+	mockGetter = new(clientMock.Getter)
 	mockClient = &clientMock.Client{
 		MachineReturn: []db.Machine{
 			{
@@ -108,7 +107,7 @@ func TestPsErrors(t *testing.T) {
 func TestPsSuccess(t *testing.T) {
 	t.Parallel()
 
-	mockGetter := new(testutils.Getter)
+	mockGetter := new(clientMock.Getter)
 	mockClient := new(clientMock.Client)
 	mockLeaderClient := new(clientMock.Client)
 
@@ -136,7 +135,7 @@ func TestQueryWorkersSuccess(t *testing.T) {
 		},
 	}
 
-	mockGetter := new(testutils.Getter)
+	mockGetter := new(clientMock.Getter)
 	mockClient := &clientMock.Client{
 		ContainerReturn: containers,
 	}
@@ -174,7 +173,7 @@ func TestQueryWorkersFailure(t *testing.T) {
 	mockClient := &clientMock.Client{
 		ContainerReturn: containers,
 	}
-	mockGetter := new(testutils.Getter)
+	mockGetter := new(clientMock.Getter)
 	mockGetter.On("Client", api.RemoteAddress("1.2.3.4")).Return(nil, mockErr)
 	mockGetter.On("Client", api.RemoteAddress("5.6.7.8")).Return(mockClient, nil)
 
@@ -185,7 +184,7 @@ func TestQueryWorkersFailure(t *testing.T) {
 
 	// Worker Machine client throws error.
 	// Still get container from non-failing machine.
-	mockGetter = new(testutils.Getter)
+	mockGetter = new(clientMock.Getter)
 	failingClient := &clientMock.Client{
 		ContainerErr: mockErr,
 	}

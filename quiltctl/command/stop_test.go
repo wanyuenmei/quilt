@@ -8,14 +8,13 @@ import (
 
 	clientMock "github.com/NetSys/quilt/api/client/mocks"
 	"github.com/NetSys/quilt/db"
-	"github.com/NetSys/quilt/quiltctl/testutils"
 	"github.com/NetSys/quilt/stitch"
 )
 
 func TestStopNamespaceDefault(t *testing.T) {
 	t.Parallel()
 
-	mockGetter := new(testutils.Getter)
+	mockGetter := new(clientMock.Getter)
 	c := &clientMock.Client{}
 	mockGetter.On("Client", mock.Anything).Return(c, nil)
 
@@ -38,7 +37,7 @@ func TestStopNamespaceDefault(t *testing.T) {
 func TestStopNamespace(t *testing.T) {
 	t.Parallel()
 
-	mockGetter := new(testutils.Getter)
+	mockGetter := new(clientMock.Getter)
 	c := &clientMock.Client{}
 	mockGetter.On("Client", mock.Anything).Return(c, nil)
 
@@ -53,7 +52,7 @@ func TestStopNamespace(t *testing.T) {
 func TestStopContainers(t *testing.T) {
 	t.Parallel()
 
-	mockGetter := new(testutils.Getter)
+	mockGetter := new(clientMock.Getter)
 	c := &clientMock.Client{}
 	mockGetter.On("Client", mock.Anything).Return(c, nil)
 

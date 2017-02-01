@@ -1,4 +1,4 @@
-package testutils
+package mocks
 
 import "github.com/NetSys/quilt/api/client"
 import "github.com/stretchr/testify/mock"

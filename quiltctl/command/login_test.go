@@ -9,7 +9,6 @@ import (
 	"github.com/NetSys/quilt/api/client/mocks"
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/quiltctl/ssh"
-	"github.com/NetSys/quilt/quiltctl/testutils"
 )
 
 func TestLoginParsing(t *testing.T) {
@@ -47,7 +46,7 @@ func checkLoginParsing(t *testing.T, args []string, expArgs Login, expErrMsg str
 
 func TestLoginRunErrors(t *testing.T) {
 	var cmd *Login
-	var mockClientGetter *testutils.Getter
+	var mockClientGetter *mocks.Getter
 	var mockSSHGetter ssh.Getter
 	var mockLocalClient, mockContainerClient *mocks.Client
 	var containers []db.Container
@@ -57,7 +56,7 @@ func TestLoginRunErrors(t *testing.T) {
 	defer func() { isTerminal = origIsTerminal }()
 
 	// Fail to get localClient
-	mockClientGetter = new(testutils.Getter)
+	mockClientGetter = new(mocks.Getter)
 	mockClientGetter.On("Client", mock.Anything).Return(nil, assert.AnError)
 
 	cmd = &Login{common: &commonFlags{}, clientGetter: mockClientGetter}
@@ -66,7 +65,7 @@ func TestLoginRunErrors(t *testing.T) {
 
 	// Fail to get containerClient
 	mockLocalClient = new(mocks.Client)
-	mockClientGetter = new(testutils.Getter)
+	mockClientGetter = new(mocks.Getter)
 	mockClientGetter.On("Client", mock.Anything).Return(mockLocalClient, nil)
 	mockClientGetter.On("ContainerClient", mockLocalClient, mock.Anything).
 		Return(nil, assert.AnError)
@@ -82,7 +81,7 @@ func TestLoginRunErrors(t *testing.T) {
 	mockLocalClient = &mocks.Client{}
 	mockContainerClient = &mocks.Client{ContainerErr: assert.AnError}
 
-	mockClientGetter = new(testutils.Getter)
+	mockClientGetter = new(mocks.Getter)
 	mockClientGetter.On("Client", mock.Anything).Return(mockLocalClient, nil)
 	mockClientGetter.On("ContainerClient", mockLocalClient, mock.Anything).
 		Return(mockContainerClient, nil)
@@ -100,7 +99,7 @@ func TestLoginRunErrors(t *testing.T) {
 		return nil, assert.AnError
 	}
 
-	mockClientGetter = new(testutils.Getter)
+	mockClientGetter = new(mocks.Getter)
 	mockClientGetter.On("Client", mock.Anything).Return(mockLocalClient, nil)
 	mockClientGetter.On("ContainerClient", mockLocalClient, mock.Anything).
 		Return(mockContainerClient, nil)
@@ -135,14 +134,14 @@ func TestLoginRunSuccess(t *testing.T) {
 	containers := []db.Container{{StitchID: "100"}}
 	mockContainerClient := &mocks.Client{ContainerReturn: containers}
 
-	sshClient := new(testutils.MockSSHClient)
+	sshClient := new(ssh.MockClient)
 	sshClient.On("Run", mock.Anything, mock.Anything).Return(nil)
 	sshClient.On("Close").Return(nil).Once()
 	mockSSHGetter := func(host string, keyPath string) (ssh.Client, error) {
 		return sshClient, nil
 	}
 
-	mockClientGetter := new(testutils.Getter)
+	mockClientGetter := new(mocks.Getter)
 	mockClientGetter.On("Client", mock.Anything).Return(mockLocalClient, nil)
 	mockClientGetter.On("ContainerClient", mockLocalClient, "100").
 		Return(mockContainerClient, nil)

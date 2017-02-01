@@ -11,7 +11,6 @@ import (
 	clientMock "github.com/NetSys/quilt/api/client/mocks"
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/quiltctl/ssh"
-	"github.com/NetSys/quilt/quiltctl/testutils"
 )
 
 func TestLogFlags(t *testing.T) {
@@ -46,7 +45,7 @@ func TestLog(t *testing.T) {
 	workerHost := "worker"
 	targetContainer := "1"
 
-	mockGetter := new(testutils.Getter)
+	mockGetter := new(clientMock.Getter)
 	mockGetter.On("Client", mock.Anything).Return(&clientMock.Client{}, nil)
 	mockGetter.On("ContainerClient", mock.Anything, mock.Anything).Return(
 		&clientMock.Client{
@@ -58,7 +57,7 @@ func TestLog(t *testing.T) {
 			},
 			HostReturn: workerHost,
 		}, nil)
-	mockSSHClient := new(testutils.MockSSHClient)
+	mockSSHClient := new(ssh.MockClient)
 	sshGetter := func(host, key string) (ssh.Client, error) {
 		assert.Equal(t, workerHost, host)
 		assert.Equal(t, "key", key)

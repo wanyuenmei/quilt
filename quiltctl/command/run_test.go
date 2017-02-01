@@ -17,7 +17,6 @@ import (
 
 	clientMock "github.com/NetSys/quilt/api/client/mocks"
 	"github.com/NetSys/quilt/db"
-	"github.com/NetSys/quilt/quiltctl/testutils"
 	"github.com/NetSys/quilt/stitch"
 	"github.com/NetSys/quilt/util"
 )
@@ -113,7 +112,7 @@ func TestRunSpec(t *testing.T) {
 	for _, test := range tests {
 		util.AppFs = afero.NewMemMapFs()
 
-		mockGetter := new(testutils.Getter)
+		mockGetter := new(clientMock.Getter)
 		c := &clientMock.Client{}
 		mockGetter.On("Client", mock.Anything).Return(c, nil)
 
@@ -313,7 +312,7 @@ func TestPromptsUser(t *testing.T) {
 			return confirmResp, nil
 		}
 
-		mockGetter := new(testutils.Getter)
+		mockGetter := new(clientMock.Getter)
 		c := &clientMock.Client{
 			ClusterReturn: []db.Cluster{
 				{
