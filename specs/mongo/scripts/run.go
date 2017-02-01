@@ -7,8 +7,6 @@ import (
 	"os/exec"
 	"strings"
 	"time"
-
-	"github.com/NetSys/quilt/specs"
 )
 
 const initialRole = "initial"
@@ -42,14 +40,10 @@ func main() {
 		return
 	}
 
-	if err := specs.PingWait(peers); err != nil {
-		log.Fatalf("Error ping wait: %s", err)
-	}
-
 	// At this point, mongod may or may not have gotten to the point where it can
 	// receive instructions to configure the replica set.  Thus, we have to wait
 	// until its ready by sleeping.
-	time.Sleep(2 * time.Second)
+	time.Sleep(5 * time.Second)
 	log.Printf("Setting up replica set with peers: %+v", peers)
 	if err := setupReplicaSet(host, peers); err != nil {
 		log.Printf("Failed setup replica set: %s", err)

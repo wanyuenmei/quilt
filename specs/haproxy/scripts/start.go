@@ -6,8 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-
-	"github.com/NetSys/quilt/specs"
 )
 
 const configPath = "/usr/local/etc/haproxy/haproxy.cfg"
@@ -19,10 +17,6 @@ func main() {
 	}
 
 	addrs := strings.Split(addrsVar, ",")
-	if err := specs.PingWait(addrs); err != nil {
-		log.Fatalf("Error ping wait: %s", err.Error())
-	}
-
 	if err := configureHAProxy(addrs); err != nil {
 		log.Fatalf("Error configuring HAProxy: %s", err.Error())
 	}
