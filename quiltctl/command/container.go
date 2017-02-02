@@ -92,7 +92,8 @@ func writeContainers(fd io.Writer, containers []db.Container, machines []db.Mach
 	connections []db.Connection) {
 	w := tabwriter.NewWriter(fd, 0, 0, 4, ' ', 0)
 	defer w.Flush()
-	fmt.Fprintln(w, "ID\tMACHINE\tCONTAINER\tLABELS\tSTATUS\tCREATED\tPUBLIC IP")
+	fmt.Fprintln(w, "CONTAINER\tMACHINE\tCOMMAND\tLABELS"+
+		"\tSTATUS\tCREATED\tPUBLIC IP")
 
 	labelPublicPortMap := map[string]string{}
 	for _, c := range connections {

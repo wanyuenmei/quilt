@@ -92,8 +92,8 @@ func (pCmd *Ps) run() error {
 		return fmt.Errorf("unable to query machines: %s", err)
 	}
 
-	fmt.Println("MACHINES")
 	writeMachines(os.Stdout, machines)
+	fmt.Println()
 
 	if leadErr != nil {
 		log.WithError(leadErr).Debug("unable to connect to a cluster leader")
@@ -109,7 +109,6 @@ func (pCmd *Ps) run() error {
 	workerContainers := pCmd.queryWorkers(machines)
 	containers = updateContainers(containers, workerContainers)
 
-	fmt.Println("\nCONTAINERS")
 	writeContainers(os.Stdout, containers, machines, connections)
 
 	return nil

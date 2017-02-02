@@ -47,9 +47,9 @@ func TestMachineOutput(t *testing.T) {
 	* errors easier to debug. */
 	result = strings.Replace(result, " ", "_", -1)
 
-	exp := `ID____ROLE______PROVIDER____REGION_______SIZE` +
+	exp := `MACHINE____ROLE______PROVIDER____REGION_______SIZE` +
 		`________PUBLIC_IP____CONNECTED
-1_____Master____Amazon______us-west-1____m4.large____8.8.8.8______false
+1__________Master____Amazon______us-west-1____m4.large____8.8.8.8______false
 `
 
 	assert.Equal(t, exp, result)
@@ -104,16 +104,19 @@ func TestContainerOutput(t *testing.T) {
 	/* By replacing space with underscore, we make the spaces explicit and whitespace
 	* errors easier to debug. */
 	result = strings.Replace(result, " ", "_", -1)
-	expected := `ID____MACHINE____CONTAINER_________LABELS` +
-		`____________STATUS_______CREATED____PUBLIC_IP
-3________________image1_cmd_1________________________running_________________
-_____________________________________________________________________________
-1_____5__________image2____________label1,_label2____scheduled_______________7.7.7.7:80
-4_____5__________image3_cmd________label1____________scheduled_______________7.7.7.7:80
-_____________________________________________________________________________
-7_____6__________image1_cmd_3_4____label1____________scheduled_______________
-_____________________________________________________________________________
-8_____7__________image1______________________________________________________
+
+	expected := `CONTAINER____MACHINE____COMMAND___________LABELS________` +
+		`____STATUS_______CREATED____PUBLIC_IP
+3_______________________image1_cmd_1________________________running_________________
+____________________________________________________________________________________
+1____________5__________image2____________label1,_label2____scheduled__________` +
+		`_____7.7.7.7:80
+4____________5__________image3_cmd________label1____________scheduled__________` +
+		`_____7.7.7.7:80
+____________________________________________________________________________________
+7____________6__________image1_cmd_3_4____label1____________scheduled_______________
+____________________________________________________________________________________
+8____________7__________image1______________________________________________________
 `
 
 	assert.Equal(t, expected, result)
@@ -136,10 +139,11 @@ _____________________________________________________________________________
 	var c bytes.Buffer
 	writeContainers(&c, containers, machines, connections)
 	result = string(c.Bytes())
-	expected = "ID____MACHINE____CONTAINER_______LABELS" +
-		"____STATUS_____CREATED___________________PUBLIC_IP\n" +
-		"3________________image1_cmd_1______________running____" +
-		mockCreatedString + "____\n"
+	expected = `CONTAINER____MACHINE____COMMAND_________LABELS____STATUS___` +
+		`__CREATED___________________PUBLIC_IP
+3_______________________image1_cmd_1______________running____` + mockCreatedString +
+		`____
+`
 
 	result = strings.Replace(result, " ", "_", -1)
 	assert.Equal(t, expected, result)
@@ -163,10 +167,11 @@ _____________________________________________________________________________
 	var d bytes.Buffer
 	writeContainers(&d, containers, machines, connections)
 	result = string(d.Bytes())
-	expected = "ID____MACHINE____CONTAINER_______LABELS" +
-		"____STATUS_____CREATED______________PUBLIC_IP\n" +
-		"3________________image1_cmd_1______________running____" +
-		mockCreatedString + "____\n"
+	expected = `CONTAINER____MACHINE____COMMAND_________LABELS____STATUS___` +
+		`__CREATED______________PUBLIC_IP
+3_______________________image1_cmd_1______________running____` + mockCreatedString +
+		`____
+`
 
 	result = strings.Replace(result, " ", "_", -1)
 	assert.Equal(t, expected, result)
