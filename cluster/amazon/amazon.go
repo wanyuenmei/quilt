@@ -48,7 +48,7 @@ var amis = map[string]string{
 
 var sleep = time.Sleep
 
-var timeout = 15 * time.Minute
+var timeout = 5 * time.Minute
 
 // New creates a new Amazon EC2 cluster.
 func New(namespace string) (*Cluster, error) {
