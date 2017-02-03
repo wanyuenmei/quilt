@@ -28,10 +28,14 @@ successful, then the `quilt` command should execute successfully in your shell.
 
 ## QUILT_PATH
 Your `QUILT_PATH` will be where Quilt looks for imported specs, and where
-specs you download with `quilt get` get placed. You can set this to be anywhere,
-but by default, your `QUILT_PATH` is `~/.quilt`. To set a custom `QUILT_PATH`,
-follow the instructions
-[here](https://github.com/NetSys/quilt/blob/master/docs/Stitch.md#quilt_path).
+specs you download with `quilt get` get placed.  By default, your `QUILT_PATH`
+is `~/.quilt`. You can set a custom `QUILT_PATH` when invoking `quilt`:
+
+```bash
+QUILT_PATH="~/.my_quilt_directory" quilt run config.spec
+```
+
+Or you can `export` a custom path into your environment.
 
 ## Configure A Cloud Provider
 

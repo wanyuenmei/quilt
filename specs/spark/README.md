@@ -5,8 +5,8 @@ value of π on our Quilt Spark cluster.
 
 ## Configuring QUILT_PATH
 Quilt uses the `QUILT_PATH` environment variable to locate packages. See the
-[Stitch language spec](../../docs/Stitch.md#quilt_path) for instructions on
-setting up your `QUILT_PATH`.
+[Getting Started Guide](../../docs/GettingStarted.md#quilt_path) for
+instructions on setting up your `QUILT_PATH`.
 
 To fetch the specs that come with `quilt`, execute `quilt get github.com/NetSys/quilt`.
 
