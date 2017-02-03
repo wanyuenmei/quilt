@@ -23,10 +23,11 @@ Unlike official go style, in Quilt lines should be wrapped to 89 characters.
 The fundamental unit of work in the Quilt project is the git commit.  Each
 commit should be a coherent whole that implements one idea completely and
 correctly. No commits should break the code, even if they "fix it" later.
-Commit messages should be wrapped to 70 characters and begin with a title of
+Commit messages should be wrapped to 80 characters and begin with a title of
 the form `<Area>: <Title>`.  The title should be capitalized, but not end
 with a period.  For example, `provider: Move the provider interfaces into the
-cluster directory` is a good title.
+cluster directory` is a good title. When possible, the title should fit in
+50 characters.
 
 All but the most trivial of commits should have a brief paragraph below the
 title (separated by an empty line), explaining the _context_ of the commit.
