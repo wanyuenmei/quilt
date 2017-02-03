@@ -1,8 +1,8 @@
 # Contributing
 
-We highly encourage contributions to Quilt from the Open Source community,
-everything from fixing spelling errors to major contributions to the
-architecture are welcome!  If you'd like to contribute but don't know
+We highly encourage contributions to Quilt from the Open Source community!
+Everything from fixing spelling errors to major contributions to the
+architecture is welcome.  If you'd like to contribute but don't know
 where to get started, feel free to reach out to
 [Ethan](http://people.eecs.berkeley.edu/~ejj/contact.html) for some guidance.
 
@@ -12,7 +12,7 @@ System and, after appropriate review, fast-forwarded into master.
 See [Submitting Patches](#submitting-patches) for details.
 
 ## Coding Style
-The coding style is as defined by the `gofmt` tool, whatever transformations it
+The coding style is as defined by the `gofmt` tool: whatever transformations it
 makes on a piece of code are considered, by definition, the correct style.  In
 addition, `golint`, `go vet`, and `go test` should pass without warning on all
 changes.  An easy way to check these requirements is to run `make lint check`
@@ -49,25 +49,20 @@ in some theme, usually the larger goal they're trying to achieve.  Completely
 unrelated patches should be included in separate pull requests.
 
 Pull requests go through a two stage review process.  In the first stage,
-anyone with at least 5 commits on master, may review the patch, provide
-feedback, wait for fixes, and ultimately approve the patch by commenting `+1`
-or the "thumbs up" emoji.  By doing this, the reviewer is taking responsibility
-for the quality of the patch.  In effect they are asserting that the patch is
-perfect and ready to be merged.  Ethan will then do his own review (that
-may be detailed, or may be cursory), provide additional feedback, and
+[quilt-bot](https://github.com/quilt-bot) will randomly assign a contributor
+to review the patch.  The first stage reviewer should provide feedback, wait
+for fixes, and ultimately approve the patch using Github's code review tool.
+By doing this, the reviewer is taking responsibility for the quality of the
+patch.  In effect they are asserting that the patch is perfect and ready to be
+merged.
+
+Once the patch has been approved by the first reviewer, quilt-bot will assign a
+committer to do a second (sometimes cursory) review. The committer will
 either merge the patch, provide feedback, or if a great deal of work is
 still needed, punt the patch back to the original reviewer.
 
-Infrequent contributors need simply submit a PR and wait for the process to
-complete and the patch to be merged.  Frequent contributors, on the other hand,
-are expected to manage the code review process for their commits.  This means
-assigning another contributor to do the initial review, usually by choosing
-someone (literally) randomly unless there's a good reason that a specific
-person should do it.  The contributor is also responsible for politely
-reminding the assigned reviewer to complete the code review, notifying Ethan
-when he should have a look at it, and generally making sure the code review
-process goes smoothly for those commits.  It should be noted that the code
-review assignment is just a suggestion, if a another contributor, or member of
+It should be noted that the code
+review assignment is just a suggestion. If a another contributor, or member of
 the public for that matter, happens to do a detailed review and provide a `+1`
 then the assigned reviewer is relieved of their responsibility.  If you're not
 the assigned reviewer, but would like to do the code review, it may be polite
