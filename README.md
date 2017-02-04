@@ -31,7 +31,7 @@ fullstack JavaScript framework used for web development. Deploying a flexible,
 multi-node MEAN stack app can be both time consuming and costly, but Quilt
 simplifies this process.
 
-With Quilt, it takes less than 10 lines of JavaScript code to set up a
+With Quilt, it takes fewer than 20 lines of JavaScript code to set up a
 replicated Node.js application, connect it to MongoDB, and hook it up with a
 web proxy:
 
