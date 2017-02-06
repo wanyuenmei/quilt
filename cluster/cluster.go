@@ -177,11 +177,14 @@ func (clst cluster) updateCloud(machines []machine.Machine, act action) {
 			noFailures = false
 			switch act {
 			case boot:
-				log.Infof("Unable to boot machines on %s.", p)
+				log.WithError(err).Warnf(
+					"Unable to boot machines on %s.", p)
 			case stop:
-				log.Infof("Unable to stop machines on %s", p)
+				log.WithError(err).Warnf(
+					"Unable to stop machines on %s", p)
 			case updateIPs:
-				log.Infof("Unable to update floating IPs on %s", p)
+				log.WithError(err).Warnf(
+					"Unable to update floating IPs on %s", p)
 			}
 		}
 	}
