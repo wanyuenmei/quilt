@@ -4,10 +4,10 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"strings"
 
 	"github.com/NetSys/quilt/api/client"
 	"github.com/NetSys/quilt/api/client/getter"
-	"github.com/NetSys/quilt/api/util"
 	"github.com/NetSys/quilt/quiltctl/ssh"
 
 	log "github.com/Sirupsen/logrus"
@@ -20,7 +20,7 @@ type Log struct {
 	showTimestamps bool
 	shouldTail     bool
 
-	targetContainer string
+	target string
 
 	sshGetter    ssh.Getter
 	clientGetter client.Getter
@@ -36,6 +36,18 @@ func NewLogCommand() *Log {
 	}
 }
 
+var logsUsage = `usage: quilt logs [-H=<daemon_host>] [-i=<private_key>] <stitch_id>
+
+Fetch the logs of a container or machine minion.
+Either a container or machine ID can be supplied.
+
+To get the logs of container 8879fd2dbcee with a specific private key:
+quilt logs -i ~/.ssh/quilt 8879fd2dbcee
+
+To follow the logs of the minion on machine 09ed35808a0b:
+quilt logs -f 09ed35808a0b
+`
+
 // InstallFlags sets up parsing for command line flags.
 func (lCmd *Log) InstallFlags(flags *flag.FlagSet) {
 	lCmd.common.InstallFlags(flags)
@@ -47,13 +59,7 @@ func (lCmd *Log) InstallFlags(flags *flag.FlagSet) {
 	flags.BoolVar(&lCmd.showTimestamps, "t", false, "show timestamps")
 
 	flags.Usage = func() {
-		fmt.Println("usage: quilt logs [-H=<daemon_host>] [-i=<private_key>] " +
-			"<stitch_id>")
-		fmt.Println("`logs` fetches the logs of a container. " +
-			"The container is identified by the stitch ID provided by " +
-			"`quilt containers`.")
-		fmt.Println("For example, to get the logs of container 5 with a " +
-			"specific private key: `quilt logs -i ~/.ssh/quilt 5`")
+		fmt.Println(logsUsage)
 		flags.PrintDefaults()
 	}
 }
@@ -61,55 +67,70 @@ func (lCmd *Log) InstallFlags(flags *flag.FlagSet) {
 // Parse parses the command line arguments for the `logs` command.
 func (lCmd *Log) Parse(args []string) error {
 	if len(args) == 0 {
-		return errors.New("must specify a target container")
+		return errors.New("must specify a target container or machine")
 	}
 
-	lCmd.targetContainer = args[0]
+	lCmd.target = args[0]
 	return nil
 }
 
-// Run finds the target continer and outputs logs.
+// Run finds the target container or machine minion and outputs logs.
 func (lCmd *Log) Run() int {
-	localClient, err := lCmd.clientGetter.Client(lCmd.common.host)
+	c, err := lCmd.clientGetter.Client(lCmd.common.host)
 	if err != nil {
 		log.Error(err)
 		return 1
 	}
-	defer localClient.Close()
+	defer c.Close()
 
-	containerClient, err := lCmd.clientGetter.ContainerClient(
-		localClient, lCmd.targetContainer)
-	if err != nil {
-		log.WithError(err).Error("Error getting container client.")
+	mach, machErr := getMachine(c, lCmd.target)
+	contHost, cont, contErr := getContainer(c, lCmd.clientGetter, lCmd.target)
+
+	resolvedMachine := machErr == nil
+	resolvedContainer := contErr == nil
+
+	switch {
+	case !resolvedMachine && !resolvedContainer:
+		log.WithFields(log.Fields{
+			"machine error":   machErr.Error(),
+			"container error": contErr.Error(),
+		}).Error("Failed to resolve target machine or container")
+		return 1
+	case resolvedMachine && resolvedContainer:
+		log.WithFields(log.Fields{
+			"machine":   mach,
+			"container": cont,
+		}).Error("Ambiguous ID")
 		return 1
 	}
 
-	container, err := util.GetContainer(containerClient, lCmd.targetContainer)
-	if err != nil {
-		log.WithError(err).Error("Error getting container information.")
-		return 1
-	}
-
-	dockerCmd := "docker logs"
+	cmd := []string{"docker", "logs"}
 	if lCmd.sinceTimestamp != "" {
-		dockerCmd += fmt.Sprintf(" --since=%s", lCmd.sinceTimestamp)
+		cmd = append(cmd, fmt.Sprintf("--since=%s", lCmd.sinceTimestamp))
 	}
 	if lCmd.showTimestamps {
-		dockerCmd += " --timestamps"
+		cmd = append(cmd, "--timestamps")
 	}
 	if lCmd.shouldTail {
-		dockerCmd += " --follow"
+		cmd = append(cmd, "--follow")
 	}
-	dockerCmd += " " + container.DockerID
 
-	sshClient, err := lCmd.sshGetter(containerClient.Host(), lCmd.privateKey)
+	host := contHost
+	if resolvedMachine {
+		host = mach.PublicIP
+		cmd = append(cmd, "minion")
+	} else {
+		cmd = append(cmd, cont.DockerID)
+	}
+
+	sshClient, err := lCmd.sshGetter(host, lCmd.privateKey)
 	if err != nil {
 		log.WithError(err).Info("Error opening SSH connection")
 		return 1
 	}
 	defer sshClient.Close()
 
-	if err = sshClient.Run(false, dockerCmd); err != nil {
+	if err = sshClient.Run(false, strings.Join(cmd, " ")); err != nil {
 		log.WithError(err).Info("Error running command over SSH")
 		return 1
 	}
