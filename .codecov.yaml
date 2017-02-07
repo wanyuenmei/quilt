@@ -23,4 +23,4 @@ parsers:
     enable_partials: false
 ignore:
     - "specs"
-    - "minion/ovsdb/ovsdb_mock.go"
+    - "**/mock*"
