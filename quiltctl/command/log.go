@@ -48,7 +48,7 @@ func (lCmd *Log) InstallFlags(flags *flag.FlagSet) {
 
 	flags.Usage = func() {
 		fmt.Println("usage: quilt logs [-H=<daemon_host>] [-i=<private_key>] " +
-			"<stitch_id> <command>")
+			"<stitch_id>")
 		fmt.Println("`logs` fetches the logs of a container. " +
 			"The container is identified by the stitch ID provided by " +
 			"`quilt containers`.")
