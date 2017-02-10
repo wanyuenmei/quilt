@@ -196,10 +196,11 @@ func parseBandwidth(output string) (int, error) {
 			receiverResult)
 	}
 
-	bandwidth, err := strconv.Atoi(match[1])
+	bandwidth, err := strconv.ParseFloat(match[1], 32)
 	if err != nil {
 		return -1, fmt.Errorf("parsing error: %s", err)
 	}
 
-	return bandwidth, nil
+	// Bandwidth is in Mbits/sec, so int overflow is extremely unlikely.
+	return int(bandwidth), nil
 }
