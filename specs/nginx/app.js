@@ -1,5 +1,9 @@
 var image = "quilt/nginx"
 
+exports.setImage = function(newImage) {
+    image = newImage;
+}
+
 exports.New = function(port) {
     port = port || 80;
     if (typeof port !== 'number') {
