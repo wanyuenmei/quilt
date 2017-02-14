@@ -79,12 +79,21 @@ func TestBadDeployment(t *testing.T) {
 func TestInvalidImage(t *testing.T) {
 	conn := db.New()
 	s := server{conn: conn}
-	testInvalidImage(t, s, "has:morethan:two:colons")
-	testInvalidImage(t, s, "hasEmptyTag:")
-	testInvalidImage(t, s, "hasEmptyTag::digest")
+	testInvalidImage(t, s, "has:morethan:two:colons",
+		"could not parse container image has:morethan:two:colons: "+
+			"invalid reference format")
+	testInvalidImage(t, s, "has-empty-tag:",
+		"could not parse container image has-empty-tag:: "+
+			"invalid reference format")
+	testInvalidImage(t, s, "has-empty-tag::digest",
+		"could not parse container image has-empty-tag::digest: "+
+			"invalid reference format")
+	testInvalidImage(t, s, "hasCapital",
+		"could not parse container image hasCapital: "+
+			"invalid reference format: repository name must be lowercase")
 }
 
-func testInvalidImage(t *testing.T, s server, img string) {
+func testInvalidImage(t *testing.T, s server, img, expErr string) {
 	deployment := fmt.Sprintf(`
 	{"Containers":[
 		{"ID": "1",
@@ -98,7 +107,7 @@ func testInvalidImage(t *testing.T, s server, img string) {
 
 	_, err := s.Deploy(context.Background(),
 		&pb.DeployRequest{Deployment: deployment})
-	assert.EqualError(t, err, "could not parse container image: "+img)
+	assert.EqualError(t, err, expErr)
 }
 
 func TestDeploy(t *testing.T) {

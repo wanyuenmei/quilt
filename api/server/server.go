@@ -7,7 +7,6 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -16,6 +15,7 @@ import (
 	"github.com/NetSys/quilt/db"
 	"github.com/NetSys/quilt/stitch"
 
+	"github.com/docker/distribution/reference"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
@@ -99,10 +99,9 @@ func (s server) Deploy(cts context.Context, deployReq *pb.DeployRequest) (
 	}
 
 	for _, c := range stitch.Containers {
-		parts := strings.Split(c.Image, ":")
-		if len(parts) > 3 || (len(parts) >= 2 && parts[1] == "") {
+		if _, err := reference.ParseAnyReference(c.Image); err != nil {
 			return &pb.DeployReply{}, fmt.Errorf("could not parse "+
-				"container image: %s", c.Image)
+				"container image %s: %s", c.Image, err.Error())
 		}
 	}
 

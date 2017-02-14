@@ -289,6 +289,18 @@
 			"revisionTime": "2016-10-29T20:57:26Z"
 		},
 		{
+			"checksumSHA1": "Gj+xR1VgFKKmFXYOJMnAczC3Znk=",
+			"path": "github.com/docker/distribution/digestset",
+			"revision": "62d8d910b5a00cfdc425d8d62faa1e86f69e3527",
+			"revisionTime": "2017-02-14T06:29:02Z"
+		},
+		{
+			"checksumSHA1": "m4wEFD0Mh+ClfprUqgl0GyNmk7Q=",
+			"path": "github.com/docker/distribution/reference",
+			"revision": "62d8d910b5a00cfdc425d8d62faa1e86f69e3527",
+			"revisionTime": "2017-02-14T06:29:02Z"
+		},
+		{
 			"checksumSHA1": "Vn60086xCfe2Q4+mbWh/UbKBwUc=",
 			"comment": "v1.4.1-12527-gc764234",
 			"path": "github.com/docker/docker/opts",
@@ -495,6 +507,13 @@
 			"path": "github.com/mitchellh/go-homedir",
 			"revision": "981ab348d865cf048eb7d17e78ac7192632d8415",
 			"revisionTime": "2016-03-01T18:31:30Z"
+		},
+		{
+			"checksumSHA1": "6qI8HIHUPhGyRyxhe3Ds6N1pgUo=",
+			"origin": "github.com/docker/distribution/vendor/github.com/opencontainers/go-digest",
+			"path": "github.com/opencontainers/go-digest",
+			"revision": "62d8d910b5a00cfdc425d8d62faa1e86f69e3527",
+			"revisionTime": "2017-02-14T06:29:02Z"
 		},
 		{
 			"checksumSHA1": "3AoPMXlmVq2+iWMpsdJZkcUKHB8=",
