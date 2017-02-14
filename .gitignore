@@ -28,6 +28,7 @@ quilt
 *.cov
 *.cov.html
 *.coverprofile
+coverage.txt
 
 *.pdf
 
