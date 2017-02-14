@@ -56,17 +56,18 @@ aws_secret_access_key = <YOUR_SECRET_KEY>
 ```
 
 ## Your First Quilt-managed Infrastructure
-We suggest you read [`specs/nginx/main.js`](../specs/nginx/main.js)
+We suggest you read
+[`quilt/nginx/main.js`](https://github.com/quilt/nginx/blob/master/main.js)
 to understand the infrastructure defined by this Quilt.js spec.
 
 ### Import Nginx Spec
 Before we can run the Nginx spec, we need to import it into our `QUILT_PATH`.
 To do that, execute the following command from your shell:
 ```bash
-quilt get github.com/NetSys/quilt/specs/nginx
+quilt get github.com/quilt/nginx
 ```
 
-### Configure `specs/nginx/main.js`
+### Configure `quilt/nginx/main.js`
 #### Set Up Your SSH Authentication
 Quilt-managed Machines use public key authentication to control SSH access.
 SSH authentication is configured with the `sshKeys` Machine attribute.
@@ -77,7 +78,7 @@ If you can access GitHub repositories through SSH, then you can also SSH into a
 `githubKey`-configured Machine.
 
 If you would like to use `githubKey` authentication, open your spec in
-`$QUILT_PATH/github.com/NetSys/quilt/specs/nginx/main.js` and set the `sshKeys` appropriately.
+`$QUILT_PATH/github.com/quilt/nginx/main.js` and set the `sshKeys` appropriately.
 ```javascript
 var baseMachine = new Machine({
     ...
@@ -86,11 +87,12 @@ var baseMachine = new Machine({
 });
 ```
 
-### Deploying `specs/nginx/main.js`
+### Deploying `quilt/nginx/main.js`
 In one shell, start the Quilt daemon with `quilt daemon`. In another shell,
-execute `quilt run github.com/NetSys/quilt/specs/nginx/main.js`. Quilt will set up several
+execute `quilt run github.com/quilt/nginx/main.js`. Quilt will set up several
 Ubuntu VMs on your cloud provider as Workers, and these Workers will host Nginx
-Docker containers as specified in [`specs/nginx/app.js`](../specs/nginx/app.js)
+Docker containers as specified in
+[`quilt/nginx/app.js`](https://github.com/quilt/nginx/blob/master/app.js)
 (you do not have to understand or edit this file).
 
 
@@ -132,11 +134,12 @@ other and your local computer.
 ### Loading the Nginx Webpage
 By default, Quilt-managed containers are disconnected from the public internet
 and isolated from one another. In order to make the Nginx container accessible
-from the public internet, [`specs/nginx/main.js`](../specs/nginx/main.js)
+from the public internet,
+[`quilt/nginx/app.js`](https://github.com/quilt/nginx/blob/master/app.js)
 explicitly opens port 80 on the Nginx container to the outside world:
 
 ```javascript
-publicInternet.connect(80, webTier);
+publicInternet.connect(port, webTier);
 ```
 
 From your browser via `http://<WORKER_PUBLIC_IP>`, or on the command-line via
@@ -156,5 +159,5 @@ A starter Spark example to explore is [SparkPI](../specs/spark/).
 ## Next Steps: Downloading Other Specs
 You can download specs into your `QUILT_PATH` by executing
 `quilt get <IMPORT_PATH>`, where `<IMPORT_PATH>` is a path to a repository
-containing specs (e.g. `github.com/NetSys/quilt/specs/nginx`). You can read more about this
+containing specs (e.g. `github.com/quilt/nginx`). You can read more about this
 functionality [here](https://github.com/NetSys/quilt/blob/master/docs/Stitch.md#quilt_path).

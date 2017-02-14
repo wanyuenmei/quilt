@@ -1,4 +1,4 @@
-var nginx = require("github.com/NetSys/quilt/specs/nginx/app");
+var nginx = require("github.com/quilt/nginx");
 var infrastructure = require("github.com/NetSys/quilt/quilt-tester/config/infrastructure")
 
 var deployment = createDeployment({});
