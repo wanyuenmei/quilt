@@ -5,7 +5,7 @@ brief, hands-on introduction to some Quilt basics.
 ## Install Go
 Quilt supports Go version 1.5 or later.
 
-Find Go using your package manager or on the [Golang website] (https://golang.org/doc/install).
+Find Go using your package manager or on the [Golang website](https://golang.org/doc/install).
 
 ### Setup GOPATH
 We recommend reading the overview to Go workplaces [here](https://golang.org/doc/code.html).
@@ -32,7 +32,7 @@ specs you download with `quilt get` get placed.  By default, your `QUILT_PATH`
 is `~/.quilt`. You can set a custom `QUILT_PATH` when invoking `quilt`:
 
 ```bash
-QUILT_PATH="~/.my_quilt_directory" quilt run config.spec
+QUILT_PATH="~/.my_quilt_directory" quilt run my_quilt_spec.js
 ```
 
 Or you can `export` a custom path into your environment.
@@ -56,11 +56,17 @@ aws_secret_access_key = <YOUR_SECRET_KEY>
 ```
 
 ## Your First Quilt-managed Infrastructure
-We suggest you read [specs/nginx/main.js](../specs/main.js) to understand the
-infrastructure defined by this Quilt.js spec.
+We suggest you read [`specs/nginx/main.js`](../specs/nginx/main.js)
+to understand the infrastructure defined by this Quilt.js spec.
 
+### Import Nginx Spec
+Before we can run the Nginx spec, we need to import it into our `QUILT_PATH`.
+To do that, execute the following command from your shell:
+```bash
+quilt get github.com/NetSys/quilt/specs/nginx
+```
 
-### Configure [specs/nginx/main.js](../specs/nginx/main.js)
+### Configure `specs/nginx/main.js`
 #### Set Up Your SSH Authentication
 Quilt-managed Machines use public key authentication to control SSH access.
 SSH authentication is configured with the `sshKeys` Machine attribute.
@@ -70,20 +76,22 @@ public keys from GitHub, so they can be used to configure SSH authentication.
 If you can access GitHub repositories through SSH, then you can also SSH into a
 `githubKey`-configured Machine.
 
-If you would like to use `githubKey` authentication, open `specs/example.js`
-and an set the `sshKeys` appropriately.
+If you would like to use `githubKey` authentication, open your spec in
+`$QUILT_PATH/github.com/NetSys/quilt/specs/nginx/main.js` and set the `sshKeys` appropriately.
 ```javascript
 var baseMachine = new Machine({
     ...
-    sshKeys: githubKeys("ejj"),
+    sshKeys: githubKeys("CHANGE_ME"),
     ...
 });
 ```
 
-### Deploying [specs/example.js](../specs/example.js)
-While in the `$GOPATH/src/github.com/NetSys/quilt/` directory, execute `quilt
-run specs/nginx/main.js`. Quilt will set up several Ubuntu VMs on your cloud
-provider as Workers, and these Workers will host Nginx Docker containers.
+### Deploying `specs/nginx/main.js`
+In one shell, start the Quilt daemon with `quilt daemon`. In another shell,
+execute `quilt run github.com/NetSys/quilt/specs/nginx/main.js`. Quilt will set up several
+Ubuntu VMs on your cloud provider as Workers, and these Workers will host Nginx
+Docker containers as specified in [`specs/nginx/app.js`](../specs/nginx/app.js)
+(you do not have to understand or edit this file).
 
 
 ### Accessing the Worker VM
@@ -124,8 +132,8 @@ other and your local computer.
 ### Loading the Nginx Webpage
 By default, Quilt-managed containers are disconnected from the public internet
 and isolated from one another. In order to make the Nginx container accessible
-from the public internet, [specs/nginx/app.js](../specs/nginx/app.js) explicitly
-opens port 80 on the Nginx container to the outside world:
+from the public internet, [`specs/nginx/main.js`](../specs/nginx/main.js)
+explicitly opens port 80 on the Nginx container to the outside world:
 
 ```javascript
 publicInternet.connect(80, webTier);
@@ -146,14 +154,7 @@ Machines in the deployment.
 A starter Spark example to explore is [SparkPI](../specs/spark/).
 
 ## Next Steps: Downloading Other Specs
-You can download specs into your QUILT_PATH by executing
+You can download specs into your `QUILT_PATH` by executing
 `quilt get <IMPORT_PATH>`, where `<IMPORT_PATH>` is a path to a repository
-containing specs (e.g. `github.com/NetSys/quilt`). Quilt will download files
-into your `QUILT_PATH`. You can read more about its functionality
-[here](https://github.com/NetSys/quilt/blob/master/docs/Stitch.md#quilt_path).
-
-Try starting the Quilt daemon with `quilt daemon`. Then, in a separate shell, try
-`quilt get github.com/NetSys/quilt` and running
-`quilt run github.com/NetSys/quilt/specs/nginx/main.js` (remember to
-configure the file that was just downloaded by following the instructions
-above).
+containing specs (e.g. `github.com/NetSys/quilt/specs/nginx`). You can read more about this
+functionality [here](https://github.com/NetSys/quilt/blob/master/docs/Stitch.md#quilt_path).
