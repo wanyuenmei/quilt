@@ -556,7 +556,9 @@ func checkError(t *testing.T, code string, exp string) {
 		Path: ".",
 	})
 	if err == nil {
-		t.Errorf(`Expected error "%s", but got nothing.`, exp)
+		if exp != "" {
+			t.Errorf(`Expected error "%s", but got nothing.`, exp)
+		}
 		return
 	}
 	if actual := err.Error(); actual != exp {
