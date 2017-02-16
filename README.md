@@ -37,7 +37,7 @@ web proxy:
 
 [//]: # (b1)
 ```javascript
-    var Node = require("github.com/NetSys/quilt/specs/node/node");
+    var Node = require("github.com/quilt/nodejs");
     var HaProxy = require("github.com/quilt/haproxy").Haproxy;
     var Mongo = require("github.com/quilt/mongo");
 
