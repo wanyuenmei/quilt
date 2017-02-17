@@ -104,6 +104,11 @@ func (lCmd *Log) Run() int {
 		return 1
 	}
 
+	if resolvedContainer && cont.DockerID == "" {
+		log.Error("Container not yet running")
+		return 1
+	}
+
 	cmd := []string{"docker", "logs"}
 	if lCmd.sinceTimestamp != "" {
 		cmd = append(cmd, fmt.Sprintf("--since=%s", lCmd.sinceTimestamp))

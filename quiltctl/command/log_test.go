@@ -179,3 +179,21 @@ func TestLogNoMatch(t *testing.T) {
 	}
 	assert.Equal(t, 1, testCmd.Run())
 }
+
+func TestLogScheduledContainer(t *testing.T) {
+	mockClient := &mocks.Client{}
+	mockClientGetter := new(mocks.Getter)
+	mockClientGetter.On("Client", mock.Anything).Return(mockClient, nil)
+	mockClientGetter.On("ContainerClient", mock.Anything, mock.Anything).Return(
+		&mocks.Client{
+			ContainerReturn: []db.Container{{StitchID: "foo"}},
+			HostReturn:      "container",
+		}, nil)
+
+	testCmd := Log{
+		common:       &commonFlags{},
+		clientGetter: mockClientGetter,
+		target:       "foo",
+	}
+	assert.Equal(t, 1, testCmd.Run())
+}
