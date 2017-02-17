@@ -1,4 +1,4 @@
-var Elasticsearch = require("github.com/NetSys/quilt/specs/elasticsearch").Elasticsearch;
+var Elasticsearch = require("github.com/quilt/elasticsearch").Elasticsearch;
 var Kibana = require("github.com/NetSys/quilt/specs/kibana").Kibana;
 
 var clusterSize = 2;
