@@ -4,7 +4,7 @@
 
 # Quilt
 
-<img src="./docs/images/quilt_mean.gif">
+<img src="https://github.com/quilt/mean/blob/master/images/mean.gif">
 
 Quilt is a simple way to use JavaScript to build and manage anything from
 website backends to complex distributed systems. As shown above, a few simple
