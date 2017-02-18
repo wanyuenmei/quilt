@@ -1,6 +1,6 @@
 var wordpress = require("github.com/NetSys/quilt/specs/wordpress/wordpress");
 var memcached = require("github.com/NetSys/quilt/specs/memcached/memcached");
-var mysql = require("github.com/NetSys/quilt/specs/mysql/mysql");
+var mysql = require("github.com/quilt/mysql");
 var haproxy = require("github.com/quilt/haproxy");
 var spark = require("github.com/NetSys/quilt/specs/spark/spark");
 
@@ -14,10 +14,7 @@ sprk.workers.connect(7077, db.master);
 hap.public();
 
 // Infrastructure
-var deployment = createDeployment({
-    namespace: "CHANGE_ME",
-    adminACL: ["local"],
-});
+var deployment = createDeployment({});
 
 var nWorker = 4;
 var baseMachine = new Machine({
