@@ -67,16 +67,14 @@ possible multi-node setup on AWS:
 
 [//]: # (b1)
 ```javascript
-    var namespace = createDeployment({
-        adminACL: ["local"],
-    });
+    var namespace = createDeployment({});
 
     // An AWS VM with 1-2 CPUs and 1-2 GiB RAM.
     // The Github user `ejj` can ssh into the VMs.
     var baseMachine = new Machine({
         provider: "Amazon",
         cpu: new Range(2),
-        ram: new Range(2),
+        ram: new Range(8),
         sshKeys: githubKeys("ejj"),
     });
 
@@ -93,13 +91,15 @@ All that is left is to deploy the application on the specified infrastructure:
     namespace.deploy(haproxy);
 ```
 
-This spec can be found in [`specs/mean/example.js`](./specs/mean/example.js)
-and used to deploy your app. Check out [this guide](./docs/DeployMEANapp.md)
+This spec can be found in
+[`github.com/quilt/mean/example.js`](https://github.com/quilt/mean/blob/master/example.js)
+and used to deploy your app. Check out [this
+guide](https://github.com/quilt/mean/blob/master/README.md)
 for step by step instructions on how to deploy your own application using
 Quilt.
 
 As shown in the very beginning, deploying a MEAN app with Quilt is now as simple
-as running the command `quilt run specs/mean/example.js`.
+as running the command `quilt run github.com/quilt/mean/example.js`.
 
 ## Features
 Quilt offers a lot of great features. These are some of them:
