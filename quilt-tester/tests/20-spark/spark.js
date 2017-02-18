@@ -1,4 +1,4 @@
-var spark = require("github.com/NetSys/quilt/specs/spark/spark");
+var spark = require("github.com/quilt/spark");
 var infrastructure = require("github.com/NetSys/quilt/quilt-tester/config/infrastructure");
 
 // Application

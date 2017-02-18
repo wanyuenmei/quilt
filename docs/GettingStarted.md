@@ -154,7 +154,7 @@ modify the specification to remove all of the Machines, or use the command,
 Machines in the deployment.
 
 ## Next Steps: Starting Spark
-A starter Spark example to explore is [SparkPI](../specs/spark/).
+A starter Spark example to explore is [SparkPI](https://github.com/quilt/spark).
 
 ## Next Steps: Downloading Other Specs
 You can download specs into your `QUILT_PATH` by executing

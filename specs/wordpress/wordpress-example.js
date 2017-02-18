@@ -2,7 +2,7 @@ var wordpress = require("github.com/NetSys/quilt/specs/wordpress/wordpress");
 var memcached = require("github.com/quilt/memcached");
 var mysql = require("github.com/quilt/mysql");
 var haproxy = require("github.com/quilt/haproxy");
-var spark = require("github.com/NetSys/quilt/specs/spark/spark");
+var spark = require("github.com/quilt/spark");
 
 var memcd = new memcached.Memcached(3);
 var db = new mysql.Mysql(2);
