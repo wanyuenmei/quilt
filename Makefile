@@ -1,6 +1,6 @@
 export GO15VENDOREXPERIMENT=1
 PACKAGES=$(shell govendor list -no-status +local)
-NOVENDOR=$(shell find . -path ./specs/**/*/vendor -prune -o -path ./vendor -prune -o -name '*.go' -print)
+NOVENDOR=$(shell find . -path -prune -o -path ./vendor -prune -o -name '*.go' -print)
 LINE_LENGTH_EXCLUDE=./api/pb/pb.pb.go \
 		    ./cluster/amazon/mock_client.go \
 		    ./cluster/cloudcfg/template.go \
@@ -28,8 +28,8 @@ check: format-check
 
 clean:
 	govendor clean -x +local
-	rm -f *.cov.coverprofile cluster/*.cov.coverprofile minion/*.cov.coverprofile specs/*.cov.coverprofile
-	rm -f *.cov.html cluster/*.cov.html minion/*.cov.html specs/*.cov.html
+	rm -f *.cov.coverprofile cluster/*.cov.coverprofile minion/*.cov.coverprofile
+	rm -f *.cov.html cluster/*.cov.html minion/*.cov.html
 
 COV_SKIP= /api/client/mocks \
 	  /api/pb \

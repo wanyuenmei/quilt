@@ -22,5 +22,4 @@ parsers:
   javascript:
     enable_partials: false
 ignore:
-    - "specs"
     - "**/mock*"
