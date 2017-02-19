@@ -35,7 +35,7 @@ func Run(conn db.Conn, dk docker.Client) {
 			continue
 		}
 
-		if minion.Role == db.Worker {
+		if minion.Role == db.Worker && minion.SupervisorInit {
 			runWorker(conn, dk, minion.PrivateIP)
 		} else if minion.Role == db.Master {
 			runMaster(conn)
