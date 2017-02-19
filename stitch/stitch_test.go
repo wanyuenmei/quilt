@@ -27,7 +27,7 @@ func TestMachine(t *testing.T) {
 	})])`,
 		[]Machine{
 			{
-				ID:       "abef9486d86c626156a54c2afb542cb469c412fb",
+				ID:       "93e93257df71a41050032714b35b20736994c713",
 				Role:     "Worker",
 				Provider: "Amazon",
 				Region:   "us-west-2",
@@ -38,17 +38,41 @@ func TestMachine(t *testing.T) {
 				SSHKeys:  []string{"key1", "key2"},
 			}})
 
+	// Check that changing the SSH keys doesn't change the hash.
+	checkMachines(t, `deployment.deploy([new Machine({
+		role: "Worker",
+		provider: "Amazon",
+		region: "us-west-2",
+		size: "m4.large",
+		cpu: new Range(2, 4),
+		ram: new Range(4, 8),
+		diskSize: 32,
+		sshKeys: ["key3"]
+	})])`,
+		[]Machine{
+			{
+				ID:       "93e93257df71a41050032714b35b20736994c713",
+				Role:     "Worker",
+				Provider: "Amazon",
+				Region:   "us-west-2",
+				Size:     "m4.large",
+				CPU:      Range{2, 4},
+				RAM:      Range{4, 8},
+				DiskSize: 32,
+				SSHKeys:  []string{"key3"},
+			}})
+
 	checkMachines(t, `var baseMachine = new Machine({provider: "Amazon"});
 		deployment.deploy(baseMachine.asMaster().replicate(2));`,
 		[]Machine{
 			{
-				ID:       "3b863122cff01d0e3a21e39df480a98950e40eca",
+				ID:       "404c03a697ed922c6108db21ce2cd1ad5d212d96",
 				Role:     "Master",
 				Provider: "Amazon",
 				SSHKeys:  []string{},
 			},
 			{
-				ID:       "44b523a5a320f15bd45104776308c416b6a00832",
+				ID:       "52577e8362c035260bcab31e3700c8718a345053",
 				Role:     "Master",
 				Provider: "Amazon",
 				SSHKeys:  []string{},
@@ -62,13 +86,13 @@ func TestMachine(t *testing.T) {
 		deployment.deploy(machines);`,
 		[]Machine{
 			{
-				ID:       "d614f26d7c29e10daae511e6187d8605ee2be23c",
+				ID:       "404c03a697ed922c6108db21ce2cd1ad5d212d96",
 				Role:     "Master",
 				Provider: "Amazon",
 				SSHKeys:  []string{"key"},
 			},
 			{
-				ID:       "3b863122cff01d0e3a21e39df480a98950e40eca",
+				ID:       "52577e8362c035260bcab31e3700c8718a345053",
 				Role:     "Master",
 				Provider: "Amazon",
 				SSHKeys:  []string{},
@@ -83,7 +107,7 @@ func TestMachine(t *testing.T) {
 	deployment.deploy(baseMachine.asMaster());`,
 		[]Machine{
 			{
-				ID:         "b1b982307101a1ca4d5b5dde891bbe844d9c1df7",
+				ID:         "a905d3dffcf2587b6ad785055064ca4a0a1fa2e8",
 				Role:       "Master",
 				Provider:   "Amazon",
 				FloatingIP: "xxx.xxx.xxx.xxx",

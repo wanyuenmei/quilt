@@ -38,7 +38,7 @@ func TestRunSpec(t *testing.T) {
 	stitch.DefaultImportGetter.Path = "/quilt_path"
 
 	exJavascript := `deployment.deploy(new Machine({}));`
-	exJSON := `{"Machines":[{"ID":"107dee4e67d9a0fead1ef7ac48adc0a5aebbedac",` +
+	exJSON := `{"Machines":[{"ID":"1370f1dd922b86289606b740d197998326b879d9",` +
 		`"CPU":{},"RAM":{}}],"Namespace":"default-namespace"}`
 	tests := []runTest{
 		{

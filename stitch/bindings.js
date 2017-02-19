@@ -23,12 +23,19 @@ function Deployment(deploymentOpts) {
     this.invariants = [];
 }
 
-// key creates a string key for objects that container a _refID, namely Containers
+function omitSSHKey(key, value) {
+    if (key == "sshKeys") {
+        return undefined;
+    }
+    return value;
+}
+
+// key creates a string key for objects that have a _refID, namely Containers
 // and Machines.
 function key(obj) {
     var keyObj = obj.clone();
     keyObj._refID = "";
-    return JSON.stringify(keyObj);
+    return JSON.stringify(keyObj, omitSSHKey);
 }
 
 // setQuiltIDs deterministically sets the id field of objects based on
