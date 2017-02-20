@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/quilt/quilt/db"
 	"github.com/quilt/quilt/join"
 	"github.com/quilt/quilt/minion/docker"
@@ -11,7 +12,6 @@ import (
 	"github.com/quilt/quilt/minion/network/openflow"
 	"github.com/quilt/quilt/minion/network/plugin"
 	"github.com/quilt/quilt/util"
-	log "github.com/Sirupsen/logrus"
 )
 
 const labelKey = "quilt"

@@ -4,11 +4,11 @@ import (
 	"errors"
 	"sync"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/quilt/quilt/cluster/acl"
 	"github.com/quilt/quilt/cluster/cloudcfg"
 	"github.com/quilt/quilt/cluster/machine"
 	"github.com/quilt/quilt/db"
-	log "github.com/Sirupsen/logrus"
 	"github.com/satori/go.uuid"
 )
 

@@ -6,9 +6,9 @@ import (
 	"regexp"
 	"strings"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/quilt/quilt/api"
 	"github.com/quilt/quilt/api/client/getter"
-	log "github.com/Sirupsen/logrus"
 )
 
 var machineRegex = regexp.MustCompile(`Machine-(\d+){(.+?), .*, PublicIP=(.*?),`)

@@ -8,11 +8,11 @@ package scheduler
 import (
 	"time"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/quilt/quilt/db"
 	"github.com/quilt/quilt/minion/docker"
 	"github.com/quilt/quilt/minion/network/plugin"
 	"github.com/quilt/quilt/util"
-	log "github.com/Sirupsen/logrus"
 )
 
 // Run blocks implementing the scheduler module.

@@ -4,8 +4,8 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/quilt/quilt/db"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/quilt/quilt/db"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/quilt/quilt/cluster/acl"
 	"github.com/quilt/quilt/cluster/amazon"
 	"github.com/quilt/quilt/cluster/foreman"
@@ -13,7 +14,6 @@ import (
 	"github.com/quilt/quilt/db"
 	"github.com/quilt/quilt/join"
 	"github.com/quilt/quilt/util"
-	log "github.com/Sirupsen/logrus"
 )
 
 type provider interface {

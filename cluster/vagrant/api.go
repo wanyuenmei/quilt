@@ -9,9 +9,9 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/quilt/quilt/util"
 	log "github.com/Sirupsen/logrus"
 	homedir "github.com/mitchellh/go-homedir"
+	"github.com/quilt/quilt/util"
 )
 
 var vagrantCmd = "vagrant"

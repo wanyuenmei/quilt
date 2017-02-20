@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"sort"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/quilt/quilt/db"
 	"github.com/quilt/quilt/util"
-	log "github.com/Sirupsen/logrus"
 )
 
 type minion struct {
