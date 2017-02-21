@@ -112,6 +112,11 @@ func (sCmd SSH) Run() int {
 		return 1
 	}
 
+	if resolvedContainer && cont.DockerID == "" {
+		log.Error("Container not yet running")
+		return 1
+	}
+
 	host := contHost
 	if resolvedMachine {
 		host = mach.PublicIP
