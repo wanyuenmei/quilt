@@ -450,6 +450,10 @@ func TestCustomDeploy(t *testing.T) {
 		`only objects that implement "deploy(deployment)" can be deployed`)
 }
 
+func TestCreateDeploymentNoArgs(t *testing.T) {
+	checkError(t, "createDeployment()", "")
+}
+
 func TestRunModule(t *testing.T) {
 	checkJavascript(t, `(function() {
 		module.exports = function() {}

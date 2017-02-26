@@ -11,6 +11,8 @@ function createDeployment(deploymentOpts) {
 }
 
 function Deployment(deploymentOpts) {
+    deploymentOpts = deploymentOpts || {};
+
     this.maxPrice = deploymentOpts.maxPrice || 0;
     this.namespace = deploymentOpts.namespace || "default-namespace";
     this.adminACL = deploymentOpts.adminACL || [];
