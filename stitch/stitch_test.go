@@ -9,7 +9,10 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/quilt/quilt/util"
 )
 
 func TestMachine(t *testing.T) {
@@ -521,6 +524,18 @@ func TestHash(t *testing.T) {
 
 	checkJavascript(t, `hash("foo");`, "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33")
 	checkError(t, `hash();`, "RangeError: hash requires an argument")
+}
+
+func TestRead(t *testing.T) {
+	t.Parallel()
+
+	util.AppFs = afero.NewMemMapFs()
+	checkError(t, `read("foo");`, "StitchError: open foo: file does not exist")
+
+	util.WriteFile("foo", []byte("bar"), 0644)
+	checkJavascript(t, `read("foo");`, "bar")
+
+	checkError(t, `read();`, "RangeError: read requires an argument")
 }
 
 func checkJavascript(t *testing.T, code string, exp interface{}) {

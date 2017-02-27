@@ -6,6 +6,7 @@ import (
 	"crypto/sha1"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 
 	"github.com/robertkrimen/otto"
 
@@ -124,6 +125,9 @@ func newVM(getter ImportGetter) (*otto.Otto, error) {
 		return vm, err
 	}
 	if err := vm.Set("hash", toOttoFunc(hashImpl)); err != nil {
+		return vm, err
+	}
+	if err := vm.Set("read", toOttoFunc(readImpl)); err != nil {
 		return vm, err
 	}
 
@@ -268,6 +272,29 @@ func hashImpl(call otto.FunctionCall) (otto.Value, error) {
 	}
 
 	return call.Otto.ToValue(fmt.Sprintf("%x", sha1.Sum([]byte(toHash))))
+}
+
+func readImpl(call otto.FunctionCall) (otto.Value, error) {
+	if len(call.ArgumentList) < 1 {
+		panic(call.Otto.MakeRangeError(
+			"read requires an argument"))
+	}
+
+	path, err := call.Argument(0).ToString()
+	if err != nil {
+		return otto.Value{}, err
+	}
+
+	if !filepath.IsAbs(path) {
+		dir := filepath.Dir(call.Otto.Context().Filename)
+		path = filepath.Join(dir, path)
+	}
+	file, err := util.ReadFile(path)
+	if err != nil {
+		return otto.Value{}, err
+	}
+
+	return call.Otto.ToValue(file)
 }
 
 // Get returns the value contained at the given index
