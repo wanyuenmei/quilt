@@ -51,10 +51,11 @@ type Placement struct {
 
 // A Container may be instantiated in the stitch and queried by users.
 type Container struct {
-	ID      string            `json:",omitempty"`
-	Image   string            `json:",omitempty"`
-	Command []string          `json:",omitempty"`
-	Env     map[string]string `json:",omitempty"`
+	ID                string            `json:",omitempty"`
+	Image             string            `json:",omitempty"`
+	Command           []string          `json:",omitempty"`
+	Env               map[string]string `json:",omitempty"`
+	FilepathToContent map[string]string `json:",omitempty"`
 }
 
 // A Label represents a logical group of containers.

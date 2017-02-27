@@ -1,6 +1,8 @@
 package scheduler
 
 import (
+	"crypto/sha1"
+	"fmt"
 	"sync"
 	"time"
 
@@ -17,6 +19,7 @@ import (
 const labelKey = "quilt"
 const labelValue = "scheduler"
 const labelPair = labelKey + "=" + labelValue
+const filesKey = "files"
 const concurrencyLimit = 32
 
 var once sync.Once
@@ -121,10 +124,14 @@ func dockerRun(dk docker.Client, iface interface{}) {
 	dbc := iface.(db.Container)
 	log.WithField("container", dbc).Info("Start container")
 	_, err := dk.Run(docker.RunOptions{
-		Image:       dbc.Image,
-		Args:        dbc.Command,
-		Env:         dbc.Env,
-		Labels:      map[string]string{labelKey: labelValue},
+		Image:             dbc.Image,
+		Args:              dbc.Command,
+		Env:               dbc.Env,
+		FilepathToContent: dbc.FilepathToContent,
+		Labels: map[string]string{
+			labelKey: labelValue,
+			filesKey: filesHash(dbc.FilepathToContent),
+		},
 		IP:          dbc.IP,
 		NetworkMode: plugin.NetworkName,
 		DNS:         []string{ipdef.GatewayIP.String()},
@@ -153,7 +160,8 @@ func syncJoinScore(left, right interface{}) int {
 	dbc := left.(db.Container)
 	dkc := right.(docker.Container)
 
-	if dbc.Image != dkc.Image || dbc.IP != dkc.IP {
+	if dbc.Image != dkc.Image || dbc.IP != dkc.IP ||
+		filesHash(dbc.FilepathToContent) != dkc.Labels[filesKey] {
 		return -1
 	}
 
@@ -175,6 +183,11 @@ func syncJoinScore(left, right interface{}) int {
 	}
 
 	return 0
+}
+
+func filesHash(filepathToContent map[string]string) string {
+	toHash := util.MapAsString(filepathToContent)
+	return fmt.Sprintf("%x", sha1.Sum([]byte(toHash)))
 }
 
 func updateOpenflow(conn db.Conn, myIP string) {

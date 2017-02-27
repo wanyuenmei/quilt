@@ -109,12 +109,12 @@ func TestCreateGet(t *testing.T) {
 	md, dk := NewMock()
 
 	md.PullError = true
-	_, err := dk.create("name", "image", nil, nil, nil, nil, nil)
+	_, err := dk.create("name", "image", nil, nil, nil, nil, nil, nil)
 	assert.NotNil(t, err)
 	md.PullError = false
 
 	md.CreateError = true
-	_, err = dk.create("name", "image", nil, nil, nil, nil, nil)
+	_, err = dk.create("name", "image", nil, nil, nil, nil, nil, nil)
 	assert.NotNil(t, err)
 	md.CreateError = false
 
@@ -124,7 +124,7 @@ func TestCreateGet(t *testing.T) {
 	args := []string{"arg1"}
 	env := []string{"envA=B"}
 	labels := map[string]string{"label": "foo"}
-	id, err := dk.create("name", "image", args, labels, env, nil, nil)
+	id, err := dk.create("name", "image", args, labels, env, nil, nil, nil)
 	assert.Nil(t, err)
 
 	container, err := dk.Get(id)
@@ -220,6 +220,23 @@ func TestRunEnv(t *testing.T) {
 	container, err := dk.Get(id)
 	assert.Nil(t, err)
 	assert.Equal(t, env, container.Env)
+}
+
+func TestRunFilepathToContent(t *testing.T) {
+	t.Parallel()
+	md, dk := NewMock()
+
+	fileMap := map[string]string{
+		"foo": "bar",
+		"baz": "qux",
+	}
+	id, err := dk.Run(RunOptions{Name: "name1", FilepathToContent: fileMap})
+	assert.NoError(t, err)
+	assert.Equal(t, fileMap, md.Uploads[id])
+
+	md.UploadError = true
+	_, err = dk.Run(RunOptions{Name: "name1", FilepathToContent: fileMap})
+	assert.NotNil(t, err)
 }
 
 func TestConfigureNetwork(t *testing.T) {

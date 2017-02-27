@@ -4,10 +4,12 @@ import (
 	"archive/tar"
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -127,6 +129,16 @@ func StrStrMapEqual(x, y map[string]string) bool {
 		}
 	}
 	return true
+}
+
+// MapAsString creates a deterministic string representing the given map.
+func MapAsString(m map[string]string) string {
+	var strs []string
+	for k, v := range m {
+		strs = append(strs, fmt.Sprintf("%s=%s", k, v))
+	}
+	sort.Sort(sort.StringSlice(strs))
+	return fmt.Sprintf("%v", strs)
 }
 
 // After returns whether the current time is after t. It is stored in a variable so it

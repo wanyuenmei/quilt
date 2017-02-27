@@ -2,11 +2,13 @@ package docker
 
 import (
 	"errors"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/quilt/quilt/minion/ipdef"
+	"github.com/quilt/quilt/util"
 
 	log "github.com/Sirupsen/logrus"
 	dkc "github.com/fsouza/go-dockerclient"
@@ -53,11 +55,12 @@ type cacheEntry struct {
 
 // RunOptions changes the behavior of the Run function.
 type RunOptions struct {
-	Name   string
-	Image  string
-	Args   []string
-	Labels map[string]string
-	Env    map[string]string
+	Name              string
+	Image             string
+	Args              []string
+	Labels            map[string]string
+	Env               map[string]string
+	FilepathToContent map[string]string
 
 	IP          string
 	NetworkMode string
@@ -128,7 +131,8 @@ func (dk Client) Run(opts RunOptions) (string, error) {
 		}
 	}
 
-	id, err := dk.create(opts.Name, opts.Image, opts.Args, opts.Labels, env, hc, nc)
+	id, err := dk.create(opts.Name, opts.Image, opts.Args, opts.Labels, env,
+		opts.FilepathToContent, hc, nc)
 	if err != nil {
 		return "", err
 	}
@@ -323,9 +327,9 @@ func (dk Client) IsRunning(name string) (bool, error) {
 	return len(containers) != 0, nil
 }
 
-func (dk Client) create(name, image string, args []string, labels map[string]string,
-	env []string, hc *dkc.HostConfig, nc *dkc.NetworkingConfig) (string,
-	error) {
+func (dk Client) create(name, image string, args []string,
+	labels map[string]string, env []string, filepathToContent map[string]string,
+	hc *dkc.HostConfig, nc *dkc.NetworkingConfig) (string, error) {
 
 	if err := dk.Pull(image); err != nil {
 		return "", err
@@ -343,6 +347,22 @@ func (dk Client) create(name, image string, args []string, labels map[string]str
 	})
 	if err != nil {
 		return "", err
+	}
+
+	for path, content := range filepathToContent {
+		dir, file := filepath.Split(path)
+		tarBuf, err := util.ToTar(file, 0644, content)
+		if err != nil {
+			return "", err
+		}
+
+		err = dk.UploadToContainer(container.ID, dkc.UploadToContainerOptions{
+			InputStream: tarBuf,
+			Path:        dir,
+		})
+		if err != nil {
+			return "", err
+		}
 	}
 
 	return container.ID, nil

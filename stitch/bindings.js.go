@@ -418,12 +418,14 @@ function Container(image, command) {
     this.image = image;
     this.command = command || [];
     this.env = {};
+    this.filepathToContent = {};
 }
 
 // Create a new Container with the same attributes.
 Container.prototype.clone = function() {
     var cloned = new Container(this.image, _.clone(this.command));
     cloned.env = _.clone(this.env);
+    cloned.filepathToContent = _.clone(this.filepathToContent);
     return cloned;
 };
 
@@ -444,6 +446,12 @@ Container.prototype.setEnv = function(key, val) {
 Container.prototype.withEnv = function(env) {
     var cloned = this.clone();
     cloned.env = env;
+    return cloned;
+};
+
+Container.prototype.withFiles = function(fileMap) {
+    var cloned = this.clone();
+    cloned.filepathToContent = fileMap;
     return cloned;
 };
 

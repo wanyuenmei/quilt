@@ -122,97 +122,106 @@ func TestMachine(t *testing.T) {
 func TestContainer(t *testing.T) {
 	t.Parallel()
 
+	expContainers := map[string]Container{
+		"2b89d485b54fda3295e71d364ff3042043536614": {
+			ID:                "2b89d485b54fda3295e71d364ff3042043536614",
+			Image:             "image",
+			Command:           []string{"arg1", "arg2"},
+			Env:               map[string]string{"foo": "bar"},
+			FilepathToContent: map[string]string{"qux": "quuz"},
+		},
+	}
 	checkContainers(t, `deployment.deploy(new Service("foo", [
-	new Container("image", ["arg1", "arg2"]).withEnv({"foo": "bar"})
-	]));`,
-		map[string]Container{
-			"7bd352cc06b0bfa0d13a25e8b28a34878c8ae9ba": {
-				ID:      "7bd352cc06b0bfa0d13a25e8b28a34878c8ae9ba",
-				Image:   "image",
-				Command: []string{"arg1", "arg2"},
-				Env:     map[string]string{"foo": "bar"},
-			},
-		})
+	new Container("image", ["arg1", "arg2"]).withEnv({"foo": "bar"}).
+		withFiles({"qux": "quuz"})
+	]));`, expContainers)
 
+	expContainers = map[string]Container{
+		"611d8d563001b8f929a81a2fb7f382e22ee0789c": {
+			ID:                "611d8d563001b8f929a81a2fb7f382e22ee0789c",
+			Image:             "image",
+			Command:           []string{"arg1", "arg2"},
+			Env:               map[string]string{},
+			FilepathToContent: map[string]string{},
+		},
+	}
 	checkContainers(t, `deployment.deploy(new Service("foo", [
 	new Container("image", ["arg1", "arg2"])
-	]));`,
-		map[string]Container{
-			"67a8499599527201fa1664f04ea78f0eabce03e1": {
-				ID:      "67a8499599527201fa1664f04ea78f0eabce03e1",
-				Image:   "image",
-				Command: []string{"arg1", "arg2"},
-				Env:     map[string]string{},
-			},
-		})
+	]));`, expContainers)
 
+	expContainers = map[string]Container{
+		"be348e1eca54bdc63942e684c1a84d4f4ae7234f": {
+			ID:                "be348e1eca54bdc63942e684c1a84d4f4ae7234f",
+			Image:             "image",
+			Command:           []string{},
+			Env:               map[string]string{},
+			FilepathToContent: map[string]string{},
+		},
+	}
 	checkContainers(t, `deployment.deploy(
 		new Service("foo", [
 		new Container("image")
 		])
-	);`,
-		map[string]Container{
-			"1d43c15752b0e45b650db4f60a24c796751f892b": {
-				ID:      "1d43c15752b0e45b650db4f60a24c796751f892b",
-				Image:   "image",
-				Command: []string{},
-				Env:     map[string]string{},
-			},
-		})
+	);`, expContainers)
 
+	expContainers = map[string]Container{
+		"af59d327bfcc7715c4a276d0a7d6e947529a148a": {
+			ID:                "af59d327bfcc7715c4a276d0a7d6e947529a148a",
+			Image:             "image",
+			Command:           []string{},
+			Env:               map[string]string{"foo": "bar"},
+			FilepathToContent: map[string]string{},
+		},
+	}
 	checkContainers(t, `var c = new Container("image");
 	c.env["foo"] = "bar";
-	deployment.deploy(new Service("foo", [c]));`,
-		map[string]Container{
-			"9bde8c9286f7f90162669fd1443cb2a7112f2674": {
-				ID:      "9bde8c9286f7f90162669fd1443cb2a7112f2674",
-				Image:   "image",
-				Command: []string{},
-				Env:     map[string]string{"foo": "bar"},
-			},
-		})
+	deployment.deploy(new Service("foo", [c]));`, expContainers)
 
+	expContainers = map[string]Container{
+		"4f52dabccd8858e66817937226d7a66bd286d6e4": {
+			ID:                "4f52dabccd8858e66817937226d7a66bd286d6e4",
+			Image:             "image",
+			Command:           []string{"arg"},
+			Env:               map[string]string{},
+			FilepathToContent: map[string]string{},
+		},
+		"5f0e1dc0a79adfe1fedacd9797ad5c97c7cc1e4f": {
+			ID:                "5f0e1dc0a79adfe1fedacd9797ad5c97c7cc1e4f",
+			Image:             "image",
+			Command:           []string{"arg"},
+			Env:               map[string]string{},
+			FilepathToContent: map[string]string{},
+		},
+	}
 	checkContainers(t, `deployment.deploy(
 		new Service("foo", new Container("image", ["arg"]).replicate(2))
-	);`,
-		map[string]Container{
-			"3ccc0897b40f7d93fc3a28c68110dfcc8a38546e": {
-				ID:      "3ccc0897b40f7d93fc3a28c68110dfcc8a38546e",
-				Image:   "image",
-				Command: []string{"arg"},
-				Env:     map[string]string{},
-			},
-			"8589230395202832f47a4e7440cfcd4361879a82": {
-				ID:      "8589230395202832f47a4e7440cfcd4361879a82",
-				Image:   "image",
-				Command: []string{"arg"},
-				Env:     map[string]string{},
-			},
-		})
+	);`, expContainers)
 
 	// Test changing attributes of replicated container.
+	expContainers = map[string]Container{
+		"8e2b87f243e27f85a40bc6a49be54db0ffcd2e8c": {
+			ID:      "8e2b87f243e27f85a40bc6a49be54db0ffcd2e8c",
+			Image:   "image",
+			Command: []string{"arg", "changed"},
+			Env: map[string]string{
+				"foo": "bar",
+			},
+			FilepathToContent: map[string]string{},
+		},
+		"5f0e1dc0a79adfe1fedacd9797ad5c97c7cc1e4f": {
+			ID:                "5f0e1dc0a79adfe1fedacd9797ad5c97c7cc1e4f",
+			Image:             "image",
+			Command:           []string{"arg"},
+			Env:               map[string]string{},
+			FilepathToContent: map[string]string{},
+		},
+	}
 	checkContainers(t, `var repl = new Container("image", ["arg"]).replicate(2);
 	repl[0].env["foo"] = "bar";
 	repl[0].command.push("changed");
 	deployment.deploy(
 		new Service("baz", repl)
-	);`,
-		map[string]Container{
-			"ee4f124fe75dafe7950616b93267491505b2da53": {
-				ID:      "ee4f124fe75dafe7950616b93267491505b2da53",
-				Image:   "image",
-				Command: []string{"arg", "changed"},
-				Env: map[string]string{
-					"foo": "bar",
-				},
-			},
-			"8589230395202832f47a4e7440cfcd4361879a82": {
-				ID:      "8589230395202832f47a4e7440cfcd4361879a82",
-				Image:   "image",
-				Command: []string{"arg"},
-				Env:     map[string]string{},
-			},
-		})
+	);`, expContainers)
 }
 
 func TestPlacement(t *testing.T) {
@@ -278,7 +287,7 @@ func TestLabel(t *testing.T) {
 			"web_tier": {
 				Name: "web_tier",
 				IDs: []string{
-					"76e8c2b7cc361d3b56876afbe99abbd9ead4f497",
+					"49b9e1c9b36065ef52c55f1759f2f46e38f56abe",
 				},
 				Annotations: []string{},
 			},
@@ -294,8 +303,8 @@ func TestLabel(t *testing.T) {
 			"web_tier": {
 				Name: "web_tier",
 				IDs: []string{
-					"76e8c2b7cc361d3b56876afbe99abbd9ead4f497",
-					"1c8527df6750f34b0936c855b0fefe23d3209162",
+					"49b9e1c9b36065ef52c55f1759f2f46e38f56abe",
+					"61fd7361db899e46f5b6673101e029ed8357a44e",
 				},
 				Annotations: []string{},
 			},
@@ -436,14 +445,14 @@ func TestCustomDeploy(t *testing.T) {
 			"web_tier": {
 				Name: "web_tier",
 				IDs: []string{
-					"76e8c2b7cc361d3b56876afbe99abbd9ead4f497",
+					"49b9e1c9b36065ef52c55f1759f2f46e38f56abe",
 				},
 				Annotations: []string{},
 			},
 			"web_tier2": {
 				Name: "web_tier2",
 				IDs: []string{
-					"1c8527df6750f34b0936c855b0fefe23d3209162",
+					"61fd7361db899e46f5b6673101e029ed8357a44e",
 				},
 				Annotations: []string{},
 			},

@@ -131,22 +131,45 @@ func TestSyncWorker(t *testing.T) {
 	assert.Len(t, dkcs, 0)
 }
 
+func TestInitsFiles(t *testing.T) {
+	t.Parallel()
+
+	md, dk := docker.NewMock()
+	fileMap := map[string]string{"File": "Contents"}
+	dbcs := []db.Container{
+		{
+			ID:                1,
+			Image:             "Image1",
+			FilepathToContent: fileMap,
+		},
+	}
+
+	runSync(dk, dbcs, nil)
+	dkcs, err := dk.List(nil)
+	assert.NoError(t, err)
+	assert.Len(t, dkcs, 1)
+	assert.Equal(t, filesHash(fileMap), dkcs[0].Labels[filesKey])
+	assert.Equal(t, fileMap, md.Uploads[dkcs[0].ID])
+}
+
 func TestSyncJoinScore(t *testing.T) {
 	t.Parallel()
 
 	dbc := db.Container{
-		IP:       "1.2.3.4",
-		Image:    "Image",
-		Command:  []string{"cmd"},
-		Env:      map[string]string{"a": "b"},
-		DockerID: "DockerID",
+		IP:                "1.2.3.4",
+		Image:             "Image",
+		Command:           []string{"cmd"},
+		Env:               map[string]string{"a": "b"},
+		FilepathToContent: map[string]string{"c": "d"},
+		DockerID:          "DockerID",
 	}
 	dkc := docker.Container{
-		IP:    "1.2.3.4",
-		Image: dbc.Image,
-		Args:  dbc.Command,
-		Env:   dbc.Env,
-		ID:    dbc.DockerID,
+		IP:     "1.2.3.4",
+		Image:  dbc.Image,
+		Args:   dbc.Command,
+		Env:    dbc.Env,
+		Labels: map[string]string{filesKey: filesHash(dbc.FilepathToContent)},
+		ID:     dbc.DockerID,
 	}
 
 	score := syncJoinScore(dbc, dkc)
@@ -181,6 +204,14 @@ func TestSyncJoinScore(t *testing.T) {
 	score = syncJoinScore(dbc, dkc)
 	assert.Equal(t, -1, score)
 	dbc.Env = dkc.Env
+
+	dbc.FilepathToContent = map[string]string{"c": "wrong"}
+	score = syncJoinScore(dbc, dkc)
+	assert.Equal(t, -1, score)
+
+	dbc.FilepathToContent = map[string]string{"c": "d"}
+	score = syncJoinScore(dbc, dkc)
+	assert.Zero(t, score)
 }
 
 func TestOpenFlowContainers(t *testing.T) {

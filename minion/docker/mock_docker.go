@@ -1,7 +1,11 @@
 package docker
 
 import (
+	"archive/tar"
 	"errors"
+	"io"
+	"io/ioutil"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -21,6 +25,7 @@ type MockClient struct {
 	Pulled     map[string]struct{}
 	Containers map[string]mockContainer
 	Networks   map[string]*dkc.Network
+	Uploads    map[string]map[string]string
 
 	createdExecs map[string]dkc.CreateExecOptions
 	Executions   map[string][]string
@@ -35,6 +40,7 @@ type MockClient struct {
 	RemoveError        bool
 	StartError         bool
 	StartExecError     bool
+	UploadError        bool
 }
 
 // NewMock creates a mock docker client suitable for use in unit tests, and a MockClient
@@ -45,6 +51,7 @@ func NewMock() (*MockClient, Client) {
 		Pulled:       map[string]struct{}{},
 		Containers:   map[string]mockContainer{},
 		Networks:     map[string]*dkc.Network{},
+		Uploads:      map[string]map[string]string{},
 		createdExecs: map[string]dkc.CreateExecOptions{},
 		Executions:   map[string][]string{},
 	}
@@ -263,10 +270,39 @@ func (dk *MockClient) ResetExec() {
 	dk.Executions = map[string][]string{}
 }
 
-// UploadToContainer is not implemented.
+// UploadToContainer extracts a tarball into the given container.
 func (dk MockClient) UploadToContainer(id string,
 	opts dkc.UploadToContainerOptions) error {
-	panic("MockClient Not Implemented")
+	dk.Lock()
+	defer dk.Unlock()
+
+	if dk.UploadError {
+		return errors.New("upload error")
+	}
+
+	if _, ok := dk.Uploads[id]; !ok {
+		dk.Uploads[id] = map[string]string{}
+	}
+
+	tr := tar.NewReader(opts.InputStream)
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return err
+		}
+
+		file, err := ioutil.ReadAll(tr)
+		if err != nil {
+			return err
+		}
+
+		path := filepath.Join(opts.Path, hdr.Name)
+		dk.Uploads[id][path] = string(file)
+	}
+
+	return nil
 }
 
 // DownloadFromContainer is not implemented.

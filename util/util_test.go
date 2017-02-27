@@ -7,6 +7,8 @@ import (
 	"io"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestToTar(t *testing.T) {
@@ -63,5 +65,17 @@ func TestWaitFor(t *testing.T) {
 	}, 1*time.Second, 300*time.Millisecond)
 	if err.Error() != "timed out" {
 		t.Errorf("Expected waitFor to timeout")
+	}
+}
+
+func TestMapAsString(t *testing.T) {
+	// Run the tests multiple times to test determinism.
+	for i := 0; i < 10; i++ {
+		assert.Equal(t, "[a=1 b=2]", MapAsString(
+			map[string]string{"a": "1", "b": "2"}))
+
+		// Nil and empty maps are the same.
+		assert.Equal(t, "[]", MapAsString(nil))
+		assert.Equal(t, "[]", MapAsString(map[string]string{}))
 	}
 }

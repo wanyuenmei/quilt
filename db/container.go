@@ -14,17 +14,18 @@ import (
 type Container struct {
 	ID int `json:"-"`
 
-	IP         string            `json:",omitempty"`
-	Minion     string            `json:",omitempty"`
-	EndpointID string            `json:",omitempty"`
-	StitchID   string            `json:",omitempty"`
-	DockerID   string            `json:",omitempty"`
-	Image      string            `json:",omitempty"`
-	Status     string            `json:",omitempty"`
-	Command    []string          `json:",omitempty"`
-	Labels     []string          `json:",omitempty"`
-	Env        map[string]string `json:",omitempty"`
-	Created    time.Time         `json:","`
+	IP                string            `json:",omitempty"`
+	Minion            string            `json:",omitempty"`
+	EndpointID        string            `json:",omitempty"`
+	StitchID          string            `json:",omitempty"`
+	DockerID          string            `json:",omitempty"`
+	Image             string            `json:",omitempty"`
+	Status            string            `json:",omitempty"`
+	Command           []string          `json:",omitempty"`
+	Labels            []string          `json:",omitempty"`
+	Env               map[string]string `json:",omitempty"`
+	FilepathToContent map[string]string `json:",omitempty"`
+	Created           time.Time         `json:","`
 }
 
 // ContainerSlice is an alias for []Container to allow for joins

@@ -97,10 +97,11 @@ func queryContainers(spec stitch.Stitch) []db.Container {
 	containers := map[string]*db.Container{}
 	for _, c := range spec.Containers {
 		containers[c.ID] = &db.Container{
-			StitchID: c.ID,
-			Command:  c.Command,
-			Image:    c.Image,
-			Env:      c.Env,
+			StitchID:          c.ID,
+			Command:           c.Command,
+			Image:             c.Image,
+			Env:               c.Env,
+			FilepathToContent: c.FilepathToContent,
 		}
 	}
 
@@ -146,6 +147,7 @@ func updateContainers(view db.Database, spec stitch.Stitch) {
 		dbc.Command = newc.Command
 		dbc.Image = newc.Image
 		dbc.Env = newc.Env
+		dbc.FilepathToContent = newc.FilepathToContent
 		dbc.StitchID = newc.StitchID
 		view.Commit(dbc)
 	}

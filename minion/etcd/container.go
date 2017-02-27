@@ -3,11 +3,11 @@ package etcd
 import (
 	"encoding/json"
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/quilt/quilt/db"
 	"github.com/quilt/quilt/join"
+	"github.com/quilt/quilt/util"
 
 	log "github.com/Sirupsen/logrus"
 )
@@ -76,26 +76,20 @@ func joinContainers(view db.Database, etcdDBCs []db.Container) {
 	key := func(iface interface{}) interface{} {
 		dbc := iface.(db.Container)
 
-		// The environment variables must be sorted to ensure they're consistent
-		// in the join key.
-		var env []string
-		for k, v := range dbc.Env {
-			env = append(env, fmt.Sprintf("%s=%s", k, v))
-		}
-		sort.Sort(sort.StringSlice(env))
-
 		return struct {
-			IP       string
-			StitchID string
-			Image    string
-			Command  string
-			Env      string
+			IP                string
+			StitchID          string
+			Image             string
+			Command           string
+			Env               string
+			FilepathToContent string
 		}{
-			IP:       dbc.IP,
-			StitchID: dbc.StitchID,
-			Image:    dbc.Image,
-			Command:  fmt.Sprintf("%v", dbc.Command),
-			Env:      fmt.Sprintf("%v", env),
+			IP:                dbc.IP,
+			StitchID:          dbc.StitchID,
+			Image:             dbc.Image,
+			Command:           fmt.Sprintf("%v", dbc.Command),
+			Env:               util.MapAsString(dbc.Env),
+			FilepathToContent: util.MapAsString(dbc.FilepathToContent),
 		}
 	}
 
@@ -123,6 +117,7 @@ func joinContainers(view db.Database, etcdDBCs []db.Container) {
 		dbc.Command = edbc.Command
 		dbc.Labels = edbc.Labels
 		dbc.Env = edbc.Env
+		dbc.FilepathToContent = edbc.FilepathToContent
 		view.Commit(dbc)
 	}
 }

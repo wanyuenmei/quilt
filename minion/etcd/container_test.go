@@ -36,6 +36,7 @@ func TestRunContainerOnce(t *testing.T) {
 		dbc.Image = "ubuntu"
 		dbc.Command = []string{"1", "2", "3"}
 		dbc.Env = map[string]string{"red": "pill", "blue": "pill"}
+		dbc.FilepathToContent = map[string]string{"foo": "bar"}
 		view.Commit(dbc)
 		return nil
 	})
@@ -61,6 +62,9 @@ func TestRunContainerOnce(t *testing.T) {
             "blue": "pill",
             "red": "pill"
         },
+        "FilepathToContent": {
+            "foo": "bar"
+        },
         "Created": "0001-01-01T00:00:00Z"
     }
 ]`
@@ -73,6 +77,7 @@ func TestRunContainerOnce(t *testing.T) {
 
 		dbc := view.SelectFromContainer(nil)[0]
 		dbc.Env = map[string]string{"red": "fish", "blue": "fish"}
+		dbc.FilepathToContent = map[string]string{"bar": "baz"}
 		view.Commit(dbc)
 		return nil
 	})
@@ -81,12 +86,13 @@ func TestRunContainerOnce(t *testing.T) {
 	assert.NoError(t, err)
 
 	expDBC := db.Container{
-		IP:       "10.0.0.2",
-		StitchID: "12",
-		Minion:   "1.2.3.4",
-		Image:    "ubuntu",
-		Command:  []string{"1", "2", "3"},
-		Env:      map[string]string{"red": "pill", "blue": "pill"},
+		IP:                "10.0.0.2",
+		StitchID:          "12",
+		Minion:            "1.2.3.4",
+		Image:             "ubuntu",
+		Command:           []string{"1", "2", "3"},
+		Env:               map[string]string{"red": "pill", "blue": "pill"},
+		FilepathToContent: map[string]string{"foo": "bar"},
 	}
 	dbcs := conn.SelectFromContainer(nil)
 	assert.Len(t, dbcs, 1)
