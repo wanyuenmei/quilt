@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/vishvananda/netlink"
 
-	"github.com/quilt/quilt/db"
 	"github.com/quilt/quilt/minion/ipdef"
 )
 
@@ -154,48 +153,6 @@ func TestGetPublicInterface(t *testing.T) {
 	res, err = getPublicInterface()
 	assert.Equal(t, "link name", res)
 	assert.NoError(t, err)
-}
-
-func defaultLabelsConnections() (map[string]db.Label, map[string][]string) {
-
-	labels := map[string]db.Label{
-		"red": {
-			IP:           "10.0.0.1",
-			ContainerIPs: []string{"1.2.2.2", "1.3.3.3", "1.4.4.4"},
-		},
-		"blue": {
-			IP:           "10.0.0.2",
-			ContainerIPs: []string{"1.3.3.3", "1.4.4.4"},
-		},
-		"green": {
-			IP:           "10.0.0.3",
-			ContainerIPs: []string{"1.1.1.1"},
-		},
-	}
-
-	connections := map[string][]string{
-		"red":  {"blue", "green"},
-		"blue": {"red"},
-	}
-
-	return labels, connections
-}
-
-func localhosts() string {
-	return `
-127.0.0.1       localhost
-::1             localhost ip6-localhost ip6-loopback
-fe00::0         ip6-localnet
-ff00::0         ip6-mcastprefix
-ff02::1         ip6-allnodes
-ff02::2         ip6-allrouters
-`
-}
-
-func routes() string {
-	return `default via 10.0.2.2 dev eth0
-	10.0.2.0/24 dev eth0  proto kernel  scope link  src 10.0.2.15
-	192.168.162.0/24 dev eth1  proto kernel  scope link  src 192.168.162.162`
 }
 
 func rules() string {
