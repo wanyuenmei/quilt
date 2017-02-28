@@ -119,49 +119,39 @@ func getRules(ipt IPTables, table, chain string) (rules []string, err error) {
 }
 
 func routingRules(publicInterface string, containers []db.Container,
-	connections []db.Connection) (strRules []string) {
+	connections []db.Connection) (rules []string) {
 
-	protocols := []string{"tcp", "udp"}
-	// Map each container IP to all ports on which it can receive packets
+	// Map each label to all ports on which it can receive packets
 	// from the public internet.
 	portsFromWeb := make(map[string]map[int]struct{})
-
-	for _, dbc := range containers {
-		for _, conn := range connections {
-
-			if conn.From != stitch.PublicInternetLabel {
-				continue
-			}
-
-			for _, l := range dbc.Labels {
-
-				if conn.To != l {
-					continue
-				}
-
-				if _, ok := portsFromWeb[dbc.IP]; !ok {
-					portsFromWeb[dbc.IP] = make(map[int]struct{})
-				}
-
-				portsFromWeb[dbc.IP][conn.MinPort] = struct{}{}
-			}
+	for _, conn := range connections {
+		if conn.From != stitch.PublicInternetLabel {
+			continue
 		}
+
+		if _, ok := portsFromWeb[conn.To]; !ok {
+			portsFromWeb[conn.To] = make(map[int]struct{})
+		}
+
+		portsFromWeb[conn.To][conn.MinPort] = struct{}{}
 	}
 
 	// Map the container's port to the same port of the host.
-	for ip, ports := range portsFromWeb {
-		for port := range ports {
-			for _, protocol := range protocols {
-				strRules = append(strRules, fmt.Sprintf(
-					"-i %[1]s -p %[2]s -m %[2]s "+
-						"--dport %[3]d -j DNAT "+
-						"--to-destination %[4]s:%[3]d",
-					publicInterface, protocol, port, ip))
+	for _, dbc := range containers {
+		for _, label := range dbc.Labels {
+			for port := range portsFromWeb[label] {
+				for _, protocol := range []string{"tcp", "udp"} {
+					rules = append(rules, fmt.Sprintf(
+						"-i %[1]s -p %[2]s -m %[2]s "+
+							"--dport %[3]d -j DNAT "+
+							"--to-destination %[4]s:%[3]d",
+						publicInterface, protocol, port, dbc.IP))
+				}
 			}
 		}
 	}
 
-	return strRules
+	return rules
 }
 
 type rule struct {
