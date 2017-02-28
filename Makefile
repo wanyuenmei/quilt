@@ -37,6 +37,7 @@ COV_SKIP= /api/client/mocks \
 	  /constants \
 	  /minion/pprofile \
 	  /minion/ovsdb/mocks \
+	  /minion/network/mocks \
 	  /quilt-tester \
 	  /quilt-tester/tests/10-network \
 	  /quilt-tester/tests/15-bandwidth \

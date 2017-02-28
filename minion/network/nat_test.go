@@ -1,117 +1,156 @@
 package network
 
+//go:generate mockery -name=IPTables
+
 import (
 	"errors"
-	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/vishvananda/netlink"
 
+	"github.com/quilt/quilt/db"
 	"github.com/quilt/quilt/minion/ipdef"
+	"github.com/quilt/quilt/minion/network/mocks"
+	"github.com/quilt/quilt/stitch"
 )
 
-func TestMakeIPRule(t *testing.T) {
-	inp := "-A INPUT -p tcp -i eth0 -m multiport --dports 465,110,995 -j ACCEPT"
-	rule, _ := makeIPRule(inp)
-	expCmd := "-A"
-	expChain := "INPUT"
-	expOpts := "-p tcp -i eth0 -m multiport --dports 465,110,995 -j ACCEPT"
+func TestUpdateNATErrors(t *testing.T) {
+	ipt := &mocks.IPTables{}
+	anErr := errors.New("err")
 
-	if rule.cmd != expCmd {
-		t.Errorf("Bad ipRule command.\nExpected:\n%s\n\nGot:\n%s\n",
-			expCmd, rule.cmd)
+	getPublicInterface = func() (string, error) {
+		return "", anErr
 	}
+	assert.NotNil(t, updateNAT(ipt, nil, nil))
 
-	if rule.chain != expChain {
-		t.Errorf("Bad ipRule chain.\nExpected:\n%s\n\nGot:\n%s\n",
-			expChain, rule.chain)
+	ipt = &mocks.IPTables{}
+	ipt.On("AppendUnique", mock.Anything, mock.Anything, mock.Anything).Return(anErr)
+	getPublicInterface = func() (string, error) {
+		return "eth0", nil
 	}
+	assert.NotNil(t, updateNAT(ipt, nil, nil))
 
-	if rule.opts != expOpts {
-		t.Errorf("Bad ipRule options.\nExpected:\n%s\n\nGot:\n%s\n",
-			expOpts, rule.opts)
-	}
-
-	inp = "-A POSTROUTING -s 10.0.3.0/24 ! -d 10.0.3.0/24 -j MASQUERADE"
-	rule, _ = makeIPRule(inp)
-	expCmd = "-A"
-	expChain = "POSTROUTING"
-	expOpts = "-s 10.0.3.0/24 ! -d 10.0.3.0/24 -j MASQUERADE"
-
-	if rule.cmd != expCmd {
-		t.Errorf("Bad ipRule command.\nExpected:\n%s\n\nGot:\n%s\n",
-			expCmd, rule.cmd)
-	}
-
-	if rule.chain != expChain {
-		t.Errorf("Bad ipRule chain.\nExpected:\n%s\n\nGot:\n%s\n",
-			expChain, rule.chain)
-	}
-
-	if rule.opts != expOpts {
-		t.Errorf("Bad ipRule options.\nExpected:\n%s\n\nGot:\n%s\n",
-			expOpts, rule.opts)
-	}
-
-	inp = "-A PREROUTING -i eth0 -p tcp --dport 80 -j DNAT " +
-		"--to-destination 10.31.0.23:80"
-	rule, _ = makeIPRule(inp)
-	expCmd = "-A"
-	expChain = "PREROUTING"
-	expOpts = "-i eth0 -p tcp --dport 80 -j DNAT --to-destination 10.31.0.23:80"
-
-	if rule.cmd != expCmd {
-		t.Errorf("Bad ipRule command.\nExpected:\n%s\n\nGot:\n%s\n",
-			expCmd, rule.cmd)
-	}
-
-	if rule.chain != expChain {
-		t.Errorf("Bad ipRule chain.\nExpected:\n%s\n\nGot:\n%s\n",
-			expChain, rule.chain)
-	}
-
-	if rule.opts != expOpts {
-		t.Errorf("Bad ipRule options.\nExpected:\n%s\n\nGot:\n%s\n",
-			expOpts, rule.opts)
-	}
+	ipt = &mocks.IPTables{}
+	ipt.On("AppendUnique", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	ipt.On("List", mock.Anything, mock.Anything).Return(nil, anErr)
+	assert.NotNil(t, updateNAT(ipt, nil, nil))
 }
 
-func TestGenerateCurrentNatRules(t *testing.T) {
-	oldShVerbose := shVerbose
-	defer func() { shVerbose = oldShVerbose }()
-	shVerbose = func(format string, args ...interface{}) (
-		stdout, stderr []byte, err error) {
-		return []byte(rules()), nil, nil
-	}
+func TestRoutingRules(t *testing.T) {
+	t.Parallel()
 
-	actual, _ := generateCurrentNatRules()
-	exp := ipRuleSlice{
+	containers := []db.Container{
 		{
-			cmd:   "-P",
-			chain: "POSTROUTING",
-			opts:  "ACCEPT",
+			IP:     "8.8.8.8",
+			Labels: []string{"red", "blue"},
 		},
 		{
-			cmd:   "-N",
-			chain: "DOCKER",
+			IP:     "9.9.9.9",
+			Labels: []string{"purple"},
 		},
 		{
-			cmd:   "-A",
-			chain: "POSTROUTING",
-			opts:  "-s 11.0.0.0/8,10.0.0.0/8 -o eth0 -j MASQUERADE",
-		},
-		{
-			cmd:   "-A",
-			chain: "POSTROUTING",
-			opts:  "-s 10.0.3.0/24 ! -d 10.0.3.0/24 -j MASQUERADE",
+			IP:     "10.10.10.10",
+			Labels: []string{"green"},
 		},
 	}
 
-	if !(reflect.DeepEqual(actual, exp)) {
-		t.Errorf("Generated wrong routes.\nExpected:\n%+v\n\nGot:\n%+v\n",
-			exp, actual)
+	connections := []db.Connection{
+		{
+			From:    stitch.PublicInternetLabel,
+			To:      "red",
+			MinPort: 80,
+		},
+		{
+			From:    stitch.PublicInternetLabel,
+			To:      "blue",
+			MinPort: 81,
+		},
+		{
+			From:    stitch.PublicInternetLabel,
+			To:      "purple",
+			MinPort: 80,
+		},
+		{
+			From:    "green",
+			To:      stitch.PublicInternetLabel,
+			MinPort: 80,
+		},
+		{
+			From:    "yellow",
+			To:      stitch.PublicInternetLabel,
+			MinPort: 80,
+		},
 	}
+
+	actual := routingRules("eth0", containers, connections)
+	exp := []string{
+		"-i eth0 -p tcp -m tcp --dport 80 -j DNAT --to-destination 8.8.8.8:80",
+		"-i eth0 -p udp -m udp --dport 80 -j DNAT --to-destination 8.8.8.8:80",
+		"-i eth0 -p tcp -m tcp --dport 81 -j DNAT --to-destination 8.8.8.8:81",
+		"-i eth0 -p udp -m udp --dport 81 -j DNAT --to-destination 8.8.8.8:81",
+		"-i eth0 -p tcp -m tcp --dport 80 -j DNAT --to-destination 9.9.9.9:80",
+		"-i eth0 -p udp -m udp --dport 80 -j DNAT --to-destination 9.9.9.9:80",
+	}
+	assert.Equal(t, exp, actual)
+}
+
+func TestGetRules(t *testing.T) {
+	ipt := &mocks.IPTables{}
+	ipt.On("List", "nat", "PREROUTING").Return([]string{
+		"-A PREROUTING -j ACCEPT",
+		"-P PREROUTING ACCEPT",
+		"-A PREROUTING -i eth0 -j DNAT --to-destination 9.9.9.9:80",
+	}, nil)
+	actual, err := getRules(ipt, "nat", "PREROUTING")
+	exp := []string{
+		"-j ACCEPT",
+		"-i eth0 -j DNAT --to-destination 9.9.9.9:80",
+	}
+	assert.NoError(t, err)
+	assert.Equal(t, exp, actual)
+
+	ipt = &mocks.IPTables{}
+	ipt.On("List", "nat", "PREROUTING").Return([]string{
+		"-A PREROUTING",
+	}, nil)
+	_, err = getRules(ipt, "nat", "PREROUTING")
+	assert.NotNil(t, err)
+}
+
+func TestSyncChain(t *testing.T) {
+	ipt := &mocks.IPTables{}
+	ipt.On("List", "nat", "PREROUTING").Return([]string{
+		"-A PREROUTING -i eth0 -j DNAT --to-destination 7.7.7.7:80",
+		"-A PREROUTING -i eth0 -j DNAT --to-destination 8.8.8.8:80",
+	}, nil)
+	ipt.On("Delete", "nat", "PREROUTING",
+		[]string{"-i", "eth0", "-j", "DNAT", "--to-destination", "7.7.7.7:80"},
+	).Return(nil)
+	ipt.On("Append", "nat", "PREROUTING",
+		[]string{"-i", "eth0", "-j", "DNAT", "--to-destination", "9.9.9.9:80"},
+	).Return(nil)
+	err := syncChain(ipt, "nat", "PREROUTING", []string{
+		"-i eth0 -j DNAT --to-destination 8.8.8.8:80",
+		"-i eth0 -j DNAT --to-destination 9.9.9.9:80",
+	})
+	assert.NoError(t, err)
+	ipt.AssertExpectations(t)
+
+	anErr := errors.New("err")
+	ipt = &mocks.IPTables{}
+	ipt.On("List", mock.Anything, mock.Anything).Return(
+		[]string{"-A PREROUTING deleteme"}, nil)
+	ipt.On("Delete", mock.Anything, mock.Anything, mock.Anything).Return(anErr)
+	err = syncChain(ipt, "nat", "PREROUTING", []string{})
+	assert.NotNil(t, err)
+
+	ipt = &mocks.IPTables{}
+	ipt.On("List", mock.Anything, mock.Anything).Return(nil, nil)
+	ipt.On("Append", mock.Anything, mock.Anything, mock.Anything).Return(anErr)
+	err = syncChain(ipt, "nat", "PREROUTING", []string{"addme"})
+	assert.NotNil(t, err)
 }
 
 func TestGetPublicInterface(t *testing.T) {
@@ -127,7 +166,7 @@ func TestGetPublicInterface(t *testing.T) {
 		return nil, errors.New("unknown")
 	}
 
-	res, err := getPublicInterface()
+	res, err := getPublicInterfaceImpl()
 	assert.Empty(t, res)
 	assert.EqualError(t, err, "route list: not implemented")
 
@@ -135,29 +174,22 @@ func TestGetPublicInterface(t *testing.T) {
 	routeList = func(link netlink.Link, family int) ([]netlink.Route, error) {
 		return routes, nil
 	}
-	res, err = getPublicInterface()
+	res, err = getPublicInterfaceImpl()
 	assert.Empty(t, res)
 	assert.EqualError(t, err, "missing default route")
 
 	routes = []netlink.Route{{Dst: &ipdef.QuiltSubnet}}
-	res, err = getPublicInterface()
+	res, err = getPublicInterfaceImpl()
 	assert.Empty(t, res)
 	assert.EqualError(t, err, "missing default route")
 
 	routes = []netlink.Route{{LinkIndex: 2}}
-	res, err = getPublicInterface()
+	res, err = getPublicInterfaceImpl()
 	assert.Empty(t, res)
 	assert.EqualError(t, err, "default route missing interface: unknown")
 
 	routes = []netlink.Route{{LinkIndex: 5}}
-	res, err = getPublicInterface()
+	res, err = getPublicInterfaceImpl()
 	assert.Equal(t, "link name", res)
 	assert.NoError(t, err)
-}
-
-func rules() string {
-	return `-P POSTROUTING ACCEPT
--N DOCKER
--A POSTROUTING -s 11.0.0.0/8,10.0.0.0/8 -o eth0 -j MASQUERADE
--A POSTROUTING -s 10.0.3.0/24 ! -d 10.0.3.0/24 -j MASQUERADE`
 }

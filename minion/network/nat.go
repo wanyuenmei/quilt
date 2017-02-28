@@ -1,12 +1,8 @@
 package network
 
 import (
-	"bufio"
-	"bytes"
 	"errors"
 	"fmt"
-	"os/exec"
-	"regexp"
 	"strings"
 
 	"github.com/quilt/quilt/db"
@@ -14,17 +10,17 @@ import (
 	"github.com/quilt/quilt/stitch"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/coreos/go-iptables/iptables"
 	"github.com/vishvananda/netlink"
 )
 
-// This represents a rule in the iptables
-type ipRule struct {
-	cmd   string
-	chain string
-	opts  string // Must be sorted - see makeIPRule
+// IPTables is an interface to *iptables.IPTables.
+type IPTables interface {
+	Append(string, string, ...string) error
+	AppendUnique(string, string, ...string) error
+	Delete(string, string, ...string) error
+	List(string, string) ([]string, error)
 }
-
-type ipRuleSlice []ipRule
 
 func runNat(conn db.Conn) {
 	tables := []db.TableType{db.ContainerTable, db.ConnectionTable, db.MinionTable}
@@ -34,79 +30,96 @@ func runNat(conn db.Conn) {
 			continue
 		}
 
+		connections := conn.SelectFromConnection(nil)
 		containers := conn.SelectFromContainer(func(c db.Container) bool {
 			return c.IP != ""
 		})
-		updateNAT(containers, conn.SelectFromConnection(nil))
+
+		ipt, err := iptables.New()
+		if err != nil {
+			log.WithError(err).Error("Failed to get iptables handle")
+			continue
+		}
+
+		if err := updateNAT(ipt, containers, connections); err != nil {
+			log.WithError(err).Error("Failed to update NAT rules")
+		}
 	}
 }
 
-func updateNAT(containers []db.Container, connections []db.Connection) {
+// updateNAT sets up iptables rules of two categories:
+// "default rules" are general rules that must be in place for the PREROUTING
+// rules to work. When syncing "default rules" we don't remove any other rules
+// that may be in place.
+// The other type of rules are those in the PREROUTING chain of the nat table.
+// They are responsible for routing traffic to specific containers. They
+// overwrite any pre-existing or outdated rules.
+func updateNAT(ipt IPTables, containers []db.Container,
+	connections []db.Connection) error {
+
 	publicInterface, err := getPublicInterface()
 	if err != nil {
-		log.WithError(err).Error("Failed to get public interface")
-		return
+		return fmt.Errorf("get public interface: %s", err)
 	}
 
-	targetRules := generateTargetNatRules(publicInterface, containers, connections)
-	currRules, err := generateCurrentNatRules()
-	if err != nil {
-		log.WithError(err).Error("failed to get NAT rules")
-		return
+	if err := setDefaultRules(ipt, publicInterface); err != nil {
+		return err
 	}
 
-	_, rulesToDel, rulesToAdd := join.HashJoin(currRules, targetRules, nil, nil)
-
-	for _, rule := range rulesToDel {
-		if err := deleteNatRule(rule.(ipRule)); err != nil {
-			log.WithError(err).Error("failed to delete ip rule")
-			continue
-		}
-	}
-
-	for _, rule := range rulesToAdd {
-		if err := addNatRule(rule.(ipRule)); err != nil {
-			log.WithError(err).Error("failed to add ip rule")
-			continue
-		}
-	}
+	target := routingRules(publicInterface, containers, connections)
+	return syncChain(ipt, "nat", "PREROUTING", target)
 }
 
-func generateCurrentNatRules() (ipRuleSlice, error) {
-	stdout, _, err := shVerbose("iptables -t nat -S")
+func syncChain(ipt IPTables, table, chain string, target []string) error {
+	curr, err := getRules(ipt, table, chain)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get IP tables: %s", err)
+		return fmt.Errorf("iptables get: %s", err.Error())
 	}
 
-	scanner := bufio.NewScanner(bytes.NewReader(stdout))
-	var rules ipRuleSlice
+	_, rulesToDel, rulesToAdd := join.HashJoin(
+		join.StringSlice(curr), join.StringSlice(target), nil, nil)
 
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		rule, err := makeIPRule(line)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get current IP rules: %s", err)
+	for _, r := range rulesToDel {
+		ruleSpec := strings.Split(r.(string), " ")
+		if err := ipt.Delete(table, chain, ruleSpec...); err != nil {
+			return fmt.Errorf("iptables delete: %s", err)
 		}
-		rules = append(rules, rule)
 	}
 
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("scanner error while getting IP tables: %s", err)
+	for _, r := range rulesToAdd {
+		ruleSpec := strings.Split(r.(string), " ")
+		if err := ipt.Append(table, chain, ruleSpec...); err != nil {
+			return fmt.Errorf("iptables append: %s", err)
+		}
 	}
+
+	return nil
+}
+
+func getRules(ipt IPTables, table, chain string) (rules []string, err error) {
+	rawRules, err := ipt.List(table, chain)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, r := range rawRules {
+		if !strings.HasPrefix(r, "-A") {
+			continue
+		}
+
+		rSplit := strings.SplitN(r, " ", 3)
+		if len(rSplit) != 3 {
+			return nil, fmt.Errorf("malformed rule: %s", r)
+		}
+
+		rules = append(rules, rSplit[2])
+	}
+
 	return rules, nil
 }
 
-func generateTargetNatRules(publicInterface string, containers []db.Container,
-	connections []db.Connection) ipRuleSlice {
-	strRules := []string{
-		"-P PREROUTING ACCEPT",
-		"-P INPUT ACCEPT",
-		"-P OUTPUT ACCEPT",
-		"-P POSTROUTING ACCEPT",
-		fmt.Sprintf("-A POSTROUTING -s 10.0.0.0/8 -o %s -j MASQUERADE",
-			publicInterface),
-	}
+func routingRules(publicInterface string, containers []db.Container,
+	connections []db.Connection) (strRules []string) {
 
 	protocols := []string{"tcp", "udp"}
 	// Map each container IP to all ports on which it can receive packets
@@ -140,107 +153,52 @@ func generateTargetNatRules(publicInterface string, containers []db.Container,
 		for port := range ports {
 			for _, protocol := range protocols {
 				strRules = append(strRules, fmt.Sprintf(
-					"-A PREROUTING -i %[1]s "+
-						"-p %[2]s -m %[2]s --dport %[3]d -j "+
-						"DNAT --to-destination %[4]s:%[3]d",
+					"-i %[1]s -p %[2]s -m %[2]s "+
+						"--dport %[3]d -j DNAT "+
+						"--to-destination %[4]s:%[3]d",
 					publicInterface, protocol, port, ip))
 			}
 		}
 	}
 
-	var rules ipRuleSlice
-	for _, r := range strRules {
-		rule, err := makeIPRule(r)
-		if err != nil {
-			panic("malformed target NAT rule")
+	return strRules
+}
+
+type rule struct {
+	table    string
+	chain    string
+	ruleSpec []string
+}
+
+func setDefaultRules(ipt IPTables, publicInterface string) error {
+	rules := []rule{
+		{
+			table:    "nat",
+			chain:    "INPUT",
+			ruleSpec: []string{"-j", "ACCEPT"},
+		},
+		{
+			table:    "nat",
+			chain:    "OUTPUT",
+			ruleSpec: []string{"-j", "ACCEPT"},
+		},
+		{
+			table: "nat",
+			chain: "POSTROUTING",
+			ruleSpec: []string{"-s", "10.0.0.0/8", "-o", publicInterface,
+				"-j", "MASQUERADE"},
+		},
+	}
+	for _, r := range rules {
+		if err := ipt.AppendUnique(r.table, r.chain, r.ruleSpec...); err != nil {
+			return fmt.Errorf("iptables append: %s", err)
 		}
-		rules = append(rules, rule)
-	}
-	return rules
-}
-
-// Returns (Stdout, Stderr, error)
-//
-// It's critical that the error returned here is the exact error
-// from "os/exec" commands
-var shVerbose = func(format string, args ...interface{}) (
-	stdout, stderr []byte, err error) {
-	command := fmt.Sprintf(format, args...)
-	cmdArgs := strings.Split(command, " ")
-	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
-
-	var outBuf, errBuf bytes.Buffer
-	cmd.Stdout = &outBuf
-	cmd.Stderr = &errBuf
-
-	if err := cmd.Run(); err != nil {
-		return nil, nil, err
-	}
-
-	return outBuf.Bytes(), errBuf.Bytes(), nil
-}
-
-// makeIPRule takes an ip rule as formatted in the output of `iptables -S`,
-// and returns the corresponding ipRule. The output options will be in the same
-// order as output by `iptables -S`.
-func makeIPRule(inputRule string) (ipRule, error) {
-	cmdRE := regexp.MustCompile("(-[A-Z]+)\\s+([A-Z]+)")
-	cmdMatch := cmdRE.FindSubmatch([]byte(inputRule))
-	if len(cmdMatch) < 3 {
-		return ipRule{}, fmt.Errorf("missing iptables command")
-	}
-
-	var opts string
-	optsRE := regexp.MustCompile("-(?:[A-Z]+\\s+)+[A-Z]+\\s+(.*)")
-	optsMatch := optsRE.FindSubmatch([]byte(inputRule))
-
-	if len(optsMatch) > 2 {
-		return ipRule{}, fmt.Errorf("malformed iptables options")
-	}
-
-	if len(optsMatch) == 2 {
-		opts = strings.TrimSpace(string(optsMatch[1]))
-	}
-
-	rule := ipRule{
-		cmd:   strings.TrimSpace(string(cmdMatch[1])),
-		chain: strings.TrimSpace(string(cmdMatch[2])),
-		opts:  opts,
-	}
-	return rule, nil
-}
-
-func deleteNatRule(rule ipRule) error {
-	var command string
-	args := fmt.Sprintf("%s %s", rule.chain, rule.opts)
-	if rule.cmd == "-A" {
-		command = fmt.Sprintf("iptables -t nat -D %s", args)
-	} else if rule.cmd == "-N" {
-		// Delete new chains.
-		command = fmt.Sprintf("iptables -t nat -X %s", rule.chain)
-	}
-
-	stdout, _, err := shVerbose(command)
-	if err != nil {
-		return fmt.Errorf("failed to delete NAT rule %s: %s", command,
-			string(stdout))
 	}
 	return nil
 }
 
-func addNatRule(rule ipRule) error {
-	args := fmt.Sprintf("%s %s", rule.chain, rule.opts)
-	cmd := fmt.Sprintf("iptables -t nat -A %s", args)
-	_, _, err := shVerbose(cmd)
-
-	if err != nil {
-		return fmt.Errorf("failed to add NAT rule %s: %s", cmd, err)
-	}
-	return nil
-}
-
-// getPublicInterface gets the interface with the default route.
-func getPublicInterface() (string, error) {
+// getPublicInterfaceImpl gets the interface with the default route.
+func getPublicInterfaceImpl() (string, error) {
 	routes, err := routeList(nil, 0)
 	if err != nil {
 		return "", fmt.Errorf("route list: %s", err)
@@ -266,13 +224,6 @@ func getPublicInterface() (string, error) {
 	return link.Attrs().Name, err
 }
 
-func (iprs ipRuleSlice) Get(ii int) interface{} {
-	return iprs[ii]
-}
-
-func (iprs ipRuleSlice) Len() int {
-	return len(iprs)
-}
-
 var routeList = netlink.RouteList
 var linkByIndex = netlink.LinkByIndex
+var getPublicInterface = getPublicInterfaceImpl
