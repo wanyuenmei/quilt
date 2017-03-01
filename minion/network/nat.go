@@ -163,6 +163,11 @@ type rule struct {
 func setDefaultRules(ipt IPTables, publicInterface string) error {
 	rules := []rule{
 		{
+			table:    "filter",
+			chain:    "FORWARD",
+			ruleSpec: []string{"-j", "ACCEPT"},
+		},
+		{
 			table:    "nat",
 			chain:    "INPUT",
 			ruleSpec: []string{"-j", "ACCEPT"},
