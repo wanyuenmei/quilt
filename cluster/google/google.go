@@ -85,7 +85,7 @@ func New(namespace, zone string) (*Cluster, error) {
 	clst := Cluster{
 		gce:       gce,
 		projID:    "declarative-infrastructure",
-		ns:        namespace,
+		ns:        fmt.Sprintf("%s-%s", zone, namespace),
 		ipv4Range: "192.168.0.0/16",
 		zone:      zone,
 	}
