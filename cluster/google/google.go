@@ -69,7 +69,6 @@ type Cluster struct {
 	zone        string // gce boot region
 
 	ns string // cluster namespace
-	id int    // the id of the cluster, used externally
 }
 
 // New creates a GCE cluster.
