@@ -49,7 +49,7 @@ func TestSpecs() error {
 		"./quilt-tester/tests/15-bandwidth/bandwidth.js",
 		"./quilt-tester/tests/10-network/network.js",
 		"./quilt-tester/tests/outbound-public/outbound-public.js",
-		"./quilt-tester/tests/pub-facing/pub-facing.js",
+		"./quilt-tester/tests/inbound-public/inbound-public.js",
 		"./quilt-tester/tests/elasticsearch/elasticsearch.js",
 		"./quilt-tester/tests/build-dockerfile/build-dockerfile.js",
 

@@ -49,7 +49,7 @@ COV_SKIP= /api/client/mocks \
 	  /quilt-tester/tests/elasticsearch \
 	  /quilt-tester/tests/etcd \
 	  /quilt-tester/tests/build-dockerfile \
-	  /quilt-tester/tests/pub-facing \
+	  /quilt-tester/tests/inbound-public \
 	  /quilt-tester/tests/outbound-public \
 	  /quiltctl/testutils \
 	  /scripts \
