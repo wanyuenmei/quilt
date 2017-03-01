@@ -60,12 +60,13 @@ const (
 type Cluster struct {
 	gce client
 
-	projID    string // gce project ID
-	imgURL    string // gce url to the VM image
-	baseURL   string // gce project specific url prefix
-	ipv4Range string // ipv4 range of the internal network
-	intFW     string // gce internal firewall name
-	zone      string // gce boot region
+	projID      string // gce project ID
+	imgURL      string // gce url to the VM image
+	baseURL     string // gce project specific url prefix
+	networkName string // gce identifier for the network
+	ipv4Range   string // ipv4 range of the internal network
+	intFW       string // gce internal firewall name
+	zone        string // gce boot region
 
 	ns string // cluster namespace
 	id int    // the id of the cluster, used externally
@@ -93,6 +94,7 @@ func New(namespace, zone string) (*Cluster, error) {
 	clst.intFW = fmt.Sprintf("%s-internal", clst.ns)
 	clst.imgURL = fmt.Sprintf("%s/%s", computeBaseURL,
 		"ubuntu-os-cloud/global/images/ubuntu-1604-xenial-v20160921")
+	clst.networkName = fmt.Sprintf("%s/global/networks/%s", clst.baseURL, clst.ns)
 
 	if err := clst.netInit(); err != nil {
 		log.WithError(err).Debug("failed to start up gce network")
@@ -308,9 +310,7 @@ func (clst *Cluster) instanceNew(name string, size string,
 						Name: ephemeralIPName,
 					},
 				},
-				Network: fmt.Sprintf("%s/global/networks/%s",
-					clst.baseURL,
-					clst.ns),
+				Network: clst.networkName,
 			},
 		},
 		Metadata: &compute.Metadata{
@@ -328,7 +328,7 @@ func (clst *Cluster) instanceNew(name string, size string,
 
 func (clst *Cluster) parseACLs(fws []*compute.Firewall) (acls []acl.ACL) {
 	for _, fw := range fws {
-		if fw.Name == clst.intFW {
+		if fw.Network != clst.networkName || fw.Name == clst.intFW {
 			continue
 		}
 		for _, cidrIP := range fw.SourceRanges {
@@ -522,10 +522,8 @@ func (clst *Cluster) networkExists(name string) (bool, error) {
 func (clst *Cluster) insertFirewall(name, ports string, sourceRanges []string) (
 	*compute.Operation, error) {
 	firewall := &compute.Firewall{
-		Name: name,
-		Network: fmt.Sprintf("%s/global/networks/%s",
-			clst.baseURL,
-			clst.ns),
+		Name:    name,
+		Network: clst.networkName,
 		Allowed: []*compute.FirewallAllowed{
 			{
 				IPProtocol: "tcp",
@@ -558,10 +556,8 @@ func (clst *Cluster) firewallExists(name string) (bool, error) {
 func (clst *Cluster) firewallPatch(name string,
 	ips []string) (*compute.Operation, error) {
 	firewall := &compute.Firewall{
-		Name: name,
-		Network: fmt.Sprintf("%s/global/networks/%s",
-			clst.baseURL,
-			clst.ns),
+		Name:         name,
+		Network:      clst.networkName,
 		SourceRanges: ips,
 	}
 
