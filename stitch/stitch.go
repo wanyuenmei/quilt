@@ -233,17 +233,12 @@ func parseContext(vm *otto.Otto) (stc Stitch, err error) {
 func (stitch *Stitch) createPortRules() {
 	ports := make(map[int][]string)
 	for _, c := range stitch.Connections {
-		if c.From != PublicInternetLabel && c.To != PublicInternetLabel {
+		if c.From != PublicInternetLabel {
 			continue
 		}
 
-		target := c.From
-		if c.From == PublicInternetLabel {
-			target = c.To
-		}
-
 		min := c.MinPort
-		ports[min] = append(ports[min], target)
+		ports[min] = append(ports[min], c.To)
 	}
 
 	for _, labels := range ports {
