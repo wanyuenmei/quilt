@@ -17,15 +17,15 @@ import (
 )
 
 // The required bandwidth in Mb/s between two containers on different machines.
-const requiredBandwidthIntermachine = 50
+const requiredBandwidthIntermachine = 50.0
 
 // The required bandwidth in Mb/s between two containers on the same machine.
-const requiredBandwidthIntramachine = 2000
+const requiredBandwidthIntramachine = 2000.0
 
 type testResult struct {
 	client, server    db.Container
 	iperfOutput       string
-	bandwidthMbPerSec int
+	bandwidthMbPerSec float64
 	err               error
 }
 
@@ -98,14 +98,14 @@ func main() {
 
 		if res.bandwidthMbPerSec < required {
 			failed = true
-			fmt.Printf("FAILED, expected at least %d Mb/s, got %d Mb/s\n",
+			fmt.Printf("FAILED, expected at least %f Mb/s, got %f Mb/s\n",
 				required, res.bandwidthMbPerSec)
 			fmt.Println("iperf output follows:")
 			fmt.Println(res.iperfOutput)
 			continue
 		}
 
-		fmt.Printf("Average bandwidth: %d Mb/s\n\n", res.bandwidthMbPerSec)
+		fmt.Printf("Average bandwidth: %f Mb/s\n\n", res.bandwidthMbPerSec)
 	}
 
 	if !failed {
@@ -168,7 +168,7 @@ func test(client, server db.Container) testResult {
 	return res
 }
 
-func parseBandwidth(output string) (int, error) {
+func parseBandwidth(output string) (float64, error) {
 	// For reference, here are the final six lines of a successful iperf3 test's
 	// output:
 	// [ ID] Interval           Transfer     Bandwidth       Retr
@@ -196,11 +196,10 @@ func parseBandwidth(output string) (int, error) {
 			receiverResult)
 	}
 
-	bandwidth, err := strconv.ParseFloat(match[1], 32)
+	bandwidth, err := strconv.ParseFloat(match[1], 64)
 	if err != nil {
 		return -1, fmt.Errorf("parsing error: %s", err)
 	}
 
-	// Bandwidth is in Mbits/sec, so int overflow is extremely unlikely.
-	return int(bandwidth), nil
+	return bandwidth, nil
 }
