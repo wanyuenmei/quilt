@@ -47,7 +47,7 @@ func (gCmd *Get) Run() int {
 		if ottoError, ok := err.(*otto.Error); ok {
 			log.Error(ottoError.String())
 		}
-		log.Errorf("Error getting import `%s`.", gCmd.importPath)
+		log.WithError(err).Errorf("Error getting import `%s`.", gCmd.importPath)
 		return 1
 	}
 
