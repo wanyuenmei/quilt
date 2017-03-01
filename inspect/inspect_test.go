@@ -44,6 +44,7 @@ const testStitch = `var a = new Service("a", [new Container("ubuntu")]);
 	a.connect(22, b);
 	b.connect(22, c);`
 
+// The expected graphviz graph returned by inspect when run on `testStitch`.
 const expGraph = `strict digraph {
     subgraph cluster_0 {
         6ea7e010f11bb105bf84de4df7ddb1d06468f333;
