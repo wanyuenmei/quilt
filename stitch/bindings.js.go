@@ -8,6 +8,9 @@ var deployment = new Deployment({});
 // The label used by the QRI to denote connections with public internet.
 var publicInternetLabel = "public";
 
+// Global unique ID counter.
+var uniqueIDCounter = 0;
+
 // Overwrite the deployment object with a new one.
 function createDeployment(deploymentOpts) {
     deployment = new Deployment(deploymentOpts);
@@ -36,6 +39,11 @@ function omitSSHKey(key, value) {
     return value;
 }
 
+// Returns a globally unique integer ID.
+function uniqueID() {
+    return uniqueIDCounter++;
+}
+
 // key creates a string key for objects that have a _refID, namely Containers
 // and Machines.
 function key(obj) {
@@ -62,7 +70,7 @@ function setQuiltIDs(objs) {
     // If there are multiple references to the same object, there will be duplicate
     // refIDs.
     Object.keys(refIDs).forEach(function(k) {
-        refIDs[k] = _.uniq(refIDs[k]).sort();
+        refIDs[k] = _.sortBy(_.uniq(refIDs[k]), _.identity);
     });
 
     objs.forEach(function(obj) {
@@ -376,7 +384,7 @@ function boxRange(x) {
 }
 
 function Machine(optionalArgs) {
-    this._refID = _.uniqueId();
+    this._refID = uniqueID();
 
     this.provider = optionalArgs.provider || "";
     this.role = optionalArgs.role || "";
@@ -439,7 +447,7 @@ function Container(image, command) {
     // refID is used to distinguish deployments with multiple references to the
     // same container, and deployments with multiple containers with the exact
     // same attributes.
-    this._refID = _.uniqueId();
+    this._refID = uniqueID();
 
     this.image = image;
     if (typeof image === 'string') {

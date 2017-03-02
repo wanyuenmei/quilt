@@ -371,17 +371,26 @@ func TestLabel(t *testing.T) {
 		})
 
 	// Conflicting label names.
-	checkLabels(t, `deployment.deploy(new Service("foo", []));
-	deployment.deploy(new Service("foo", []));`,
+	// We need to generate a couple of dummy containers so that the two
+	// deployed containers have _refID's that are sorted differently lexicographically
+	// and numerically.
+	checkLabels(t, `for (var i = 0; i < 2; i++) new Container("image");
+	deployment.deploy(new Service("foo", [new Container("image")]));
+	for (var i = 0; i < 7; i++) new Container("image");
+	deployment.deploy(new Service("foo", [new Container("image")]));`,
 		map[string]Label{
 			"foo": {
-				Name:        "foo",
-				IDs:         []string{},
+				Name: "foo",
+				IDs: []string{
+					"475c40d6070969839ba0f88f7a9bd0cc7936aa30",
+				},
 				Annotations: []string{},
 			},
 			"foo2": {
-				Name:        "foo2",
-				IDs:         []string{},
+				Name: "foo2",
+				IDs: []string{
+					"3047630375a1621cb400811b795757a07de8e268",
+				},
 				Annotations: []string{},
 			},
 		})
