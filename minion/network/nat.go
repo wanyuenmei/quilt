@@ -47,13 +47,14 @@ func runNat(conn db.Conn) {
 	}
 }
 
-// updateNAT sets up iptables rules of two categories:
+// updateNAT sets up iptables rules of three categories:
 // "default rules" are general rules that must be in place for the PREROUTING
 // rules to work. When syncing "default rules" we don't remove any other rules
 // that may be in place.
-// The other type of rules are those in the PREROUTING chain of the nat table.
-// They are responsible for routing traffic to specific containers. They
-// overwrite any pre-existing or outdated rules.
+// "prerouting rules" are responsible for routing traffic to specific
+// containers. They overwrite any pre-existing or outdated rules.
+// "postrouting rules" are responsible for routing traffic from containers
+// to the public internet. They overwrite any pre-existing or outdated rules.
 func updateNAT(ipt IPTables, containers []db.Container,
 	connections []db.Connection) error {
 
@@ -62,12 +63,17 @@ func updateNAT(ipt IPTables, containers []db.Container,
 		return fmt.Errorf("get public interface: %s", err)
 	}
 
-	if err := setDefaultRules(ipt, publicInterface); err != nil {
+	if err := setDefaultRules(ipt); err != nil {
 		return err
 	}
 
-	target := routingRules(publicInterface, containers, connections)
-	return syncChain(ipt, "nat", "PREROUTING", target)
+	prerouting := preroutingRules(publicInterface, containers, connections)
+	if err := syncChain(ipt, "nat", "PREROUTING", prerouting); err != nil {
+		return err
+	}
+
+	postrouting := postroutingRules(publicInterface, containers, connections)
+	return syncChain(ipt, "nat", "POSTROUTING", postrouting)
 }
 
 func syncChain(ipt IPTables, table, chain string, target []string) error {
@@ -118,7 +124,7 @@ func getRules(ipt IPTables, table, chain string) (rules []string, err error) {
 	return rules, nil
 }
 
-func routingRules(publicInterface string, containers []db.Container,
+func preroutingRules(publicInterface string, containers []db.Container,
 	connections []db.Connection) (rules []string) {
 
 	// Map each label to all ports on which it can receive packets
@@ -154,13 +160,48 @@ func routingRules(publicInterface string, containers []db.Container,
 	return rules
 }
 
+func postroutingRules(publicInterface string, containers []db.Container,
+	connections []db.Connection) (rules []string) {
+
+	// Map each label to all ports on which it can send packets
+	// to the public internet.
+	portsToWeb := make(map[string]map[int]struct{})
+	for _, conn := range connections {
+		if conn.To != stitch.PublicInternetLabel {
+			continue
+		}
+
+		if _, ok := portsToWeb[conn.From]; !ok {
+			portsToWeb[conn.From] = make(map[int]struct{})
+		}
+
+		portsToWeb[conn.From][conn.MinPort] = struct{}{}
+	}
+
+	for _, dbc := range containers {
+		for _, label := range dbc.Labels {
+			for port := range portsToWeb[label] {
+				for _, protocol := range []string{"tcp", "udp"} {
+					rules = append(rules, fmt.Sprintf(
+						"-s %s/32 -p %s --dport %d -o %s "+
+							"-j MASQUERADE",
+						dbc.IP, protocol, port, publicInterface,
+					))
+				}
+			}
+		}
+	}
+
+	return rules
+}
+
 type rule struct {
 	table    string
 	chain    string
 	ruleSpec []string
 }
 
-func setDefaultRules(ipt IPTables, publicInterface string) error {
+func setDefaultRules(ipt IPTables) error {
 	rules := []rule{
 		{
 			table:    "filter",
@@ -176,12 +217,6 @@ func setDefaultRules(ipt IPTables, publicInterface string) error {
 			table:    "nat",
 			chain:    "OUTPUT",
 			ruleSpec: []string{"-j", "ACCEPT"},
-		},
-		{
-			table: "nat",
-			chain: "POSTROUTING",
-			ruleSpec: []string{"-s", "10.0.0.0/8", "-o", publicInterface,
-				"-j", "MASQUERADE"},
 		},
 	}
 	for _, r := range rules {

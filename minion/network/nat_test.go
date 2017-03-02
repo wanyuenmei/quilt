@@ -4,6 +4,7 @@ package network
 
 import (
 	"errors"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -36,9 +37,15 @@ func TestUpdateNATErrors(t *testing.T) {
 	ipt.On("AppendUnique", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	ipt.On("List", mock.Anything, mock.Anything).Return(nil, anErr)
 	assert.NotNil(t, updateNAT(ipt, nil, nil))
+
+	ipt = &mocks.IPTables{}
+	ipt.On("AppendUnique", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	ipt.On("List", "nat", "PREROUTING").Return(nil, nil)
+	ipt.On("List", "nat", "POSTROUTING").Return(nil, anErr)
+	assert.NotNil(t, updateNAT(ipt, nil, nil))
 }
 
-func TestRoutingRules(t *testing.T) {
+func TestPreroutingRules(t *testing.T) {
 	t.Parallel()
 
 	containers := []db.Container{
@@ -84,7 +91,7 @@ func TestRoutingRules(t *testing.T) {
 		},
 	}
 
-	actual := routingRules("eth0", containers, connections)
+	actual := preroutingRules("eth0", containers, connections)
 	exp := []string{
 		"-i eth0 -p tcp -m tcp --dport 80 -j DNAT --to-destination 8.8.8.8:80",
 		"-i eth0 -p udp -m udp --dport 80 -j DNAT --to-destination 8.8.8.8:80",
@@ -93,6 +100,72 @@ func TestRoutingRules(t *testing.T) {
 		"-i eth0 -p tcp -m tcp --dport 80 -j DNAT --to-destination 9.9.9.9:80",
 		"-i eth0 -p udp -m udp --dport 80 -j DNAT --to-destination 9.9.9.9:80",
 	}
+	assert.Equal(t, exp, actual)
+}
+
+func TestPostroutingRules(t *testing.T) {
+	t.Parallel()
+
+	containers := []db.Container{
+		{
+			IP:     "8.8.8.8",
+			Labels: []string{"red", "blue"},
+		},
+		{
+			IP:     "9.9.9.9",
+			Labels: []string{"purple"},
+		},
+		{
+			IP:     "10.10.10.10",
+			Labels: []string{"green"},
+		},
+	}
+
+	connections := []db.Connection{
+		{
+			From:    "red",
+			To:      stitch.PublicInternetLabel,
+			MinPort: 80,
+		},
+		{
+			From:    "blue",
+			To:      stitch.PublicInternetLabel,
+			MinPort: 81,
+		},
+		{
+			From:    "purple",
+			To:      stitch.PublicInternetLabel,
+			MinPort: 80,
+		},
+		{
+			From:    "purple",
+			To:      stitch.PublicInternetLabel,
+			MinPort: 81,
+		},
+		{
+			From:    stitch.PublicInternetLabel,
+			To:      "green",
+			MinPort: 80,
+		},
+		{
+			From:    "yellow",
+			To:      stitch.PublicInternetLabel,
+			MinPort: 80,
+		},
+	}
+
+	exp := []string{
+		"-s 8.8.8.8/32 -p tcp --dport 80 -o eth0 -j MASQUERADE",
+		"-s 8.8.8.8/32 -p tcp --dport 81 -o eth0 -j MASQUERADE",
+		"-s 8.8.8.8/32 -p udp --dport 80 -o eth0 -j MASQUERADE",
+		"-s 8.8.8.8/32 -p udp --dport 81 -o eth0 -j MASQUERADE",
+		"-s 9.9.9.9/32 -p tcp --dport 80 -o eth0 -j MASQUERADE",
+		"-s 9.9.9.9/32 -p tcp --dport 81 -o eth0 -j MASQUERADE",
+		"-s 9.9.9.9/32 -p udp --dport 80 -o eth0 -j MASQUERADE",
+		"-s 9.9.9.9/32 -p udp --dport 81 -o eth0 -j MASQUERADE",
+	}
+	actual := postroutingRules("eth0", containers, connections)
+	sort.Strings(actual)
 	assert.Equal(t, exp, actual)
 }
 
