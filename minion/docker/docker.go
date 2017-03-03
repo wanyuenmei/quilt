@@ -273,7 +273,7 @@ func (dk Client) Get(id string) (Container, error) {
 
 	env := make(map[string]string)
 	for _, value := range dkc.Config.Env {
-		e := strings.Split(value, "=")
+		e := strings.SplitN(value, "=", 2)
 		if len(e) > 1 {
 			env[e[0]] = e[1]
 		}

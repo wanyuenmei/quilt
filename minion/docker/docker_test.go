@@ -210,16 +210,33 @@ func TestRunEnv(t *testing.T) {
 	t.Parallel()
 	_, dk := NewMock()
 
-	env := map[string]string{
-		"a": "b",
-		"c": "d",
+	testEnvs := []map[string]string{
+		{
+			"a": "b",
+			"c": "d",
+		},
+		{
+			"a": "",
+		},
+		{
+			"a": "has=equal",
+		},
+		{
+			"a": "has=two=equals",
+		},
 	}
-	id, err := dk.Run(RunOptions{Name: "name1", Env: env})
-	assert.Nil(t, err)
 
-	container, err := dk.Get(id)
-	assert.Nil(t, err)
-	assert.Equal(t, env, container.Env)
+	for _, env := range testEnvs {
+		id, err := dk.Run(RunOptions{
+			Name: "name",
+			Env:  env,
+		})
+		assert.NoError(t, err)
+
+		actual, err := dk.Get(id)
+		assert.NoError(t, err)
+		assert.Equal(t, env, actual.Env)
+	}
 }
 
 func TestRunFilepathToContent(t *testing.T) {
