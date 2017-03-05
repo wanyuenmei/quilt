@@ -20,11 +20,11 @@ func TestUpdateTable(t *testing.T) {
 		return nil
 	}
 
-	table := updateTable(nil, []db.Label{{Label: "foo", IP: "1.2.3.4"}})
+	table := updateTable(nil, []db.Hostname{{Hostname: "foo", IP: "1.2.3.4"}})
 	assert.NotNil(t, table)
 	assert.Equal(t, map[string]net.IP{"foo.q.": net.IPv4(1, 2, 3, 4)}, table.records)
 
-	newTable := updateTable(table, []db.Label{{Label: "foo", IP: "5.6.7.8"}})
+	newTable := updateTable(table, []db.Hostname{{Hostname: "foo", IP: "5.6.7.8"}})
 	assert.NotNil(t, newTable)
 	assert.True(t, table == newTable) // Pointer Equality.
 	assert.Equal(t, map[string]net.IP{"foo.q.": net.IPv4(5, 6, 7, 8)},
@@ -109,28 +109,154 @@ func TestMakeTable(t *testing.T) {
 	assert.Equal(t, tbl.server.Net, "udp")
 }
 
-func TestLabelsToDNS(t *testing.T) {
+func TestHostnamesToDNS(t *testing.T) {
 	t.Parallel()
 
-	res := labelsToDNS([]db.Label{{
-		Label: "l1",
+	res := hostnamesToDNS([]db.Hostname{{
+		Hostname: "h1",
 	}, {
-		Label:        "l2",
-		IP:           "badIP",
-		ContainerIPs: []string{"another", "bad", "IP"},
+		Hostname: "h2",
+		IP:       "badIP",
 	}, {
-		Label: "l3",
-		IP:    "1.2.3.4",
+		Hostname: "h3",
+		IP:       "1.2.3.4",
 	}, {
-		Label:        "l4",
-		IP:           "5.6.7.8",
-		ContainerIPs: []string{"1.1.1.1", "2.2.2.2"},
+		Hostname: "h4",
+		IP:       "5.6.7.8",
+	}, {
+		Hostname: "1.h4",
+		IP:       "1.1.1.1",
+	}, {
+		Hostname: "2.h4",
+		IP:       "2.2.2.2",
 	}})
 	exp := map[string]net.IP{
-		"l3.q.":   net.IPv4(1, 2, 3, 4),
-		"l4.q.":   net.IPv4(5, 6, 7, 8),
-		"1.l4.q.": net.IPv4(1, 1, 1, 1),
-		"2.l4.q.": net.IPv4(2, 2, 2, 2),
+		"h3.q.":   net.IPv4(1, 2, 3, 4),
+		"h4.q.":   net.IPv4(5, 6, 7, 8),
+		"1.h4.q.": net.IPv4(1, 1, 1, 1),
+		"2.h4.q.": net.IPv4(2, 2, 2, 2),
 	}
 	assert.Equal(t, exp, res)
+}
+
+func TestSyncHostnamesWorker(t *testing.T) {
+	conn := db.New()
+	conn.Txn(db.AllTables...).Run(func(view db.Database) error {
+		dbl := view.InsertLabel()
+		dbl.Label = "label"
+		dbl.IP = "IP"
+		view.Commit(dbl)
+		return nil
+	})
+	syncHostnamesOnce(conn)
+	assert.Empty(t, conn.SelectFromHostname(nil))
+
+	conn.Txn(db.AllTables...).Run(func(view db.Database) error {
+		etcd := view.InsertEtcd()
+		etcd.Leader = true
+		view.Commit(etcd)
+		return nil
+	})
+	syncHostnamesOnce(conn)
+	assert.Equal(t, []db.Hostname{{ID: 3, Hostname: "label", IP: "IP"}},
+		conn.SelectFromHostname(nil))
+}
+
+type syncHostnameTest struct {
+	labels                     []db.Label
+	oldHostnames, expHostnames []db.Hostname
+}
+
+func TestSyncHostnames(t *testing.T) {
+	tests := []syncHostnameTest{
+		{
+			labels: []db.Label{
+				{
+					Label:        "foo",
+					IP:           "fooIP",
+					ContainerIPs: []string{"container", "ips"},
+				},
+			},
+			expHostnames: []db.Hostname{
+				{Hostname: "foo", IP: "fooIP"},
+				{Hostname: "1.foo", IP: "container"},
+				{Hostname: "2.foo", IP: "ips"},
+			},
+		},
+		{
+			labels: []db.Label{
+				{
+					Label:        "foo",
+					IP:           "fooIP",
+					ContainerIPs: []string{"container", "ips"},
+				},
+				{
+					Label: "bar",
+					IP:    "barIP",
+				},
+			},
+			oldHostnames: []db.Hostname{
+				{Hostname: "foo", IP: "fooIP"},
+				{Hostname: "1.foo", IP: "container"},
+				{Hostname: "2.foo", IP: "ips"},
+			},
+			expHostnames: []db.Hostname{
+				{Hostname: "foo", IP: "fooIP"},
+				{Hostname: "1.foo", IP: "container"},
+				{Hostname: "2.foo", IP: "ips"},
+				{Hostname: "bar", IP: "barIP"},
+			},
+		},
+		{
+			labels: []db.Label{
+				{
+					Label: "bar",
+					IP:    "barIP",
+				},
+			},
+			oldHostnames: []db.Hostname{
+				{Hostname: "foo", IP: "fooIP"},
+				{Hostname: "bar", IP: "barIP"},
+			},
+			expHostnames: []db.Hostname{
+				{Hostname: "bar", IP: "barIP"},
+			},
+		},
+	}
+	for _, test := range tests {
+		conn := db.New()
+		conn.Txn(db.AllTables...).Run(func(view db.Database) error {
+			etcd := view.InsertEtcd()
+			etcd.Leader = true
+			view.Commit(etcd)
+
+			for _, l := range test.labels {
+				dbl := view.InsertLabel()
+				l.ID = dbl.ID
+				view.Commit(l)
+			}
+			for _, h := range test.oldHostnames {
+				dbh := view.InsertHostname()
+				h.ID = dbh.ID
+				view.Commit(h)
+			}
+			return nil
+		})
+		syncHostnamesOnce(conn)
+		assertHostnamesEqual(t, test.expHostnames, conn.SelectFromHostname(nil))
+	}
+}
+
+func assertHostnamesEqual(t *testing.T, exp, actual []db.Hostname) {
+	assert.Len(t, actual, len(exp))
+	assert.Equal(t, toHostnameMap(exp), toHostnameMap(actual))
+}
+
+func toHostnameMap(hostnames []db.Hostname) map[db.Hostname]struct{} {
+	hostnameMap := map[db.Hostname]struct{}{}
+	for _, h := range hostnames {
+		h.ID = 0
+		hostnameMap[h] = struct{}{}
+	}
+	return hostnameMap
 }

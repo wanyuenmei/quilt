@@ -17,7 +17,7 @@ func Run(conn db.Conn) {
 	go runElection(conn, store)
 	go runConnection(conn, store)
 	go runContainer(conn, store)
-	go runLabel(conn, store)
+	go runHostname(conn, store)
 	runMinionSync(conn, store)
 }
 

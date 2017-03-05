@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/quilt/quilt/db"
+	"github.com/quilt/quilt/join"
 	"github.com/quilt/quilt/minion/ipdef"
 
 	log "github.com/Sirupsen/logrus"
@@ -25,12 +26,70 @@ type dnsTable struct {
 var table *dnsTable
 
 func runDNS(conn db.Conn) {
+	go syncHostnames(conn)
+	go serveDNS(conn)
+}
+
+func syncHostnames(conn db.Conn) {
 	for range conn.Trigger(db.LabelTable, db.MinionTable).C {
-		runDNSOnce(conn)
+		syncHostnamesOnce(conn)
 	}
 }
 
-func runDNSOnce(conn db.Conn) {
+func serveDNS(conn db.Conn) {
+	for range conn.Trigger(db.HostnameTable, db.MinionTable).C {
+		serveDNSOnce(conn)
+	}
+}
+
+func syncHostnamesOnce(conn db.Conn) {
+	if !conn.EtcdLeader() {
+		return
+	}
+
+	conn.Txn(db.LabelTable, db.HostnameTable).Run(joinHostnames)
+}
+
+func joinHostnames(view db.Database) error {
+	var target []db.Hostname
+	for _, label := range view.SelectFromLabel(nil) {
+		if label.IP != "" {
+			target = append(target, db.Hostname{
+				Hostname: label.Label,
+				IP:       label.IP,
+			})
+		}
+		for i, containerIP := range label.ContainerIPs {
+			target = append(target, db.Hostname{
+				Hostname: fmt.Sprintf("%d.%s", i+1, label.Label),
+				IP:       containerIP,
+			})
+		}
+	}
+
+	key := func(iface interface{}) interface{} {
+		h := iface.(db.Hostname)
+		h.ID = 0
+		return h
+	}
+	_, toAdd, toDel := join.HashJoin(db.HostnameSlice(target),
+		db.HostnameSlice(view.SelectFromHostname(nil)), key, key)
+
+	for _, intf := range toDel {
+		view.Remove(intf.(db.Hostname))
+	}
+
+	for _, intf := range toAdd {
+		tgt := intf.(db.Hostname)
+		dbHostname := view.InsertHostname()
+		tgt.ID = dbHostname.ID
+		view.Commit(tgt)
+	}
+
+	return nil
+}
+
+func serveDNSOnce(conn db.Conn) {
 	self, err := conn.MinionSelf()
 	if err != nil {
 		log.WithError(err).Debug("Failed to get self")
@@ -54,11 +113,11 @@ func runDNSOnce(conn db.Conn) {
 		return
 	}
 
-	table = updateTable(table, conn.SelectFromLabel(nil))
+	table = updateTable(table, conn.SelectFromHostname(nil))
 }
 
-func updateTable(table *dnsTable, labels []db.Label) *dnsTable {
-	records := labelsToDNS(labels)
+func updateTable(table *dnsTable, hostnames []db.Hostname) *dnsTable {
+	records := hostnamesToDNS(hostnames)
 	if table != nil {
 		table.recordLock.Lock()
 		table.records = records
@@ -176,17 +235,11 @@ func makeTable(records map[string]net.IP) *dnsTable {
 	return tbl
 }
 
-func labelsToDNS(labels []db.Label) map[string]net.IP {
+func hostnamesToDNS(hostnames []db.Hostname) map[string]net.IP {
 	records := map[string]net.IP{}
-	for _, label := range labels {
-		if ip := net.ParseIP(label.IP); ip != nil {
-			records[label.Label+".q."] = ip
-		}
-
-		for i, ipStr := range label.ContainerIPs {
-			if ip := net.ParseIP(ipStr); ip != nil {
-				records[fmt.Sprintf("%d.%s.q.", i+1, label.Label)] = ip
-			}
+	for _, hn := range hostnames {
+		if ip := net.ParseIP(hn.IP); ip != nil {
+			records[hn.Hostname+".q."] = ip
 		}
 	}
 	return records

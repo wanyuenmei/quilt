@@ -38,11 +38,15 @@ var ACLTable = TableType(reflect.TypeOf(ACL{}).String())
 // ImageTable is the type of the image table.
 var ImageTable = TableType(reflect.TypeOf(Image{}).String())
 
+// HostnameTable is the type of the Hostname table.
+var HostnameTable = TableType(reflect.TypeOf(Hostname{}).String())
+
 // AllTables is a slice of all the db TableTypes. It is used primarily for tests,
 // where there is no reason to put lots of thought into which tables a Transaction
 // should use.
 var AllTables = []TableType{ClusterTable, MachineTable, ContainerTable, MinionTable,
-	ConnectionTable, LabelTable, EtcdTable, PlacementTable, ACLTable, ImageTable}
+	ConnectionTable, LabelTable, EtcdTable, PlacementTable, ACLTable, ImageTable,
+	HostnameTable}
 
 type table struct {
 	rows map[int]row

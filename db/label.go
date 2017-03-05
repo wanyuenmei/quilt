@@ -2,7 +2,7 @@ package db
 
 // A Label row is created for each label specified by the policy.
 type Label struct {
-	ID int `json:"-"`
+	ID int
 
 	Label        string
 	IP           string
