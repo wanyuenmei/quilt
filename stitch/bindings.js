@@ -135,6 +135,7 @@ Deployment.prototype.vet = function() {
     });
 
     var dockerfiles = {};
+    var hostnames = {};
     this.services.forEach(function(service) {
         service.connections.forEach(function(conn) {
             var to = conn.to.name;
@@ -168,6 +169,13 @@ Deployment.prototype.vet = function() {
                 throw name + " has differing Dockerfiles";
             }
             dockerfiles[name] = c.image.dockerfile;
+
+            if (c.hostname !== undefined) {
+                if (hostnames[c.hostname]) {
+                    throw "hostname \"" + c.hostname + "\" used for multiple containers";
+                }
+                hostnames[c.hostname] = true;
+            }
         })
     });
 };
@@ -475,6 +483,17 @@ Container.prototype.withFiles = function(fileMap) {
     var cloned = this.clone();
     cloned.filepathToContent = fileMap;
     return cloned;
+};
+
+Container.prototype.setHostname = function(h) {
+    this.hostname = h;
+};
+
+Container.prototype.getHostname = function() {
+    if (this.hostname === undefined) {
+        throw new Error("no hostname");
+    }
+    return this.hostname + ".q";
 };
 
 var enough = { form: "enough" };

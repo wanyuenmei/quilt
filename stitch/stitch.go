@@ -63,6 +63,7 @@ type Container struct {
 	Command           []string          `json:",omitempty"`
 	Env               map[string]string `json:",omitempty"`
 	FilepathToContent map[string]string `json:",omitempty"`
+	Hostname          string            `json:",omitempty"`
 }
 
 // A Label represents a logical group of containers.

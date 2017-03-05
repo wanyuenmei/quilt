@@ -253,6 +253,35 @@ func TestContainer(t *testing.T) {
 	deployment.deploy(
 		new Service("baz", repl)
 	);`, expContainers)
+
+	expContainers = map[string]Container{
+		"475c40d6070969839ba0f88f7a9bd0cc7936aa30": {
+			ID: "475c40d6070969839ba0f88f7a9bd0cc7936aa30",
+			Image: Image{
+				Name: "image",
+			},
+			Command:           []string{},
+			Env:               map[string]string{},
+			FilepathToContent: map[string]string{},
+			Hostname:          "host",
+		},
+	}
+	checkContainers(t, `var c = new Container("image");
+	c.setHostname("host");
+	deployment.deploy(new Service("foo", [c]));`, expContainers)
+
+	checkJavascript(t, `(function() {
+		var c = new Container("image");
+		c.setHostname("host");
+		return c.getHostname();
+	})()`, "host.q")
+
+	checkError(t, `var a = new Container("image");
+	a.setHostname("host");
+	var b = new Container("image");
+	b.setHostname("host");
+	deployment.deploy(new Service("foo", [a, b]))`,
+		`hostname "host" used for multiple containers`)
 }
 
 func TestPlacement(t *testing.T) {

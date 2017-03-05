@@ -66,3 +66,16 @@ However, if the file content specified by `filepathToContent` changes, Quilt wil
 destroy the old container and boot a new one with the proper files.
 
 The files are installed with permissions `0644`.
+
+### Container.hostname()
+
+`Container.hostname` gets the container's hostname. If the container has no
+hostname, an error is thrown.
+
+### Container.setHostname()
+
+`Container.setHostname` gives the container a hostname at which the container
+can be reached.
+
+If multiple containers have the same hostname, an error is thrown during the
+vetting process.

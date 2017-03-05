@@ -24,6 +24,7 @@ type Container struct {
 	Labels            []string          `json:",omitempty"`
 	Env               map[string]string `json:",omitempty"`
 	FilepathToContent map[string]string `json:",omitempty"`
+	Hostname          string            `json:"-"`
 	Created           time.Time         `json:","`
 
 	Image      string `json:",omitempty"`
@@ -92,6 +93,10 @@ func (c Container) String() string {
 
 	if c.IP != "" {
 		tags = append(tags, fmt.Sprintf("IP: %s", c.IP))
+	}
+
+	if c.Hostname != "" {
+		tags = append(tags, fmt.Sprintf("Hostname: %s", c.Hostname))
 	}
 
 	if len(c.Labels) > 0 {

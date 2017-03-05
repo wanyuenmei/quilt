@@ -164,6 +164,7 @@ func TestSyncHostnamesWorker(t *testing.T) {
 
 type syncHostnameTest struct {
 	labels                     []db.Label
+	containers                 []db.Container
 	oldHostnames, expHostnames []db.Hostname
 }
 
@@ -222,6 +223,27 @@ func TestSyncHostnames(t *testing.T) {
 				{Hostname: "bar", IP: "barIP"},
 			},
 		},
+		{
+			labels: []db.Label{
+				{
+					Label: "foo",
+					IP:    "fooIP",
+				},
+			},
+			containers: []db.Container{
+				{
+					Hostname: "container",
+					IP:       "containerIP",
+				},
+			},
+			oldHostnames: []db.Hostname{
+				{Hostname: "foo", IP: "fooIP"},
+			},
+			expHostnames: []db.Hostname{
+				{Hostname: "foo", IP: "fooIP"},
+				{Hostname: "container", IP: "containerIP"},
+			},
+		},
 	}
 	for _, test := range tests {
 		conn := db.New()
@@ -239,6 +261,11 @@ func TestSyncHostnames(t *testing.T) {
 				dbh := view.InsertHostname()
 				h.ID = dbh.ID
 				view.Commit(h)
+			}
+			for _, c := range test.containers {
+				dbc := view.InsertContainer()
+				c.ID = dbc.ID
+				view.Commit(c)
 			}
 			return nil
 		})

@@ -104,6 +104,7 @@ func queryContainers(spec stitch.Stitch) []db.Container {
 			FilepathToContent: c.FilepathToContent,
 			Image:             c.Image.Name,
 			Dockerfile:        c.Image.Dockerfile,
+			Hostname:          c.Hostname,
 		}
 	}
 
@@ -152,6 +153,7 @@ func updateContainers(view db.Database, spec stitch.Stitch) {
 		dbc.Env = newc.Env
 		dbc.FilepathToContent = newc.FilepathToContent
 		dbc.StitchID = newc.StitchID
+		dbc.Hostname = newc.Hostname
 		view.Commit(dbc)
 	}
 }

@@ -146,6 +146,7 @@ func TestContainerString(t *testing.T) {
 		DockerID:   "DockerID",
 		Image:      "test/test",
 		Status:     "testing",
+		Hostname:   "hostname",
 		Command:    []string{"run", "/bin/sh"},
 		Labels:     []string{"label1"},
 		Env:        fakeMap,
@@ -153,8 +154,9 @@ func TestContainerString(t *testing.T) {
 	}
 
 	exp = "Container-1{run test/test run /bin/sh, DockerID: DockerID, " +
-		"Minion: Test, StitchID: 1, IP: 1.2.3.4, Labels: [label1], " +
-		"Env: map[test:tester], Status: testing, Created: " + fakeTimeString + "}"
+		"Minion: Test, StitchID: 1, IP: 1.2.3.4, Hostname: hostname, " +
+		"Labels: [label1], Env: map[test:tester], Status: testing, " +
+		"Created: " + fakeTimeString + "}"
 
 	assert.Equal(t, exp, c.String())
 }
