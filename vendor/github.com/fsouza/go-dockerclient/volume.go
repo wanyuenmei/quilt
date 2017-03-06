@@ -24,10 +24,10 @@ var (
 //
 // See https://goo.gl/FZA4BK for more details.
 type Volume struct {
-	Name       string            `json:"Name" yaml:"Name"`
-	Driver     string            `json:"Driver,omitempty" yaml:"Driver,omitempty"`
-	Mountpoint string            `json:"Mountpoint,omitempty" yaml:"Mountpoint,omitempty"`
-	Labels     map[string]string `json:"Labels,omitempty" yaml:"Labels,omitempty"`
+	Name       string            `json:"Name" yaml:"Name" toml:"Name"`
+	Driver     string            `json:"Driver,omitempty" yaml:"Driver,omitempty" toml:"Driver,omitempty"`
+	Mountpoint string            `json:"Mountpoint,omitempty" yaml:"Mountpoint,omitempty" toml:"Mountpoint,omitempty"`
+	Labels     map[string]string `json:"Labels,omitempty" yaml:"Labels,omitempty" toml:"Labels,omitempty"`
 }
 
 // ListVolumesOptions specify parameters to the ListVolumes function.
@@ -50,7 +50,7 @@ func (c *Client) ListVolumes(opts ListVolumesOptions) ([]Volume, error) {
 	}
 	defer resp.Body.Close()
 	m := make(map[string]interface{})
-	if err := json.NewDecoder(resp.Body).Decode(&m); err != nil {
+	if err = json.NewDecoder(resp.Body).Decode(&m); err != nil {
 		return nil, err
 	}
 	var volumes []Volume
@@ -76,6 +76,7 @@ type CreateVolumeOptions struct {
 	Driver     string
 	DriverOpts map[string]string
 	Context    context.Context `json:"-"`
+	Labels     map[string]string
 }
 
 // CreateVolume creates a volume on the server.
