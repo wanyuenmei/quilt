@@ -141,7 +141,7 @@ func dockerRun(dk docker.Client, iface interface{}) {
 		log.WithFields(log.Fields{
 			"error":     err,
 			"container": dbc,
-		}).WithError(err).Warning("Failed to run container", dbc)
+		}).WithError(err).Warning("Failed to run container")
 	}
 }
 
