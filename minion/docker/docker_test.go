@@ -187,11 +187,11 @@ func TestRun(t *testing.T) {
 	assert.Equal(t, 2, len(containers))
 	assert.True(t, containers[0].ID == id2 || containers[1].ID == id2)
 
-	md.InspectError = true
+	md.InspectContainerError = true
 	containers, err = dk.List(nil)
 	assert.Nil(t, err)
 	assert.Zero(t, len(containers))
-	md.InspectError = false
+	md.InspectContainerError = false
 
 	running, err := dk.IsRunning("no")
 	assert.Nil(t, err)
@@ -308,6 +308,47 @@ func TestRemove(t *testing.T) {
 	containers, err := dk.list(nil, true)
 	assert.Nil(t, err)
 	assert.Zero(t, len(containers))
+}
+
+func TestBuild(t *testing.T) {
+	t.Parallel()
+	md, dk := NewMock()
+
+	_, err := dk.Build("foo", "bar")
+	assert.NoError(t, err)
+	assert.Equal(t, map[BuildImageOptions]struct{}{
+		{
+			Name:       "foo",
+			Dockerfile: "bar",
+		}: {},
+	}, md.Built)
+
+	md.InspectImageError = true
+	_, err = dk.Build("foo", "bar")
+	assert.NotNil(t, err)
+
+	md.BuildError = true
+	_, err = dk.Build("foo", "bar")
+	assert.NotNil(t, err)
+}
+
+func TestPush(t *testing.T) {
+	t.Parallel()
+	md, dk := NewMock()
+
+	err := dk.Push("foo", "bar:baz")
+	assert.NoError(t, err)
+	assert.Equal(t, map[dkc.PushImageOptions]struct{}{
+		{
+			Registry: "foo",
+			Name:     "bar",
+			Tag:      "baz",
+		}: {},
+	}, md.Pushed)
+
+	md.PushError = true
+	err = dk.Push("foo", "bar")
+	assert.NotNil(t, err)
 }
 
 func cacheKeys(cache map[string]*cacheEntry) map[string]struct{} {

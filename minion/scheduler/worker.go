@@ -160,8 +160,14 @@ func syncJoinScore(left, right interface{}) int {
 	dbc := left.(db.Container)
 	dkc := right.(docker.Container)
 
-	if dbc.Image != dkc.Image || dbc.IP != dkc.IP ||
-		filesHash(dbc.FilepathToContent) != dkc.Labels[filesKey] {
+	if dbc.IP != dkc.IP || filesHash(dbc.FilepathToContent) != dkc.Labels[filesKey] {
+		return -1
+	}
+
+	compareIDs := dbc.ImageID != ""
+	namesMatch := dkc.Image == dbc.Image
+	idsMatch := dkc.ImageID == dbc.ImageID
+	if (compareIDs && !idsMatch) || (!compareIDs && !namesMatch) {
 		return -1
 	}
 

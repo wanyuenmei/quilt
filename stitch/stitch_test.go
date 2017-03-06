@@ -123,9 +123,11 @@ func TestContainer(t *testing.T) {
 	t.Parallel()
 
 	expContainers := map[string]Container{
-		"2b89d485b54fda3295e71d364ff3042043536614": {
-			ID:                "2b89d485b54fda3295e71d364ff3042043536614",
-			Image:             "image",
+		"3f0028780b8d9e35ae8c02e4e8b87e2ca55305db": {
+			ID: "3f0028780b8d9e35ae8c02e4e8b87e2ca55305db",
+			Image: Image{
+				Name: "image",
+			},
 			Command:           []string{"arg1", "arg2"},
 			Env:               map[string]string{"foo": "bar"},
 			FilepathToContent: map[string]string{"qux": "quuz"},
@@ -137,9 +139,11 @@ func TestContainer(t *testing.T) {
 	]));`, expContainers)
 
 	expContainers = map[string]Container{
-		"611d8d563001b8f929a81a2fb7f382e22ee0789c": {
-			ID:                "611d8d563001b8f929a81a2fb7f382e22ee0789c",
-			Image:             "image",
+		"45b5015830c4b8fb738d15c7a2822ee108c20bd8": {
+			ID: "45b5015830c4b8fb738d15c7a2822ee108c20bd8",
+			Image: Image{
+				Name: "image",
+			},
 			Command:           []string{"arg1", "arg2"},
 			Env:               map[string]string{},
 			FilepathToContent: map[string]string{},
@@ -150,9 +154,11 @@ func TestContainer(t *testing.T) {
 	]));`, expContainers)
 
 	expContainers = map[string]Container{
-		"be348e1eca54bdc63942e684c1a84d4f4ae7234f": {
-			ID:                "be348e1eca54bdc63942e684c1a84d4f4ae7234f",
-			Image:             "image",
+		"475c40d6070969839ba0f88f7a9bd0cc7936aa30": {
+			ID: "475c40d6070969839ba0f88f7a9bd0cc7936aa30",
+			Image: Image{
+				Name: "image",
+			},
 			Command:           []string{},
 			Env:               map[string]string{},
 			FilepathToContent: map[string]string{},
@@ -165,9 +171,11 @@ func TestContainer(t *testing.T) {
 	);`, expContainers)
 
 	expContainers = map[string]Container{
-		"af59d327bfcc7715c4a276d0a7d6e947529a148a": {
-			ID:                "af59d327bfcc7715c4a276d0a7d6e947529a148a",
-			Image:             "image",
+		"f54486d0f95b4cc478952a1a775a0699d8f5d959": {
+			ID: "f54486d0f95b4cc478952a1a775a0699d8f5d959",
+			Image: Image{
+				Name: "image",
+			},
 			Command:           []string{},
 			Env:               map[string]string{"foo": "bar"},
 			FilepathToContent: map[string]string{},
@@ -178,16 +186,20 @@ func TestContainer(t *testing.T) {
 	deployment.deploy(new Service("foo", [c]));`, expContainers)
 
 	expContainers = map[string]Container{
-		"4f52dabccd8858e66817937226d7a66bd286d6e4": {
-			ID:                "4f52dabccd8858e66817937226d7a66bd286d6e4",
-			Image:             "image",
+		"6563036090dd1a6d4a2fe2f56a31e61c2cdca8e2": {
+			ID: "6563036090dd1a6d4a2fe2f56a31e61c2cdca8e2",
+			Image: Image{
+				Name: "image",
+			},
 			Command:           []string{"arg"},
 			Env:               map[string]string{},
 			FilepathToContent: map[string]string{},
 		},
-		"5f0e1dc0a79adfe1fedacd9797ad5c97c7cc1e4f": {
-			ID:                "5f0e1dc0a79adfe1fedacd9797ad5c97c7cc1e4f",
-			Image:             "image",
+		"c6cea5bd411c6e5afac755c37517af89a2d03dbe": {
+			ID: "c6cea5bd411c6e5afac755c37517af89a2d03dbe",
+			Image: Image{
+				Name: "image",
+			},
 			Command:           []string{"arg"},
 			Env:               map[string]string{},
 			FilepathToContent: map[string]string{},
@@ -197,20 +209,39 @@ func TestContainer(t *testing.T) {
 		new Service("foo", new Container("image", ["arg"]).replicate(2))
 	);`, expContainers)
 
+	expContainers = map[string]Container{
+		"1dc23744f60b5c2fb7e3eafb3e8a7e3b085b9b9c": {
+			ID: "1dc23744f60b5c2fb7e3eafb3e8a7e3b085b9b9c",
+			Image: Image{
+				Name:       "name",
+				Dockerfile: "dockerfile",
+			},
+			Command:           []string{},
+			Env:               map[string]string{},
+			FilepathToContent: map[string]string{},
+		},
+	}
+	checkContainers(t, `var c = new Container(new Image("name", "dockerfile"));
+	deployment.deploy(new Service("foo", [c]));`, expContainers)
+
 	// Test changing attributes of replicated container.
 	expContainers = map[string]Container{
-		"8e2b87f243e27f85a40bc6a49be54db0ffcd2e8c": {
-			ID:      "8e2b87f243e27f85a40bc6a49be54db0ffcd2e8c",
-			Image:   "image",
+		"c3371b4dec2600f20cd8cc5b59bc116dedcbea92": {
+			ID: "c3371b4dec2600f20cd8cc5b59bc116dedcbea92",
+			Image: Image{
+				Name: "image",
+			},
 			Command: []string{"arg", "changed"},
 			Env: map[string]string{
 				"foo": "bar",
 			},
 			FilepathToContent: map[string]string{},
 		},
-		"5f0e1dc0a79adfe1fedacd9797ad5c97c7cc1e4f": {
-			ID:                "5f0e1dc0a79adfe1fedacd9797ad5c97c7cc1e4f",
-			Image:             "image",
+		"6563036090dd1a6d4a2fe2f56a31e61c2cdca8e2": {
+			ID: "6563036090dd1a6d4a2fe2f56a31e61c2cdca8e2",
+			Image: Image{
+				Name: "image",
+			},
 			Command:           []string{"arg"},
 			Env:               map[string]string{},
 			FilepathToContent: map[string]string{},
@@ -287,7 +318,7 @@ func TestLabel(t *testing.T) {
 			"web_tier": {
 				Name: "web_tier",
 				IDs: []string{
-					"49b9e1c9b36065ef52c55f1759f2f46e38f56abe",
+					"c47b5770b59a4459519ba2b3ae3cd7a1598fbd8d",
 				},
 				Annotations: []string{},
 			},
@@ -303,8 +334,8 @@ func TestLabel(t *testing.T) {
 			"web_tier": {
 				Name: "web_tier",
 				IDs: []string{
-					"49b9e1c9b36065ef52c55f1759f2f46e38f56abe",
-					"61fd7361db899e46f5b6673101e029ed8357a44e",
+					"c47b5770b59a4459519ba2b3ae3cd7a1598fbd8d",
+					"6044e40ba6e4d97be45ca290b993ef2f368c7bb1",
 				},
 				Annotations: []string{},
 			},
@@ -426,6 +457,24 @@ func TestVet(t *testing.T) {
 		deployment.deploy([foo]);
 	`, "foo has a floating IP and multiple containers. This is "+
 		"not yet supported.")
+
+	checkError(t, `
+		deployment.deploy(new Service("foo",
+			[new Container(new Image("img", "dk"))]
+		));
+		deployment.deploy(new Service("foo",
+			[new Container(new Image("img", "dk"))]
+		));
+	`, "")
+
+	checkError(t, `
+		deployment.deploy(new Service("foo",
+			[new Container(new Image("img", "dk"))]
+		));
+		deployment.deploy(new Service("foo",
+			[new Container(new Image("img", "dk2"))]
+		));
+	`, "img has differing Dockerfiles")
 }
 
 func TestCustomDeploy(t *testing.T) {
@@ -445,14 +494,14 @@ func TestCustomDeploy(t *testing.T) {
 			"web_tier": {
 				Name: "web_tier",
 				IDs: []string{
-					"49b9e1c9b36065ef52c55f1759f2f46e38f56abe",
+					"c47b5770b59a4459519ba2b3ae3cd7a1598fbd8d",
 				},
 				Annotations: []string{},
 			},
 			"web_tier2": {
 				Name: "web_tier2",
 				IDs: []string{
-					"61fd7361db899e46f5b6673101e029ed8357a44e",
+					"6044e40ba6e4d97be45ca290b993ef2f368c7bb1",
 				},
 				Annotations: []string{},
 			},

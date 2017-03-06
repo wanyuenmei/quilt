@@ -64,8 +64,9 @@ func TestMaster(t *testing.T) {
 	ctx.run()
 
 	exp := map[string][]string{
-		Etcd:  etcdArgsMaster(ip, etcdIPs),
-		Ovsdb: {"ovsdb-server"},
+		Etcd:     etcdArgsMaster(ip, etcdIPs),
+		Ovsdb:    {"ovsdb-server"},
+		Registry: nil,
 	}
 	if !reflect.DeepEqual(ctx.fd.running(), exp) {
 		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running()),
@@ -96,6 +97,7 @@ func TestMaster(t *testing.T) {
 		Etcd:      etcdArgsMaster(ip, etcdIPs),
 		Ovsdb:     {"ovsdb-server"},
 		Ovnnorthd: {"ovn-northd"},
+		Registry:  nil,
 	}
 	if !reflect.DeepEqual(ctx.fd.running(), exp) {
 		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running()),
@@ -115,8 +117,9 @@ func TestMaster(t *testing.T) {
 	ctx.run()
 
 	exp = map[string][]string{
-		Etcd:  etcdArgsMaster(ip, etcdIPs),
-		Ovsdb: {"ovsdb-server"},
+		Etcd:     etcdArgsMaster(ip, etcdIPs),
+		Ovsdb:    {"ovsdb-server"},
+		Registry: nil,
 	}
 	if !reflect.DeepEqual(ctx.fd.running(), exp) {
 		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running()),
@@ -231,8 +234,9 @@ func TestChange(t *testing.T) {
 	ctx.run()
 
 	exp = map[string][]string{
-		Etcd:  etcdArgsMaster(ip, etcdIPs),
-		Ovsdb: {"ovsdb-server"},
+		Etcd:     etcdArgsMaster(ip, etcdIPs),
+		Ovsdb:    {"ovsdb-server"},
+		Registry: nil,
 	}
 	if !reflect.DeepEqual(ctx.fd.running(), exp) {
 		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running()),
@@ -284,8 +288,9 @@ func TestEtcdAdd(t *testing.T) {
 	ctx.run()
 
 	exp := map[string][]string{
-		Etcd:  etcdArgsMaster(ip, etcdIPs),
-		Ovsdb: {"ovsdb-server"},
+		Etcd:     etcdArgsMaster(ip, etcdIPs),
+		Ovsdb:    {"ovsdb-server"},
+		Registry: nil,
 	}
 	if !reflect.DeepEqual(ctx.fd.running(), exp) {
 		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running()),
@@ -306,8 +311,9 @@ func TestEtcdAdd(t *testing.T) {
 	ctx.run()
 
 	exp = map[string][]string{
-		Etcd:  etcdArgsMaster(ip, etcdIPs),
-		Ovsdb: {"ovsdb-server"},
+		Etcd:     etcdArgsMaster(ip, etcdIPs),
+		Ovsdb:    {"ovsdb-server"},
+		Registry: nil,
 	}
 	if !reflect.DeepEqual(ctx.fd.running(), exp) {
 		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running()),
@@ -332,8 +338,9 @@ func TestEtcdRemove(t *testing.T) {
 	ctx.run()
 
 	exp := map[string][]string{
-		Etcd:  etcdArgsMaster(ip, etcdIPs),
-		Ovsdb: {"ovsdb-server"},
+		Etcd:     etcdArgsMaster(ip, etcdIPs),
+		Ovsdb:    {"ovsdb-server"},
+		Registry: nil,
 	}
 	if !reflect.DeepEqual(ctx.fd.running(), exp) {
 		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running()),
@@ -354,8 +361,9 @@ func TestEtcdRemove(t *testing.T) {
 	ctx.run()
 
 	exp = map[string][]string{
-		Etcd:  etcdArgsMaster(ip, etcdIPs),
-		Ovsdb: {"ovsdb-server"},
+		Etcd:     etcdArgsMaster(ip, etcdIPs),
+		Ovsdb:    {"ovsdb-server"},
+		Registry: nil,
 	}
 	if !reflect.DeepEqual(ctx.fd.running(), exp) {
 		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running()),

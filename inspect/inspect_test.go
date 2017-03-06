@@ -47,13 +47,13 @@ const testStitch = `var a = new Service("a", [new Container("ubuntu")]);
 // The expected graphviz graph returned by inspect when run on `testStitch`.
 const expGraph = `strict digraph {
     subgraph cluster_0 {
-        33595ff0350bdd0e78b1fefb3f5b666ea661a5b8;
-        6658237d394668acaef0d3211949e6cefcbd7846;
-        99301a9ea4b177ba36eba250cc3c55d990dc6dba;
+        3c1a5738512a43c3122608ab32dbf9f84a14e5f9;
+        54be1283e837c6e40ac79709aca8cdb8ec5f31f5;
+        cb129f8a27df770b1dac70955c227a57bc5c4af6;
         public;
     }
-    33595ff0350bdd0e78b1fefb3f5b666ea661a5b8 -> 99301a9ea4b177ba36eba250cc3c55d990dc6dba
-    99301a9ea4b177ba36eba250cc3c55d990dc6dba -> 6658237d394668acaef0d3211949e6cefcbd7846
+    3c1a5738512a43c3122608ab32dbf9f84a14e5f9 -> cb129f8a27df770b1dac70955c227a57bc5c4af6
+    54be1283e837c6e40ac79709aca8cdb8ec5f31f5 -> 3c1a5738512a43c3122608ab32dbf9f84a14e5f9
 }`
 
 func isGraphEqual(a, b string) bool {

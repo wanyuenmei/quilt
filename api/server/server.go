@@ -99,9 +99,9 @@ func (s server) Deploy(cts context.Context, deployReq *pb.DeployRequest) (
 	}
 
 	for _, c := range stitch.Containers {
-		if _, err := reference.ParseAnyReference(c.Image); err != nil {
+		if _, err := reference.ParseAnyReference(c.Image.Name); err != nil {
 			return &pb.DeployReply{}, fmt.Errorf("could not parse "+
-				"container image %s: %s", c.Image, err.Error())
+				"container image %s: %s", c.Image.Name, err.Error())
 		}
 	}
 

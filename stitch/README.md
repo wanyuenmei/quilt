@@ -4,6 +4,43 @@ Documentation for quilt.js
 ## Container
 The Container object represents a container to be deployed.
 
+### Specifying the Image
+The first argument of the `Container` constructor is the image that container
+should run.
+
+#### Repository Link
+If a `string` is supplied, the image at that repository is used.
+
+#### Dockerfile
+Instead of supplying a link to a pre-built image, Quilt also support building
+images in the cluster. When specifying a `Dockerfile` to be built, an `Image`
+object must be passed to the `Container` constructor.
+
+For example,
+```
+new Container(new Image("my-image-name",
+  "FROM nginx\n" +
+  "RUN cd /web_root && git clone github.com/my/web_repo"
+))
+```
+would deploy an image called `my-image-name` built on top of the `nginx` image,
+with the `github.com/my/web_repo` repository cloned into `/web_root`.
+
+If the Dockerfile is saved as a file, it can simply be `read` in:
+```
+new Container(new Image("my-image-name", read("./Dockerfile")))
+```
+
+If a user runs a spec that uses a custom image, then runs another spec that
+changes the contents of that image's Dockerfile, the image is re-built and
+all containers referencing that Dockerfile are restarted with the new image.
+
+If multiple containers specify the same Dockerfile, the same image is reused for
+all containers.
+
+If two images with the same name but different Dockerfiles are referenced, an
+error is thrown.
+
 ### Container.filepathToContent
 
 `Container.filepathToContent` defines text files to be installed on the container

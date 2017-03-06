@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/quilt/quilt/db"
+	"github.com/quilt/quilt/join"
 	"github.com/quilt/quilt/stitch"
 	"github.com/stretchr/testify/assert"
 )
@@ -333,6 +334,108 @@ func TestPlacementTxn(t *testing.T) {
 			TargetLabel: "baz",
 			Exclusive:   true,
 			OtherLabel:  "bar",
+		},
+	)
+}
+
+func checkImage(t *testing.T, conn db.Conn, spec string, exp ...db.Image) {
+	depl, err := stitch.FromJavascript(spec, stitch.DefaultImportGetter)
+	assert.NoError(t, err)
+
+	var images []db.Image
+	conn.Txn(db.AllTables...).Run(func(view db.Database) error {
+		updatePolicy(view, depl.String())
+		images = view.SelectFromImage(nil)
+		return nil
+	})
+
+	key := func(intf interface{}) interface{} {
+		im := intf.(db.Image)
+		im.ID = 0
+		return im
+	}
+	_, lonelyLeft, lonelyRight := join.HashJoin(
+		db.ImageSlice(images), db.ImageSlice(exp), key, key)
+	assert.Empty(t, lonelyLeft, "unexpected images")
+	assert.Empty(t, lonelyRight, "missing images")
+}
+
+func TestImageTxn(t *testing.T) {
+	t.Parallel()
+
+	// Regular image that isn't built by Quilt.
+	checkImage(t, db.New(),
+		`deployment.deploy(
+			new Service("foo", [
+				new Container("image")
+			])
+		);`,
+	)
+
+	conn := db.New()
+	checkImage(t, conn,
+		`deployment.deploy([
+			new Service("foo", [
+				new Container(
+					new Image("a", "1")
+				)
+			]),
+			new Service("foo", [
+				new Container(
+					new Image("a", "1")
+				)
+			]),
+			new Service("foo", [
+				new Container(
+					new Image("b", "1")
+				)
+			]),
+			new Service("foo", [
+				new Container(
+					new Image("c")
+				)
+			]),
+		]);`,
+		db.Image{
+			Name:       "a",
+			Dockerfile: "1",
+		},
+		db.Image{
+			Name:       "b",
+			Dockerfile: "1",
+		},
+	)
+
+	// Ensure existing images are preserved.
+	conn.Txn(db.ImageTable).Run(func(view db.Database) error {
+		img := view.SelectFromImage(func(img db.Image) bool {
+			return img.Name == "a"
+		})[0]
+		img.DockerID = "id"
+		view.Commit(img)
+		return nil
+	})
+	checkImage(t, conn,
+		`deployment.deploy([
+			new Service("foo", [
+				new Container(
+					new Image("a", "1")
+				)
+			]),
+			new Service("foo", [
+				new Container(
+					new Image("b", "2")
+				)
+			]),
+		]);`,
+		db.Image{
+			Name:       "a",
+			Dockerfile: "1",
+			DockerID:   "id",
+		},
+		db.Image{
+			Name:       "b",
+			Dockerfile: "2",
 		},
 	)
 }

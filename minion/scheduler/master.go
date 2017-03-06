@@ -23,7 +23,7 @@ type context struct {
 }
 
 func runMaster(conn db.Conn) {
-	conn.Txn(db.ContainerTable, db.EtcdTable, db.MinionTable,
+	conn.Txn(db.ContainerTable, db.EtcdTable, db.MinionTable, db.ImageTable,
 		db.PlacementTable).Run(func(view db.Database) error {
 
 		if view.EtcdLeader() {
@@ -37,8 +37,9 @@ func placeContainers(view db.Database) {
 	constraints := view.SelectFromPlacement(nil)
 	containers := view.SelectFromContainer(nil)
 	minions := view.SelectFromMinion(nil)
+	images := view.SelectFromImage(nil)
 
-	ctx := makeContext(minions, constraints, containers)
+	ctx := makeContext(minions, constraints, containers, images)
 	cleanupPlacements(ctx)
 	placeUnassigned(ctx)
 
@@ -191,7 +192,7 @@ func validPlacement(constraints []db.Placement, m minion, peers []*db.Container,
 }
 
 func makeContext(minions []db.Minion, constraints []db.Placement,
-	containers []db.Container) *context {
+	containers []db.Container, images []db.Image) *context {
 
 	ctx := context{}
 	ctx.constraints = constraints
@@ -207,12 +208,38 @@ func makeContext(minions []db.Minion, constraints []db.Placement,
 		ipMinion[m.PrivateIP] = &m
 	}
 
+	builtImages := map[db.Image]db.Image{}
+	for _, img := range images {
+		if img.DockerID != "" {
+			builtImages[db.Image{
+				Name:       img.Name,
+				Dockerfile: img.Dockerfile,
+			}] = img
+		}
+	}
+
 	for i := range containers {
 		dbc := &containers[i]
 		minion := ipMinion[dbc.Minion]
 		if minion == nil && dbc.Minion != "" {
 			dbc.Minion = ""
 			ctx.changed = append(ctx.changed, dbc)
+		}
+
+		// If the container is built by Quilt, only schedule it if the image
+		// has been built.
+		if dbc.Dockerfile != "" {
+			img, ok := builtImages[db.Image{
+				Name:       dbc.Image,
+				Dockerfile: dbc.Dockerfile,
+			}]
+			if !ok {
+				continue
+			}
+			if dbc.ImageID != img.DockerID {
+				dbc.ImageID = img.DockerID
+				ctx.changed = append(ctx.changed, dbc)
+			}
 		}
 
 		if dbc.Minion == "" {

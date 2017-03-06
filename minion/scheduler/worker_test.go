@@ -212,6 +212,17 @@ func TestSyncJoinScore(t *testing.T) {
 	dbc.FilepathToContent = map[string]string{"c": "d"}
 	score = syncJoinScore(dbc, dkc)
 	assert.Zero(t, score)
+
+	dkc.ImageID = "id"
+	dbc.Command = dkc.Args
+	dbc.Env = dkc.Env
+	dbc.ImageID = dkc.ImageID
+	score = syncJoinScore(dbc, dkc)
+	assert.Zero(t, score)
+
+	dbc.ImageID = "wrong"
+	score = syncJoinScore(dbc, dkc)
+	assert.Equal(t, -1, score)
 }
 
 func TestOpenFlowContainers(t *testing.T) {

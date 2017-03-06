@@ -31,6 +31,9 @@ const (
 
 	// Ovsvswitchd is the name of the ovs-vswitchd container.
 	Ovsvswitchd = "ovs-vswitchd"
+
+	// Registry is the name of the registry container.
+	Registry = "registry"
 )
 
 const ovsImage = "quilt/ovs"
@@ -45,6 +48,7 @@ var images = map[string]string{
 	Ovnnorthd:     ovsImage,
 	Ovsdb:         ovsImage,
 	Ovsvswitchd:   ovsImage,
+	Registry:      "registry:2",
 }
 
 const etcdHeartbeatInterval = "500"
@@ -189,6 +193,7 @@ func (sv *supervisor) updateMaster(IP string, etcdIPs []string, leader bool) {
 		return
 	}
 
+	sv.run(Registry)
 	sv.run(Etcd, fmt.Sprintf("--name=master-%s", IP),
 		fmt.Sprintf("--initial-cluster=%s", initialClusterString(etcdIPs)),
 		fmt.Sprintf("--advertise-client-urls=http://%s:2379", IP),

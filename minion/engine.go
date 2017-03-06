@@ -17,6 +17,7 @@ func updatePolicy(view db.Database, spec string) {
 		return
 	}
 
+	updateImages(view, compiled)
 	updateContainers(view, compiled)
 	updatePlacements(view, compiled)
 	updateConnections(view, compiled)
@@ -99,9 +100,10 @@ func queryContainers(spec stitch.Stitch) []db.Container {
 		containers[c.ID] = &db.Container{
 			StitchID:          c.ID,
 			Command:           c.Command,
-			Image:             c.Image,
 			Env:               c.Env,
 			FilepathToContent: c.FilepathToContent,
+			Image:             c.Image.Name,
+			Dockerfile:        c.Image.Dockerfile,
 		}
 	}
 
@@ -146,9 +148,58 @@ func updateContainers(view db.Database, spec stitch.Stitch) {
 
 		dbc.Command = newc.Command
 		dbc.Image = newc.Image
+		dbc.Dockerfile = newc.Dockerfile
 		dbc.Env = newc.Env
 		dbc.FilepathToContent = newc.FilepathToContent
 		dbc.StitchID = newc.StitchID
 		view.Commit(dbc)
 	}
+}
+
+func updateImages(view db.Database, spec stitch.Stitch) {
+	dbImageKey := func(intf interface{}) interface{} {
+		return stitch.Image{
+			Name:       intf.(db.Image).Name,
+			Dockerfile: intf.(db.Image).Dockerfile,
+		}
+	}
+
+	specImages := stitchImageSlice(queryImages(spec))
+	dbImages := db.ImageSlice(view.SelectFromImage(nil))
+	_, toAdd, toRemove := join.HashJoin(specImages, dbImages, nil, dbImageKey)
+
+	for _, intf := range toAdd {
+		im := view.InsertImage()
+		im.Name = intf.(stitch.Image).Name
+		im.Dockerfile = intf.(stitch.Image).Dockerfile
+		view.Commit(im)
+	}
+
+	for _, row := range toRemove {
+		view.Remove(row.(db.Image))
+	}
+}
+
+func queryImages(spec stitch.Stitch) (images []stitch.Image) {
+	addedImages := map[stitch.Image]struct{}{}
+	for _, c := range spec.Containers {
+		_, addedImage := addedImages[c.Image]
+		if c.Image.Dockerfile == "" || addedImage {
+			continue
+		}
+
+		images = append(images, c.Image)
+		addedImages[c.Image] = struct{}{}
+	}
+	return images
+}
+
+type stitchImageSlice []stitch.Image
+
+func (slc stitchImageSlice) Get(ii int) interface{} {
+	return slc[ii]
+}
+
+func (slc stitchImageSlice) Len() int {
+	return len(slc)
 }

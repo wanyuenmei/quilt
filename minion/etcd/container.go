@@ -39,11 +39,23 @@ func runContainerOnce(conn db.Conn, store Store) error {
 }
 
 func updateLeader(conn db.Conn, store Store, etcdStr string) error {
+	self, err := conn.MinionSelf()
+	if err != nil {
+		return err
+	}
+	myIP := self.PrivateIP
+
 	dbcs := conn.SelectFromContainer(func(dbc db.Container) bool {
 		return dbc.Minion != "" && dbc.IP != ""
 	})
+	for i := range dbcs {
+		if dbcs[i].Dockerfile == "" {
+			continue
+		}
+		dbcs[i].Image = myIP + ":5000/" + dbcs[i].Image
+	}
 
-	err := writeEtcdSlice(store, containerPath, etcdStr, db.ContainerSlice(dbcs))
+	err = writeEtcdSlice(store, containerPath, etcdStr, db.ContainerSlice(dbcs))
 	if err != nil {
 		return fmt.Errorf("etcd write error: %s", err)
 	}
@@ -80,6 +92,7 @@ func joinContainers(view db.Database, etcdDBCs []db.Container) {
 			IP                string
 			StitchID          string
 			Image             string
+			ImageID           string
 			Command           string
 			Env               string
 			FilepathToContent string
@@ -87,6 +100,7 @@ func joinContainers(view db.Database, etcdDBCs []db.Container) {
 			IP:                dbc.IP,
 			StitchID:          dbc.StitchID,
 			Image:             dbc.Image,
+			ImageID:           dbc.ImageID,
 			Command:           fmt.Sprintf("%v", dbc.Command),
 			Env:               util.MapAsString(dbc.Env),
 			FilepathToContent: util.MapAsString(dbc.FilepathToContent),
@@ -114,6 +128,7 @@ func joinContainers(view db.Database, etcdDBCs []db.Container) {
 		dbc.Minion = edbc.Minion
 		dbc.StitchID = edbc.StitchID
 		dbc.Image = edbc.Image
+		dbc.ImageID = edbc.ImageID
 		dbc.Command = edbc.Command
 		dbc.Labels = edbc.Labels
 		dbc.Env = edbc.Env

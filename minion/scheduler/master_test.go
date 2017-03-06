@@ -73,7 +73,7 @@ func TestCleanup(t *testing.T) {
 		},
 	}
 
-	ctx := makeContext(minions, placements, containers)
+	ctx := makeContext(minions, placements, containers, nil)
 	cleanupPlacements(ctx)
 
 	expMinions := []*minion{
@@ -163,7 +163,7 @@ func TestCleanupLabelRule(t *testing.T) {
 		},
 	}
 
-	ctx := makeContext(minions, placements, containers)
+	ctx := makeContext(minions, placements, containers, nil)
 	cleanupPlacements(ctx)
 
 	expMinions := []*minion{
@@ -201,7 +201,7 @@ func TestPlaceUnassigned(t *testing.T) {
 	t.Parallel()
 
 	var exp []*db.Container
-	ctx := makeContext(nil, nil, nil)
+	ctx := makeContext(nil, nil, nil, nil)
 	placeUnassigned(ctx)
 	assert.Equal(t, exp, ctx.changed)
 
@@ -245,7 +245,7 @@ func TestPlaceUnassigned(t *testing.T) {
 		},
 	}
 
-	ctx = makeContext(minions, placements, containers)
+	ctx = makeContext(minions, placements, containers, nil)
 	placeUnassigned(ctx)
 
 	exp = nil
@@ -260,14 +260,14 @@ func TestPlaceUnassigned(t *testing.T) {
 
 	assert.Equal(t, exp, ctx.changed)
 
-	ctx = makeContext(minions, placements, containers)
+	ctx = makeContext(minions, placements, containers, nil)
 	placeUnassigned(ctx)
 	assert.Nil(t, ctx.changed)
 
 	placements[0].Exclusive = false
 	placements[0].Region = "Nowhere"
 	containers[0].Minion = ""
-	ctx = makeContext(minions, placements, containers)
+	ctx = makeContext(minions, placements, containers, nil)
 	placeUnassigned(ctx)
 	assert.Nil(t, ctx.changed)
 }
@@ -292,6 +292,17 @@ func TestMakeContext(t *testing.T) {
 			Region:    "Region3",
 		},
 	}
+	images := []db.Image{
+		{
+			Name:       "foo",
+			Dockerfile: "bar",
+			DockerID:   "baz",
+		},
+		{
+			Name:       "qux",
+			Dockerfile: "quuz",
+		},
+	}
 	containers := []db.Container{
 		{
 			ID: 1,
@@ -304,6 +315,26 @@ func TestMakeContext(t *testing.T) {
 			ID:     3,
 			Minion: "3",
 		},
+		// Container is scheduled with wrong DockerID.
+		{
+			ID:         4,
+			Image:      "foo",
+			Dockerfile: "bar",
+			DockerID:   "change",
+		},
+		// Image not built yet.
+		{
+			ID:         5,
+			Image:      "foo",
+			Dockerfile: "baz",
+			DockerID:   "baz",
+		},
+		// Image not built yet.
+		{
+			ID:         6,
+			Image:      "qux",
+			Dockerfile: "quuz",
+		},
 	}
 	placements := []db.Placement{
 		{
@@ -313,7 +344,7 @@ func TestMakeContext(t *testing.T) {
 		},
 	}
 
-	ctx := makeContext(minions, placements, containers)
+	ctx := makeContext(minions, placements, containers, images)
 	assert.Equal(t, placements, ctx.constraints)
 
 	expMinions := []*minion{
@@ -328,10 +359,10 @@ func TestMakeContext(t *testing.T) {
 	}
 	assert.Equal(t, expMinions, ctx.minions)
 
-	expUnassigned := []*db.Container{&containers[0], &containers[2]}
+	expUnassigned := []*db.Container{&containers[0], &containers[2], &containers[3]}
 	assert.Equal(t, expUnassigned, ctx.unassigned)
 
-	expChanged := []*db.Container{&containers[2]}
+	expChanged := []*db.Container{&containers[2], &containers[3]}
 	assert.Equal(t, expChanged, ctx.changed)
 }
 

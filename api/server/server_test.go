@@ -59,8 +59,9 @@ func TestContainerResponse(t *testing.T) {
 		return nil
 	})
 
-	exp := `[{"DockerID":"docker-id","Image":"image","Command":["cmd","arg"],` +
-		`"Labels":["labelA","labelB"],"Created":"0001-01-01T00:00:00Z"}]`
+	exp := `[{"DockerID":"docker-id","Command":["cmd","arg"],` +
+		`"Labels":["labelA","labelB"],"Created":"0001-01-01T00:00:00Z",` +
+		`"Image":"image"}]`
 
 	checkQuery(t, server{conn}, db.ContainerTable, exp)
 }
@@ -97,7 +98,7 @@ func testInvalidImage(t *testing.T, s server, img, expErr string) {
 	deployment := fmt.Sprintf(`
 	{"Containers":[
 		{"ID": "1",
-                "Image":"%s",
+                "Image": {"Name": "%s"},
                 "Command":[
                         "sleep",
                         "10000"

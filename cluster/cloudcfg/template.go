@@ -35,7 +35,10 @@ initialize_docker() {
 	[Service]
 	# The below empty ExecStart deletes the official one installed by docker daemon.
 	ExecStart=
-	ExecStart=/usr/bin/docker daemon --ip-forward=false --bridge=none -H unix:///var/run/docker.sock
+	ExecStart=/usr/bin/docker daemon --ip-forward=false --bridge=none \
+	--insecure-registry 10.0.0.0/8 --insecure-registry 172.16.0.0/12 --insecure-registry 192.168.0.0/16 \
+	-H unix:///var/run/docker.sock
+
 
 	[Install]
 	WantedBy=multi-user.target

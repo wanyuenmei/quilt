@@ -19,13 +19,16 @@ type Container struct {
 	EndpointID        string            `json:",omitempty"`
 	StitchID          string            `json:",omitempty"`
 	DockerID          string            `json:",omitempty"`
-	Image             string            `json:",omitempty"`
 	Status            string            `json:",omitempty"`
 	Command           []string          `json:",omitempty"`
 	Labels            []string          `json:",omitempty"`
 	Env               map[string]string `json:",omitempty"`
 	FilepathToContent map[string]string `json:",omitempty"`
 	Created           time.Time         `json:","`
+
+	Image      string `json:",omitempty"`
+	ImageID    string `json:",omitempty"`
+	Dockerfile string `json:"-"`
 }
 
 // ContainerSlice is an alias for []Container to allow for joins
@@ -68,6 +71,11 @@ func (c Container) getID() int {
 func (c Container) String() string {
 	cmdStr := strings.Join(append([]string{"run", c.Image}, c.Command...), " ")
 	tags := []string{cmdStr}
+
+	if c.ImageID != "" {
+		id := util.ShortUUID(c.ImageID)
+		tags = append(tags, fmt.Sprintf("ImageID: %s", id))
+	}
 
 	if c.DockerID != "" {
 		id := util.ShortUUID(c.DockerID)

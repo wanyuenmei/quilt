@@ -35,11 +35,14 @@ var PlacementTable = TableType(reflect.TypeOf(Placement{}).String())
 // ACLTable is the type of the ACL table.
 var ACLTable = TableType(reflect.TypeOf(ACL{}).String())
 
+// ImageTable is the type of the image table.
+var ImageTable = TableType(reflect.TypeOf(Image{}).String())
+
 // AllTables is a slice of all the db TableTypes. It is used primarily for tests,
 // where there is no reason to put lots of thought into which tables a Transaction
 // should use.
 var AllTables = []TableType{ClusterTable, MachineTable, ContainerTable, MinionTable,
-	ConnectionTable, LabelTable, EtcdTable, PlacementTable, ACLTable}
+	ConnectionTable, LabelTable, EtcdTable, PlacementTable, ACLTable, ImageTable}
 
 type table struct {
 	rows map[int]row

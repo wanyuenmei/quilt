@@ -138,6 +138,7 @@ Deployment.prototype.vet = function() {
         labelMap[service.name] = true;
     });
 
+    var dockerfiles = {};
     this.services.forEach(function(service) {
         service.connections.forEach(function(conn) {
             var to = conn.to.name;
@@ -164,6 +165,14 @@ Deployment.prototype.vet = function() {
             throw service.name + " has a floating IP and multiple containers. " +
               "This is not yet supported."
         }
+
+        service.containers.forEach(function(c) {
+            var name = c.image.name;
+            if (dockerfiles[name] != undefined && dockerfiles[name] != c.image.dockerfile) {
+                throw name + " has differing Dockerfiles";
+            }
+            dockerfiles[name] = c.image.dockerfile;
+        })
     });
 };
 
@@ -409,6 +418,15 @@ Machine.prototype.replicate = function(n) {
     return res;
 };
 
+function Image(name, dockerfile) {
+    this.name = name;
+    this.dockerfile = dockerfile;
+}
+
+Image.prototype.clone = function() {
+    return new Image(this.name, this.dockerfile);
+}
+
 function Container(image, command) {
     // refID is used to distinguish deployments with multiple references to the
     // same container, and deployments with multiple containers with the exact
@@ -416,6 +434,14 @@ function Container(image, command) {
     this._refID = _.uniqueId();
 
     this.image = image;
+    if (typeof image === 'string') {
+        this.image = new Image(image);
+    }
+
+    if (this.image.constructor !== Image) {
+        throw new Error('bad image type');
+    }
+
     this.command = command || [];
     this.env = {};
     this.filepathToContent = {};
@@ -423,7 +449,7 @@ function Container(image, command) {
 
 // Create a new Container with the same attributes.
 Container.prototype.clone = function() {
-    var cloned = new Container(this.image, _.clone(this.command));
+    var cloned = new Container(this.image.clone(), _.clone(this.command));
     cloned.env = _.clone(this.env);
     cloned.filepathToContent = _.clone(this.filepathToContent);
     return cloned;

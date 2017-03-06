@@ -2,6 +2,7 @@ package docker
 
 import (
 	"errors"
+	"io/ioutil"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -27,6 +28,7 @@ type Container struct {
 	EID     string
 	Name    string
 	Image   string
+	ImageID string
 	IP      string
 	Mac     string
 	Path    string
@@ -77,9 +79,12 @@ type client interface {
 	UploadToContainer(id string, opts dkc.UploadToContainerOptions) error
 	DownloadFromContainer(id string, opts dkc.DownloadFromContainerOptions) error
 	RemoveContainer(opts dkc.RemoveContainerOptions) error
+	BuildImage(opts dkc.BuildImageOptions) error
 	PullImage(opts dkc.PullImageOptions, auth dkc.AuthConfiguration) error
+	PushImage(opts dkc.PushImageOptions, auth dkc.AuthConfiguration) error
 	ListContainers(opts dkc.ListContainersOptions) ([]dkc.APIContainers, error)
 	InspectContainer(id string) (*dkc.Container, error)
+	InspectImage(id string) (*dkc.Image, error)
 	CreateContainer(dkc.CreateContainerOptions) (*dkc.Container, error)
 	CreateNetwork(dkc.CreateNetworkOptions) (*dkc.Network, error)
 	ListNetworks() ([]dkc.Network, error)
@@ -190,6 +195,32 @@ func (dk Client) RemoveID(id string) error {
 	return nil
 }
 
+// Build builds an image with the given name and Dockerfile, and returns the
+// ID of the resulting image.
+func (dk Client) Build(name, dockerfile string) (id string, err error) {
+	tarBuf, err := util.ToTar("Dockerfile", 0644, dockerfile)
+	if err != nil {
+		return "", err
+	}
+
+	err = dk.BuildImage(dkc.BuildImageOptions{
+		NetworkMode:  "host",
+		Name:         name,
+		InputStream:  tarBuf,
+		OutputStream: ioutil.Discard,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	img, err := dk.InspectImage(name)
+	if err != nil {
+		return "", err
+	}
+
+	return img.ID, nil
+}
+
 // Pull retrieves the given docker image from an image cache.
 // The `image` argument can be of the form <repo>, <repo>:<tag>, or
 // <repo>:<tag>@<digestFormat>:<digest>.
@@ -234,6 +265,16 @@ func (dk Client) getCacheEntry(repo, tag string) *cacheEntry {
 	entry := &cacheEntry{}
 	dk.imageCache[key] = entry
 	return entry
+}
+
+// Push pushes the given image to the registry.
+func (dk Client) Push(registry, image string) error {
+	repo, tag := dkc.ParseRepositoryTag(image)
+	return dk.PushImage(dkc.PushImageOptions{
+		Registry: registry,
+		Name:     repo,
+		Tag:      tag,
+	}, dkc.AuthConfiguration{})
 }
 
 // List returns a slice of all running containers.  The List can be be filtered with the
@@ -286,6 +327,7 @@ func (dk Client) Get(id string) (Container, error) {
 		Mac:     dkc.NetworkSettings.MacAddress,
 		EID:     dkc.NetworkSettings.EndpointID,
 		Image:   dkc.Config.Image,
+		ImageID: dkc.Image,
 		Path:    dkc.Path,
 		Args:    dkc.Args,
 		Pid:     dkc.State.Pid,

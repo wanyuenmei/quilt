@@ -49,10 +49,17 @@ type Placement struct {
 	FloatingIP string `json:",omitempty"`
 }
 
+// An Image represents a Docker image that can be run. If the Dockerfile is non-empty,
+// the image should be built and hosted by Quilt.
+type Image struct {
+	Name       string `json:",omitempty"`
+	Dockerfile string `json:",omitempty"`
+}
+
 // A Container may be instantiated in the stitch and queried by users.
 type Container struct {
 	ID                string            `json:",omitempty"`
-	Image             string            `json:",omitempty"`
+	Image             Image             `json:",omitempty"`
 	Command           []string          `json:",omitempty"`
 	Env               map[string]string `json:",omitempty"`
 	FilepathToContent map[string]string `json:",omitempty"`
