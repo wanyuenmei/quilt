@@ -52,6 +52,8 @@ COV_SKIP= /api/client/mocks \
 	  /quiltctl/testutils \
 	  /scripts \
 	  /scripts/format \
+	  /scripts/specs-tester \
+	  /scripts/specs-tester/tests \
 	  /minion/pb
 
 COV_PKG = $(subst github.com/quilt/quilt,,$(PACKAGES))
@@ -78,6 +80,12 @@ format-check:
 	    echo $$RESULT && \
 	    exit 1 ; \
 	fi
+
+build-specs-tester: scripts/specs-tester/*
+	cd scripts/specs-tester && go build .
+
+check-specs: build-specs-tester
+	scripts/specs-tester/specs-tester
 
 lint: format
 	cd -P . && govendor vet +local

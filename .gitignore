@@ -33,4 +33,5 @@ coverage.txt
 *.pdf
 
 scripts/format/format
+scripts/specs-tester/specs-tester
 buildinfo
