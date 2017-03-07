@@ -46,8 +46,11 @@ func TestSpecs() error {
 		"./quilt-tester/tests/40-stop/stop.js",
 		"./quilt-tester/tests/30-mean/mean.js",
 		"./quilt-tester/tests/20-spark/spark.js",
+		"./quilt-tester/tests/15-bandwidth/bandwidth.js",
 		"./quilt-tester/tests/10-network/network.js",
 		"./quilt-tester/tests/pub-facing/pub-facing.js",
+		"./quilt-tester/tests/elasticsearch/elasticsearch.js",
+		"./quilt-tester/tests/build-dockerfile/build-dockerfile.js",
 
 		"github.com/quilt/nginx/main.js",
 		"github.com/quilt/spark/sparkPI.js",
