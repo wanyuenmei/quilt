@@ -59,6 +59,7 @@ var quiltContainers = map[string]struct{}{
 	supervisor.Ovnnorthd:     {},
 	supervisor.Ovsdb:         {},
 	supervisor.Ovsvswitchd:   {},
+	supervisor.Registry:      {},
 	"minion":                 {},
 }
 
