@@ -32,5 +32,5 @@ coverage.txt
 
 *.pdf
 
-scripts/format
+scripts/format/format
 buildinfo

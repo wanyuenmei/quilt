@@ -51,6 +51,7 @@ COV_SKIP= /api/client/mocks \
 	  /quilt-tester/tests/pub-facing \
 	  /quiltctl/testutils \
 	  /scripts \
+	  /scripts/format \
 	  /minion/pb
 
 COV_PKG = $(subst github.com/quilt/quilt,,$(PACKAGES))
@@ -64,12 +65,12 @@ coverage: $(addsuffix .cov, $(filter-out $(COV_SKIP), $(COV_PKG)))
 	go test -coverprofile=.$@ .$*
 	go tool cover -html=.$@ -o .$@.html
 
-format: scripts/format
+format: scripts/format/format
 	gofmt -w -s $(NOVENDOR)
-	scripts/format $(filter-out $(LINE_LENGTH_EXCLUDE),$(NOVENDOR))
+	scripts/format/format $(filter-out $(LINE_LENGTH_EXCLUDE),$(NOVENDOR))
 
-scripts/format: scripts/format.go
-	cd scripts && go build format.go
+scripts/format/format: scripts/format/format.go
+	cd scripts/format && go build format.go
 
 format-check:
 	RESULT=`gofmt -s -l $(NOVENDOR)` && \
