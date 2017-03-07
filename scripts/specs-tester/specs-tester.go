@@ -22,17 +22,19 @@ func main() {
 	}
 	sort.Strings(names)
 
+	failed := false
 	for _, name := range names {
 		test := testsByName[name]
-		runTest(name, test)
+		if result := test(); result != nil {
+			fmt.Printf("FAILED\t%s: %s\n", name, result.Error())
+			failed = true
+		} else {
+			fmt.Printf("PASSED\t%s\n", name)
+		}
 	}
-}
 
-func runTest(name string, test func() error) {
-	result := test()
-	if result == nil {
-		fmt.Printf("PASSED\t%s\n", name)
-	} else {
-		fmt.Printf("FAILED\t%s: %s\n", name, result.Error())
+	if failed {
+		os.Exit(1)
 	}
+	os.Exit(0)
 }
