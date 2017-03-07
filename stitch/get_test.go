@@ -485,9 +485,7 @@ func TestRequire(t *testing.T) {
 			util.WriteFile(f.name, []byte(f.contents), 0644)
 		}
 
-		testVM, _ := newVM(ImportGetter{
-			Path: test.quiltPath,
-		})
+		testVM, _ := newVM(NewImportGetter(test.quiltPath))
 		res, err := run(testVM, "main.js", test.mainFile)
 
 		if err != nil || test.expErr != "" {

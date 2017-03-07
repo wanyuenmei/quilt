@@ -89,12 +89,18 @@ func goRepoFactory(repoName string) (repo, error) {
 	return goRepo{vcsRepo}, err
 }
 
+// NewImportGetter returns an ImporGetter with the given path and without
+// automatic downloads.
+func NewImportGetter(path string) ImportGetter {
+	return ImportGetter{
+		Path:        path,
+		repoFactory: goRepoFactory,
+	}
+}
+
 // DefaultImportGetter uses the default QUILT_PATH, and doesn't automatically
 // download imports.
-var DefaultImportGetter = ImportGetter{
-	Path:        GetQuiltPath(),
-	repoFactory: goRepoFactory,
-}
+var DefaultImportGetter = NewImportGetter(GetQuiltPath())
 
 // Get takes in an import path `repoName`, and attempts to download the
 // repository associated with that repoName.
