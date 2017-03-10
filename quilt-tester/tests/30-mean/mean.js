@@ -9,7 +9,7 @@ deployment.deploy(infrastructure);
 var mongo = new Mongo(3);
 var app = new Node({
   nWorker: 3,
-  image: "quilt/mean-service",
+  repo: "https://github.com/tejasmanohar/node-todo.git",
   env: {
     PORT: "80",
     MONGO_URI: mongo.uri("mean-example")
