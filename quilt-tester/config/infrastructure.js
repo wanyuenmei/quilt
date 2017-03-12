@@ -1,7 +1,8 @@
-// We will have four worker machines.
-var nWorker = 4;
+function MachineDeployer(nWorker) {
+    this.nWorker = nWorker;
+}
 
-var deployMachines = function(deployment) {
+MachineDeployer.prototype.deploy = function(deployment) {
     var baseMachine = new Machine({
         provider: "Amazon",
         region: "us-west-1",
@@ -9,9 +10,8 @@ var deployMachines = function(deployment) {
     });
 
     deployment.deploy(baseMachine.asMaster())
-    deployment.deploy(baseMachine.asWorker().replicate(nWorker));
+    deployment.deploy(baseMachine.asWorker().replicate(this.nWorker));
 }
 
-module.exports = {
-    deploy: deployMachines,
-}
+// We will have four worker machines.
+module.exports = new MachineDeployer(4);

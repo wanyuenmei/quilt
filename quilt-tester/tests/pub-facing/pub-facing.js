@@ -4,11 +4,7 @@ var infrastructure = require("github.com/quilt/quilt/quilt-tester/config/infrast
 var deployment = createDeployment({});
 deployment.deploy(infrastructure);
 
-var nWorker = deployment.machines.filter(function(m) {
-    return m.role == "Worker"
-}).length;
-
-for (var i = 0 ; i < nWorker ; i++) {
+for (var i = 0 ; i < infrastructure.nWorker ; i++) {
     deployment.deploy(nginx.New(80));
     deployment.deploy(nginx.New(8000));
 }

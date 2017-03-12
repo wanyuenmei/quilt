@@ -5,10 +5,8 @@ var infrastructure = require("github.com/quilt/quilt/quilt-tester/config/infrast
 var deployment = createDeployment({});
 deployment.deploy(infrastructure);
 
-var nWorker = deployment.machines.filter(function(m) {
-    return m.role == "Worker"
-}).length;
-var containers = new Service("containers", new Container("google/pause").replicate(nWorker));
+var containers = new Service("containers",
+    new Container("google/pause").replicate(infrastructure.nWorker));
 containers.place(new LabelRule(true, containers));
 
 deployment.deploy(containers);
