@@ -1,5 +1,5 @@
-// We will have three worker machines.
-var nWorker = 3;
+// We will have four worker machines.
+var nWorker = 4;
 
 var deployMachines = function(deployment) {
     var baseMachine = new Machine({
@@ -9,7 +9,7 @@ var deployMachines = function(deployment) {
     });
 
     deployment.deploy(baseMachine.asMaster())
-    deployment.deploy(baseMachine.asWorker().replicate(nWorker + 1));
+    deployment.deploy(baseMachine.asWorker().replicate(nWorker));
 }
 
 module.exports = {
