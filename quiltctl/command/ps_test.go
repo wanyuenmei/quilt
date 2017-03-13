@@ -247,4 +247,13 @@ func TestUpdateContainers(t *testing.T) {
 	expect = []db.Container{}
 	result = updateContainers(lContainers, wContainers)
 	assert.Equal(t, expect, result)
+
+	// Test a deployed Dockerfile.
+	lContainers = []db.Container{{StitchID: "1", Image: "image"}}
+	wContainers = []db.Container{
+		{StitchID: "1", Image: "8.8.8.8/image", Created: created},
+	}
+	expect = []db.Container{{StitchID: "1", Image: "image", Created: created}}
+	result = updateContainers(lContainers, wContainers)
+	assert.Equal(t, expect, result)
 }

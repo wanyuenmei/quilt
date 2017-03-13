@@ -182,6 +182,10 @@ func updateContainers(lContainers []db.Container,
 	for _, lc := range lContainers {
 		wc, ok := cMap[lc.StitchID]
 		if ok {
+			// Always use the leader's view of the image name because the name
+			// is modified on workers for images that are built in the
+			// cluster.
+			wc.Image = lc.Image
 			allContainers = append(allContainers, wc)
 		} else {
 			allContainers = append(allContainers, lc)
