@@ -46,6 +46,8 @@ COV_SKIP= /api/client/mocks \
 	  /quilt-tester/tests/40-stop \
 	  /quilt-tester/tests/100-logs \
 	  /quilt-tester/tests/75-network \
+	  /quilt-tester/tests/60-duplicate-cluster-setup \
+	  /quilt-tester/tests/61-duplicate-cluster \
 	  /quilt-tester/tests/elasticsearch \
 	  /quilt-tester/tests/etcd \
 	  /quilt-tester/tests/build-dockerfile \

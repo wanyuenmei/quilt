@@ -43,6 +43,9 @@ func testSpec(specPath string) error {
 func TestSpecs() error {
 	specs := []string{
 		"./quilt-tester/tests/100-logs/logs.js",
+		"./quilt-tester/tests/61-duplicate-cluster/duplicate-cluster.js",
+		"./quilt-tester/tests/60-duplicate-cluster-setup/" +
+			"duplicate-cluster-setup.js",
 		"./quilt-tester/tests/40-stop/stop.js",
 		"./quilt-tester/tests/30-mean/mean.js",
 		"./quilt-tester/tests/20-spark/spark.js",
