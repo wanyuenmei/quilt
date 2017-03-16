@@ -130,12 +130,17 @@ func (pCmd *Ps) run() error {
 func writeMachines(fd io.Writer, machines []db.Machine) {
 	w := tabwriter.NewWriter(fd, 0, 0, 4, ' ', 0)
 	defer w.Flush()
-	fmt.Fprintln(w, "MACHINE\tROLE\tPROVIDER\tREGION\tSIZE\tPUBLIC IP\tCONNECTED")
+	fmt.Fprintln(w, "MACHINE\tROLE\tPROVIDER\tREGION\tSIZE\tPUBLIC IP\tSTATUS")
 
 	for _, m := range db.SortMachines(machines) {
+		status := "disconnected"
+		if m.Connected {
+			status = "connected"
+		}
+
 		fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\t%v\n",
 			util.ShortUUID(m.StitchID), m.Role, m.Provider, m.Region, m.Size,
-			m.PublicIP, m.Connected)
+			m.PublicIP, status)
 	}
 }
 

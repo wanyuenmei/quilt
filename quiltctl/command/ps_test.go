@@ -289,8 +289,8 @@ func TestMachineOutput(t *testing.T) {
 	result = strings.Replace(result, " ", "_", -1)
 
 	exp := `MACHINE____ROLE______PROVIDER____REGION_______SIZE` +
-		`________PUBLIC_IP____CONNECTED
-1__________Master____Amazon______us-west-1____m4.large____8.8.8.8______false
+		`________PUBLIC_IP____STATUS
+1__________Master____Amazon______us-west-1____m4.large____8.8.8.8______disconnected
 `
 
 	assert.Equal(t, exp, result)
