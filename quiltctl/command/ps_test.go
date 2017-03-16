@@ -27,6 +27,12 @@ func TestPsFlags(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, expHost, cmd.common.host)
+
+	cmd = NewPsCommand()
+	err = parseHelper(cmd, []string{"-no-trunc"})
+
+	assert.NoError(t, err)
+	assert.True(t, cmd.noTruncate)
 }
 
 func TestPsErrors(t *testing.T) {
@@ -42,7 +48,7 @@ func TestPsErrors(t *testing.T) {
 	mockGetter = new(clientMock.Getter)
 	mockGetter.On("Client", mock.Anything).Return(nil, mockErr)
 
-	cmd = &Ps{&commonFlags{}, mockGetter}
+	cmd = &Ps{false, &commonFlags{}, mockGetter}
 	assert.EqualError(t, cmd.run(), "error connecting to quilt daemon: error")
 	mockGetter.AssertExpectations(t)
 
@@ -52,7 +58,7 @@ func TestPsErrors(t *testing.T) {
 	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
 	mockGetter.On("LeaderClient", mock.Anything).Return(nil, mockErr)
 
-	cmd = &Ps{&commonFlags{}, mockGetter}
+	cmd = &Ps{false, &commonFlags{}, mockGetter}
 	assert.EqualError(t, cmd.run(), "unable to query machines: error")
 	mockGetter.AssertExpectations(t)
 
@@ -62,7 +68,7 @@ func TestPsErrors(t *testing.T) {
 	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
 	mockGetter.On("LeaderClient", mock.Anything).Return(nil, mockErr)
 
-	cmd = &Ps{&commonFlags{}, mockGetter}
+	cmd = &Ps{false, &commonFlags{}, mockGetter}
 	assert.NoError(t, cmd.run())
 	mockGetter.AssertExpectations(t)
 
@@ -73,7 +79,7 @@ func TestPsErrors(t *testing.T) {
 	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
 	mockGetter.On("LeaderClient", mock.Anything).Return(mockLeaderClient, nil)
 
-	cmd = &Ps{&commonFlags{}, mockGetter}
+	cmd = &Ps{false, &commonFlags{}, mockGetter}
 	assert.EqualError(t, cmd.run(), "unable to query containers: error")
 	mockGetter.AssertExpectations(t)
 
@@ -84,7 +90,7 @@ func TestPsErrors(t *testing.T) {
 	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
 	mockGetter.On("LeaderClient", mock.Anything).Return(mockLeaderClient, nil)
 
-	cmd = &Ps{&commonFlags{}, mockGetter}
+	cmd = &Ps{false, &commonFlags{}, mockGetter}
 	assert.EqualError(t, cmd.run(), "unable to query connections: error")
 	mockGetter.AssertExpectations(t)
 
@@ -103,7 +109,7 @@ func TestPsErrors(t *testing.T) {
 	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
 	mockGetter.On("LeaderClient", mock.Anything).Return(mockLeaderClient, nil)
 
-	cmd = &Ps{&commonFlags{}, mockGetter}
+	cmd = &Ps{false, &commonFlags{}, mockGetter}
 	assert.Equal(t, 0, cmd.Run())
 	mockGetter.AssertExpectations(t)
 }
@@ -118,7 +124,7 @@ func TestPsSuccess(t *testing.T) {
 	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
 	mockGetter.On("LeaderClient", mock.Anything).Return(mockLeaderClient, nil)
 
-	cmd := &Ps{&commonFlags{}, mockGetter}
+	cmd := &Ps{false, &commonFlags{}, mockGetter}
 	assert.Equal(t, 0, cmd.Run())
 	mockGetter.AssertExpectations(t)
 }
@@ -145,7 +151,7 @@ func TestQueryWorkersSuccess(t *testing.T) {
 	}
 	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
 
-	cmd := &Ps{&commonFlags{}, mockGetter}
+	cmd := &Ps{false, &commonFlags{}, mockGetter}
 	result := cmd.queryWorkers(machines)
 	assert.Equal(t, containers, result)
 	mockGetter.AssertExpectations(t)
@@ -181,7 +187,7 @@ func TestQueryWorkersFailure(t *testing.T) {
 	mockGetter.On("Client", api.RemoteAddress("1.2.3.4")).Return(nil, mockErr)
 	mockGetter.On("Client", api.RemoteAddress("5.6.7.8")).Return(mockClient, nil)
 
-	cmd := &Ps{&commonFlags{}, mockGetter}
+	cmd := &Ps{false, &commonFlags{}, mockGetter}
 	result := cmd.queryWorkers(machines)
 	assert.Equal(t, containers, result)
 	mockGetter.AssertExpectations(t)
@@ -195,7 +201,7 @@ func TestQueryWorkersFailure(t *testing.T) {
 	mockGetter.On("Client", api.RemoteAddress("1.2.3.4")).Return(failingClient, nil)
 	mockGetter.On("Client", api.RemoteAddress("5.6.7.8")).Return(mockClient, nil)
 
-	cmd = &Ps{&commonFlags{}, mockGetter}
+	cmd = &Ps{false, &commonFlags{}, mockGetter}
 	result = cmd.queryWorkers(machines)
 	assert.Equal(t, containers, result)
 	mockGetter.AssertExpectations(t)
@@ -321,7 +327,7 @@ func TestContainerOutput(t *testing.T) {
 	}
 
 	var b bytes.Buffer
-	writeContainers(&b, containers, machines, connections)
+	writeContainers(&b, containers, machines, connections, true)
 	result := string(b.Bytes())
 
 	/* By replacing space with underscore, we make the spaces explicit and whitespace
@@ -360,7 +366,7 @@ ________________________________________________________________________________
 	connections = []db.Connection{}
 
 	var c bytes.Buffer
-	writeContainers(&c, containers, machines, connections)
+	writeContainers(&c, containers, machines, connections, true)
 	result = string(c.Bytes())
 	expected = `CONTAINER____MACHINE____COMMAND_________LABELS____STATUS___` +
 		`__CREATED___________________PUBLIC_IP
@@ -388,7 +394,7 @@ ________________________________________________________________________________
 	connections = []db.Connection{}
 
 	var d bytes.Buffer
-	writeContainers(&d, containers, machines, connections)
+	writeContainers(&d, containers, machines, connections, true)
 	result = string(d.Bytes())
 	expected = `CONTAINER____MACHINE____COMMAND_________LABELS____STATUS___` +
 		`__CREATED______________PUBLIC_IP
@@ -398,14 +404,48 @@ ________________________________________________________________________________
 
 	result = strings.Replace(result, " ", "_", -1)
 	assert.Equal(t, expected, result)
+	containers = []db.Container{
+		{ID: 1, StitchID: "3", Minion: "3.3.3.3", IP: "1.2.3.4",
+			Image: "image1", Command: []string{"cmd", "1", "&&", "cmd",
+				"91283403472903847293014320984723908473248-23843984"},
+			Status: "running", Created: mockTime.UTC()},
+	}
+
+	machines = []db.Machine{}
+	connections = []db.Connection{}
+
+	// Test that long outputs are truncated when `truncate` is true
+	var e bytes.Buffer
+	writeContainers(&e, containers, machines, connections, true)
+	result = string(e.Bytes())
+	expected = `CONTAINER____MACHINE____COMMAND___________________________LABELS_` +
+		`___STATUS_____CREATED______________PUBLIC_IP
+3_______________________image1_cmd_1_&&_cmd_9128340347______________running____` +
+		mockCreatedString + `____
+`
+	result = strings.Replace(result, " ", "_", -1)
+	assert.Equal(t, expected, result)
+
+	// Test that long outputs are not truncated when `truncate` is true
+	var f bytes.Buffer
+	writeContainers(&f, containers, machines, connections, false)
+	result = string(f.Bytes())
+	expected = `CONTAINER____MACHINE____COMMAND___________________________________` +
+		`________________________________LABELS____STATUS_____CREATED_________` +
+		`_____PUBLIC_IP
+3_______________________image1_cmd_1_&&_cmd_91283403472903847293014320984723908473248` +
+		`-23843984______________running____` + mockCreatedString + `____
+`
+	result = strings.Replace(result, " ", "_", -1)
+	assert.Equal(t, expected, result)
 }
 
 func TestContainerStr(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, "", containerStr("", nil))
-	assert.Equal(t, "", containerStr("", []string{"arg0"}))
+	assert.Equal(t, "", containerStr("", nil, false))
+	assert.Equal(t, "", containerStr("", []string{"arg0"}, false))
 	assert.Equal(t, "container arg0 arg1",
-		containerStr("container", []string{"arg0", "arg1"}))
+		containerStr("container", []string{"arg0", "arg1"}, false))
 }
 
 func TestPublicIPStr(t *testing.T) {

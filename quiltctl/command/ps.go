@@ -20,8 +20,12 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
+// An arbitrary length to truncate container commands to.
+const truncLength = 30
+
 // Ps contains the options for querying machines and containers.
 type Ps struct {
+	noTruncate   bool
 	common       *commonFlags
 	clientGetter client.Getter
 }
@@ -37,6 +41,8 @@ func NewPsCommand() *Ps {
 // InstallFlags sets up parsing for command line flags
 func (pCmd *Ps) InstallFlags(flags *flag.FlagSet) {
 	pCmd.common.InstallFlags(flags)
+	flags.BoolVar(&pCmd.noTruncate, "no-trunc", false, "do not truncate container"+
+		" command output")
 	flags.Usage = func() {
 		fmt.Println("usage: quilt ps [-H=<daemon_host>]")
 		fmt.Println("`ps` displays the status of quilt-managed " +
@@ -116,7 +122,7 @@ func (pCmd *Ps) run() error {
 	workerContainers := pCmd.queryWorkers(machines)
 	containers = updateContainers(containers, workerContainers)
 
-	writeContainers(os.Stdout, containers, machines, connections)
+	writeContainers(os.Stdout, containers, machines, connections, !pCmd.noTruncate)
 
 	return nil
 }
@@ -214,7 +220,7 @@ func updateContainers(lContainers []db.Container,
 }
 
 func writeContainers(fd io.Writer, containers []db.Container, machines []db.Machine,
-	connections []db.Connection) {
+	connections []db.Connection, truncate bool) {
 	w := tabwriter.NewWriter(fd, 0, 0, 4, ' ', 0)
 	defer w.Flush()
 	fmt.Fprintln(w, "CONTAINER\tMACHINE\tCOMMAND\tLABELS"+
@@ -269,7 +275,7 @@ func writeContainers(fd io.Writer, containers []db.Container, machines []db.Mach
 				}
 			}
 
-			container := containerStr(dbc.Image, dbc.Command)
+			container := containerStr(dbc.Image, dbc.Command, truncate)
 			labels := strings.Join(dbc.Labels, ", ")
 			status := dbc.Status
 			if dbc.Status == "" && dbc.Minion != "" {
@@ -293,11 +299,17 @@ func writeContainers(fd io.Writer, containers []db.Container, machines []db.Mach
 	}
 }
 
-func containerStr(image string, args []string) string {
+func containerStr(image string, args []string, truncate bool) string {
 	if image == "" {
 		return ""
 	}
-	return fmt.Sprintf("%s %s", image, strings.Join(args, " "))
+
+	container := fmt.Sprintf("%s %s", image, strings.Join(args, " "))
+	if truncate && len(container) > truncLength {
+		return container[:truncLength]
+	}
+
+	return container
 }
 
 func publicIPStr(hostPublicIP string, publicPorts []string) string {
