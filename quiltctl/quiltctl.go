@@ -10,17 +10,15 @@ import (
 )
 
 var commands = map[string]command.SubCommand{
-	"containers": command.NewContainerCommand(),
-	"daemon":     command.NewDaemonCommand(),
-	"get":        &command.Get{},
-	"inspect":    &command.Inspect{},
-	"logs":       command.NewLogCommand(),
-	"machines":   command.NewMachineCommand(),
-	"minion":     command.NewMinionCommand(),
-	"ps":         command.NewPsCommand(),
-	"run":        command.NewRunCommand(),
-	"ssh":        command.NewSSHCommand(),
-	"stop":       command.NewStopCommand(),
+	"daemon":  command.NewDaemonCommand(),
+	"get":     &command.Get{},
+	"inspect": &command.Inspect{},
+	"logs":    command.NewLogCommand(),
+	"minion":  command.NewMinionCommand(),
+	"ps":      command.NewPsCommand(),
+	"run":     command.NewRunCommand(),
+	"ssh":     command.NewSSHCommand(),
+	"stop":    command.NewStopCommand(),
 }
 
 // Run parses and runs the quiltctl subcommand given the command line arguments.

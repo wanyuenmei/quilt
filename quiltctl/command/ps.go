@@ -3,12 +3,19 @@ package command
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
+	"sort"
+	"strings"
+	"text/tabwriter"
+	"time"
 
+	units "github.com/docker/go-units"
 	"github.com/quilt/quilt/api"
 	"github.com/quilt/quilt/api/client"
 	"github.com/quilt/quilt/api/client/getter"
 	"github.com/quilt/quilt/db"
+	"github.com/quilt/quilt/util"
 
 	log "github.com/Sirupsen/logrus"
 )
@@ -114,6 +121,18 @@ func (pCmd *Ps) run() error {
 	return nil
 }
 
+func writeMachines(fd io.Writer, machines []db.Machine) {
+	w := tabwriter.NewWriter(fd, 0, 0, 4, ' ', 0)
+	defer w.Flush()
+	fmt.Fprintln(w, "MACHINE\tROLE\tPROVIDER\tREGION\tSIZE\tPUBLIC IP\tCONNECTED")
+
+	for _, m := range db.SortMachines(machines) {
+		fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\t%v\n",
+			util.ShortUUID(m.StitchID), m.Role, m.Provider, m.Region, m.Size,
+			m.PublicIP, m.Connected)
+	}
+}
+
 // queryWorkers gets a client for all connected worker machines (have a PublicIP
 // and are role Worker) and returns a list of db.Container on these machines.
 // If there is an error querying any machine, we skip it and attempt to return
@@ -192,4 +211,103 @@ func updateContainers(lContainers []db.Container,
 		}
 	}
 	return allContainers
+}
+
+func writeContainers(fd io.Writer, containers []db.Container, machines []db.Machine,
+	connections []db.Connection) {
+	w := tabwriter.NewWriter(fd, 0, 0, 4, ' ', 0)
+	defer w.Flush()
+	fmt.Fprintln(w, "CONTAINER\tMACHINE\tCOMMAND\tLABELS"+
+		"\tSTATUS\tCREATED\tPUBLIC IP")
+
+	labelPublicPorts := map[string]string{}
+	for _, c := range connections {
+		if c.From != "public" {
+			continue
+		}
+
+		labelPublicPorts[c.To] = fmt.Sprintf("%d", c.MinPort)
+		if c.MinPort != c.MaxPort {
+			labelPublicPorts[c.To] += fmt.Sprintf("-%d", c.MaxPort)
+		}
+	}
+
+	ipIDMap := map[string]string{}
+	idMachineMap := map[string]db.Machine{}
+	for _, m := range machines {
+		ipIDMap[m.PrivateIP] = m.StitchID
+		idMachineMap[m.StitchID] = m
+	}
+
+	machineDBC := map[string][]db.Container{}
+	for _, dbc := range containers {
+		id := ipIDMap[dbc.Minion]
+		machineDBC[id] = append(machineDBC[id], dbc)
+	}
+
+	var machineIDs []string
+	for key := range machineDBC {
+		machineIDs = append(machineIDs, key)
+	}
+	sort.Strings(machineIDs)
+
+	for i, machineID := range machineIDs {
+		if i > 0 {
+			// Insert a blank line between each machine.
+			// Need to print tabs in a blank line; otherwise, spacing will
+			// change in subsequent lines.
+			fmt.Fprintf(w, "\t\t\t\t\t\t\n")
+		}
+
+		dbcs := machineDBC[machineID]
+		sort.Sort(db.ContainerSlice(dbcs))
+		for _, dbc := range dbcs {
+			publicPorts := []string{}
+			for _, label := range dbc.Labels {
+				if p, ok := labelPublicPorts[label]; ok {
+					publicPorts = append(publicPorts, p)
+				}
+			}
+
+			container := containerStr(dbc.Image, dbc.Command)
+			labels := strings.Join(dbc.Labels, ", ")
+			status := dbc.Status
+			if dbc.Status == "" && dbc.Minion != "" {
+				status = "scheduled"
+			}
+
+			created := ""
+			if !dbc.Created.IsZero() {
+				createdTime := dbc.Created.Local()
+				duration := units.HumanDuration(time.Since(createdTime))
+				created = fmt.Sprintf("%s ago", duration)
+			}
+
+			publicIP := publicIPStr(idMachineMap[machineID].PublicIP,
+				publicPorts)
+
+			fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\t%v\n",
+				util.ShortUUID(dbc.StitchID), util.ShortUUID(machineID),
+				container, labels, status, created, publicIP)
+		}
+	}
+}
+
+func containerStr(image string, args []string) string {
+	if image == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s %s", image, strings.Join(args, " "))
+}
+
+func publicIPStr(hostPublicIP string, publicPorts []string) string {
+	if hostPublicIP == "" || len(publicPorts) == 0 {
+		return ""
+	}
+
+	if len(publicPorts) == 1 {
+		return fmt.Sprintf("%s:%s", hostPublicIP, publicPorts[0])
+	}
+
+	return fmt.Sprintf("%s:[%s]", hostPublicIP, strings.Join(publicPorts, ","))
 }

@@ -30,8 +30,8 @@ func main() {
 		log.WithError(err).Fatal("FAILED, couldn't query containers.")
 	}
 
-	containersPretty, _ := exec.Command("quilt", "containers").Output()
-	fmt.Println("`quilt containers` output:")
+	containersPretty, _ := exec.Command("quilt", "ps").Output()
+	fmt.Println("`quilt ps` output:")
 	fmt.Println(string(containersPretty))
 
 	var id string
