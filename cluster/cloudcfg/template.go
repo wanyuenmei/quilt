@@ -16,9 +16,9 @@ initialize_ovs() {
 	ExecStartPre=/sbin/modprobe gre
 	ExecStartPre=/sbin/modprobe nf_nat_ipv6
 	ExecStart=/usr/bin/docker run --rm --privileged {{.QuiltImage}} \
-	bash -c "insmod /modules/openvswitch.ko \
-	         && insmod /modules/vport-geneve.ko \
-	         && insmod /modules/vport-stt.ko"
+	bash -c "insmod /modules/$(uname -r)/openvswitch.ko \
+	         && insmod /modules/$(uname -r)/vport-geneve.ko \
+	         && insmod /modules/$(uname -r)/vport-stt.ko"
 
 	[Install]
 	WantedBy=multi-user.target
