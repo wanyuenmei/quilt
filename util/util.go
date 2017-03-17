@@ -103,6 +103,23 @@ func ReadFile(filename string) (string, error) {
 	return string(fileBytes), nil
 }
 
+// Mkdir creates a new aero directory.
+func Mkdir(path string, perm os.FileMode) error {
+	a := afero.Afero{
+		Fs: AppFs,
+	}
+	return a.Mkdir(path, perm)
+}
+
+// FileExists checks if the given path corresponds to an existing file in the Afero
+// file system.
+func FileExists(path string) (bool, error) {
+	a := afero.Afero{
+		Fs: AppFs,
+	}
+	return a.Exists(path)
+}
+
 // StrSliceEqual returns true of the string slices 'x' and 'y' are identical.
 func StrSliceEqual(x, y []string) bool {
 	if len(x) != len(y) {

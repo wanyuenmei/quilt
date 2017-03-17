@@ -101,6 +101,17 @@ func (c NativeClient) Run(requestPTY bool, command string) error {
 	return session.Run(command)
 }
 
+// CombinedOutput runs an SSH command, returning the combined stdin and stdout.
+func (c NativeClient) CombinedOutput(command string) ([]byte, error) {
+	session, err := c.NewSession()
+	if err != nil {
+		return nil, err
+	}
+	defer session.Close()
+
+	return session.CombinedOutput(command)
+}
+
 // Shell starts a login shell.
 func (c NativeClient) Shell() error {
 	s, err := c.NewSession()

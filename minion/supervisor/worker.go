@@ -7,6 +7,7 @@ import (
 
 	"github.com/quilt/quilt/db"
 	"github.com/quilt/quilt/minion/ipdef"
+	"github.com/quilt/quilt/minion/supervisor/images"
 	"github.com/quilt/quilt/util"
 	"github.com/vishvananda/netlink"
 
@@ -19,15 +20,15 @@ func runWorker() {
 }
 
 func setupWorker() {
-	run(Ovsdb, "ovsdb-server")
-	run(Ovsvswitchd, "ovs-vswitchd")
+	run(images.Ovsdb, "ovsdb-server")
+	run(images.Ovsvswitchd, "ovs-vswitchd")
 
 	for {
 		err := setupBridge()
 		if err == nil {
 			break
 		}
-		log.WithError(err).Warnf("Failed to exec in %s.", Ovsvswitchd)
+		log.WithError(err).Warnf("Failed to exec in %s.", images.Ovsvswitchd)
 		time.Sleep(5 * time.Second)
 	}
 
@@ -64,19 +65,20 @@ func runWorkerOnce() {
 	IP := minion.PrivateIP
 
 	if !util.StrSliceEqual(oldEtcdIPs, etcdIPs) {
-		Remove(Etcd)
+		Remove(images.Etcd)
 	}
 
 	oldEtcdIPs = etcdIPs
 	oldIP = IP
 
-	run(Etcd, fmt.Sprintf("--initial-cluster=%s", initialClusterString(etcdIPs)),
+	run(images.Etcd,
+		fmt.Sprintf("--initial-cluster=%s", initialClusterString(etcdIPs)),
 		"--heartbeat-interval="+etcdHeartbeatInterval,
 		"--election-timeout="+etcdElectionTimeout,
 		"--proxy=on")
 
-	run(Ovsdb, "ovsdb-server")
-	run(Ovsvswitchd, "ovs-vswitchd")
+	run(images.Ovsdb, "ovsdb-server")
+	run(images.Ovsvswitchd, "ovs-vswitchd")
 
 	if leaderIP == "" || IP == "" {
 		return
@@ -89,14 +91,14 @@ func runWorkerOnce() {
 		fmt.Sprintf("external_ids:api_server=\"http://%s:9000\"", leaderIP),
 		fmt.Sprintf("external_ids:system-id=\"%s\"", IP))
 	if err != nil {
-		log.WithError(err).Warnf("Failed to exec in %s.", Ovsvswitchd)
+		log.WithError(err).Warnf("Failed to exec in %s.", images.Ovsvswitchd)
 		return
 	}
 
 	/* The ovn controller doesn't support reconfiguring ovn-remote mid-run.
 	 * So, we need to restart the container when the leader changes. */
-	Remove(Ovncontroller)
-	run(Ovncontroller, "ovn-controller")
+	Remove(images.Ovncontroller)
+	run(images.Ovncontroller, "ovn-controller")
 }
 
 func setupBridge() error {

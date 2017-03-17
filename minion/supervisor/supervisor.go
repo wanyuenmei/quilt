@@ -7,29 +7,10 @@ import (
 
 	"github.com/quilt/quilt/db"
 	"github.com/quilt/quilt/minion/docker"
+	"github.com/quilt/quilt/minion/supervisor/images"
 	"github.com/vishvananda/netlink"
 
 	log "github.com/Sirupsen/logrus"
-)
-
-const (
-	// Etcd is the name etcd cluster store container.
-	Etcd = "etcd"
-
-	// Ovncontroller is the name of the OVN controller container.
-	Ovncontroller = "ovn-controller"
-
-	// Ovnnorthd is the name of the OVN northd container.
-	Ovnnorthd = "ovn-northd"
-
-	// Ovsdb is the name of the OVSDB container.
-	Ovsdb = "ovsdb-server"
-
-	// Ovsvswitchd is the name of the ovs-vswitchd container.
-	Ovsvswitchd = "ovs-vswitchd"
-
-	// Registry is the name of the registry container.
-	Registry = "registry"
 )
 
 const ovsImage = "quilt/ovs"
@@ -38,13 +19,13 @@ const ovsImage = "quilt/ovs"
 // "stt" and "geneve" are supported.
 const tunnelingProtocol = "stt"
 
-var images = map[string]string{
-	Etcd:          "quay.io/coreos/etcd:v3.0.2",
-	Ovncontroller: ovsImage,
-	Ovnnorthd:     ovsImage,
-	Ovsdb:         ovsImage,
-	Ovsvswitchd:   ovsImage,
-	Registry:      "registry:2",
+var imageMap = map[string]string{
+	images.Etcd:          "quay.io/coreos/etcd:v3.0.2",
+	images.Ovncontroller: ovsImage,
+	images.Ovnnorthd:     ovsImage,
+	images.Ovsdb:         ovsImage,
+	images.Ovsvswitchd:   ovsImage,
+	images.Registry:      "registry:2",
 }
 
 const etcdHeartbeatInterval = "500"
@@ -63,7 +44,7 @@ func Run(_conn db.Conn, _dk docker.Client, _role db.Role) {
 	role = _role
 
 	imageSet := map[string]struct{}{}
-	for _, image := range images {
+	for _, image := range imageMap {
 		imageSet[image] = struct{}{}
 	}
 
@@ -92,13 +73,13 @@ func run(name string, args ...string) {
 
 	ro := docker.RunOptions{
 		Name:        name,
-		Image:       images[name],
+		Image:       imageMap[name],
 		Args:        args,
 		NetworkMode: "host",
 		VolumesFrom: []string{"minion"},
 	}
 
-	if name == Ovsvswitchd {
+	if name == images.Ovsvswitchd {
 		ro.Privileged = true
 	}
 

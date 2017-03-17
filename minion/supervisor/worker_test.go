@@ -10,6 +10,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/quilt/quilt/db"
 	"github.com/quilt/quilt/minion/ipdef"
+	"github.com/quilt/quilt/minion/supervisor/images"
 	"github.com/stretchr/testify/assert"
 	"github.com/vishvananda/netlink"
 )
@@ -31,9 +32,9 @@ func TestWorker(t *testing.T) {
 	ctx.run()
 
 	exp := map[string][]string{
-		Etcd:        etcdArgsWorker(etcdIPs),
-		Ovsdb:       {"ovsdb-server"},
-		Ovsvswitchd: {"ovs-vswitchd"},
+		images.Etcd:        etcdArgsWorker(etcdIPs),
+		images.Ovsdb:       {"ovsdb-server"},
+		images.Ovsvswitchd: {"ovs-vswitchd"},
 	}
 	if !reflect.DeepEqual(ctx.fd.running(), exp) {
 		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running()),
@@ -58,10 +59,10 @@ func TestWorker(t *testing.T) {
 	ctx.run()
 
 	exp = map[string][]string{
-		Etcd:          etcdArgsWorker(etcdIPs),
-		Ovsdb:         {"ovsdb-server"},
-		Ovncontroller: {"ovn-controller"},
-		Ovsvswitchd:   {"ovs-vswitchd"},
+		images.Etcd:          etcdArgsWorker(etcdIPs),
+		images.Ovsdb:         {"ovsdb-server"},
+		images.Ovncontroller: {"ovn-controller"},
+		images.Ovsvswitchd:   {"ovs-vswitchd"},
 	}
 	if !reflect.DeepEqual(ctx.fd.running(), exp) {
 		t.Errorf("fd.running = %s\n\nwant %s", spew.Sdump(ctx.fd.running()),
@@ -81,8 +82,8 @@ func TestSetupWorker(t *testing.T) {
 	setupWorker()
 
 	exp := map[string][]string{
-		Ovsdb:       {"ovsdb-server"},
-		Ovsvswitchd: {"ovs-vswitchd"},
+		images.Ovsdb:       {"ovsdb-server"},
+		images.Ovsvswitchd: {"ovs-vswitchd"},
 	}
 
 	if !reflect.DeepEqual(ctx.fd.running(), exp) {

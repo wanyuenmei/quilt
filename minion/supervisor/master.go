@@ -4,12 +4,13 @@ import (
 	"fmt"
 
 	"github.com/quilt/quilt/db"
+	"github.com/quilt/quilt/minion/supervisor/images"
 	"github.com/quilt/quilt/util"
 )
 
 func runMaster() {
-	run(Ovsdb, "ovsdb-server")
-	run(Registry)
+	run(images.Ovsdb, "ovsdb-server")
+	run(images.Registry)
 	go runMasterSystem()
 }
 
@@ -35,7 +36,7 @@ func runMasterOnce() {
 	leader := etcdRow.Leader
 
 	if oldIP != IP || !util.StrSliceEqual(oldEtcdIPs, etcdIPs) {
-		Remove(Etcd)
+		Remove(images.Etcd)
 	}
 
 	oldEtcdIPs = etcdIPs
@@ -45,7 +46,7 @@ func runMasterOnce() {
 		return
 	}
 
-	run(Etcd, fmt.Sprintf("--name=master-%s", IP),
+	run(images.Etcd, fmt.Sprintf("--name=master-%s", IP),
 		fmt.Sprintf("--initial-cluster=%s", initialClusterString(etcdIPs)),
 		fmt.Sprintf("--advertise-client-urls=http://%s:2379", IP),
 		fmt.Sprintf("--listen-peer-urls=http://%s:2380", IP),
@@ -55,15 +56,15 @@ func runMasterOnce() {
 		"--initial-cluster-state=new",
 		"--election-timeout="+etcdElectionTimeout)
 
-	run(Ovsdb, "ovsdb-server")
-	run(Registry)
+	run(images.Ovsdb, "ovsdb-server")
+	run(images.Registry)
 
 	if leader {
 		/* XXX: If we fail to boot ovn-northd, we should give up
 		* our leadership somehow.  This ties into the general
 		* problem of monitoring health. */
-		run(Ovnnorthd, "ovn-northd")
+		run(images.Ovnnorthd, "ovn-northd")
 	} else {
-		Remove(Ovnnorthd)
+		Remove(images.Ovnnorthd)
 	}
 }

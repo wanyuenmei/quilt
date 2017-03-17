@@ -24,7 +24,8 @@ func main() {
 			"[log-file=<log_output_file>] " +
 			"[daemon | inspect <stitch> | run <stitch> | minion | " +
 			"stop <namespace> | get <import_path> | " +
-			"ps | ssh <id> [command] | logs <container> | version]")
+			"ps | ssh <id> [command] | " +
+			"logs <container> | debug-logs <id...> | version]")
 		fmt.Println("\nWhen provided a stitch, quilt takes responsibility\n" +
 			"for deploying it as specified.  Alternatively, quilt may be\n" +
 			"instructed to stop all deployments in a given namespace,\n" +

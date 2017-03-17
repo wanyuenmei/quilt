@@ -21,6 +21,29 @@ func (_m *MockClient) Close() error {
 	return r0
 }
 
+// CombinedOutput provides a mock function with given fields: _a0
+func (_m *MockClient) CombinedOutput(_a0 string) ([]byte, error) {
+	ret := _m.Called(_a0)
+
+	var r0 []byte
+	if rf, ok := ret.Get(0).(func(string) []byte); ok {
+		r0 = rf(_a0)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]byte)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(_a0)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Run provides a mock function with given fields: _a0, _a1
 func (_m *MockClient) Run(_a0 bool, _a1 string) error {
 	ret := _m.Called(_a0, _a1)

@@ -48,6 +48,7 @@ COV_SKIP= /api/client/mocks \
 	  /scripts/specs-tester \
 	  /scripts/specs-tester/tests \
 	  /minion/pb \
+	  /minion/supervisor/images \
 	  /version
 
 COV_PKG = $(subst github.com/quilt/quilt,,$(PACKAGES))
