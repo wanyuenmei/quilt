@@ -249,7 +249,11 @@ func TestRunFilepathToContent(t *testing.T) {
 	}
 	id, err := dk.Run(RunOptions{Name: "name1", FilepathToContent: fileMap})
 	assert.NoError(t, err)
-	assert.Equal(t, fileMap, md.Uploads[id])
+
+	assert.Equal(t, map[UploadToContainerOptions]struct{}{
+		{ContainerID: id, UploadPath: "", TarPath: "baz", Contents: "qux"}: {},
+		{ContainerID: id, UploadPath: "", TarPath: "foo", Contents: "bar"}: {},
+	}, md.Uploads)
 
 	md.UploadError = true
 	_, err = dk.Run(RunOptions{Name: "name1", FilepathToContent: fileMap})

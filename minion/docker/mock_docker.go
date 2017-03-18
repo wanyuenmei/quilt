@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"path/filepath"
 	"strings"
 	"sync"
 
@@ -24,6 +23,11 @@ type BuildImageOptions struct {
 	Name, Dockerfile string
 }
 
+// UploadToContainerOptions represents the parameters in a call to UploadToContainer.
+type UploadToContainerOptions struct {
+	ContainerID, UploadPath, TarPath, Contents string
+}
+
 // MockClient gives unit testers access to the internals of the mock docker client
 // returned by NewMock.
 type MockClient struct {
@@ -33,7 +37,7 @@ type MockClient struct {
 	Pushed     map[dkc.PushImageOptions]struct{}
 	Containers map[string]mockContainer
 	Networks   map[string]*dkc.Network
-	Uploads    map[string]map[string]string
+	Uploads    map[UploadToContainerOptions]struct{}
 	Images     map[string]*dkc.Image
 
 	createdExecs map[string]dkc.CreateExecOptions
@@ -65,7 +69,7 @@ func NewMock() (*MockClient, Client) {
 		Pushed:       map[dkc.PushImageOptions]struct{}{},
 		Containers:   map[string]mockContainer{},
 		Networks:     map[string]*dkc.Network{},
-		Uploads:      map[string]map[string]string{},
+		Uploads:      map[UploadToContainerOptions]struct{}{},
 		Images:       map[string]*dkc.Image{},
 		createdExecs: map[string]dkc.CreateExecOptions{},
 		Executions:   map[string][]string{},
@@ -366,10 +370,6 @@ func (dk MockClient) UploadToContainer(id string,
 		return errors.New("upload error")
 	}
 
-	if _, ok := dk.Uploads[id]; !ok {
-		dk.Uploads[id] = map[string]string{}
-	}
-
 	tr := tar.NewReader(opts.InputStream)
 	for {
 		hdr, err := tr.Next()
@@ -384,8 +384,12 @@ func (dk MockClient) UploadToContainer(id string,
 			return err
 		}
 
-		path := filepath.Join(opts.Path, hdr.Name)
-		dk.Uploads[id][path] = string(file)
+		dk.Uploads[UploadToContainerOptions{
+			ContainerID: id,
+			UploadPath:  opts.Path,
+			TarPath:     hdr.Name,
+			Contents:    string(file),
+		}] = struct{}{}
 	}
 
 	return nil

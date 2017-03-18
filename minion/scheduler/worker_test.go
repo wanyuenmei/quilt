@@ -149,7 +149,14 @@ func TestInitsFiles(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, dkcs, 1)
 	assert.Equal(t, filesHash(fileMap), dkcs[0].Labels[filesKey])
-	assert.Equal(t, fileMap, md.Uploads[dkcs[0].ID])
+	assert.Equal(t, map[docker.UploadToContainerOptions]struct{}{
+		{
+			ContainerID: dkcs[0].ID,
+			UploadPath:  "",
+			TarPath:     "File",
+			Contents:    "Contents",
+		}: {},
+	}, md.Uploads)
 }
 
 func TestSyncJoinScore(t *testing.T) {
