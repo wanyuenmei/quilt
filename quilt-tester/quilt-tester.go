@@ -21,8 +21,8 @@ const (
 	quiltPath          = "/.quilt"
 	infrastructureSpec = quiltPath + "/github.com/quilt/quilt/quilt-tester/" +
 		"config/infrastructure-runner.js"
-	slackEndpoint = "https://hooks.slack.com/services/T04Q3TL41/B0M25TWP5/" +
-		"soKJeP5HbWcjkUJzEHh7ylYm"
+	slackEndpoint = "https://hooks.slack.com/services/T4LADFWP5/B4M344RU6/" +
+		"D4SUkbqsAR1JNJyvjB460mK8"
 	testerImport = "github.com/quilt/quilt"
 	webRoot      = "/var/www/quilt-tester"
 )
