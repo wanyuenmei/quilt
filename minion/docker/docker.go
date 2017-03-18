@@ -392,8 +392,15 @@ func (dk Client) create(name, image string, args []string,
 	}
 
 	for path, content := range filepathToContent {
-		dir, file := filepath.Split(path)
-		tarBuf, err := util.ToTar(file, 0644, content)
+		dir := "."
+		if filepath.IsAbs(path) {
+			dir = "/"
+		}
+
+		// We can safely ignore the error returned by `filepath.Rel` because
+		// dir can only be `.` or `/`.
+		relPath, _ := filepath.Rel(dir, path)
+		tarBuf, err := util.ToTar(relPath, 0644, content)
 		if err != nil {
 			return "", err
 		}

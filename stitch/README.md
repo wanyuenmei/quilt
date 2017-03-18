@@ -65,7 +65,8 @@ If the files change after the container boots, Quilt does not restart the contai
 However, if the file content specified by `filepathToContent` changes, Quilt will
 destroy the old container and boot a new one with the proper files.
 
-The files are installed with permissions `0644`.
+The files are installed with permissions `0644`. Parent directories are
+automatically created.
 
 ### Container.hostname()
 

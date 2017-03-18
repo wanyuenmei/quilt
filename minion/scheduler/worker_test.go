@@ -152,7 +152,7 @@ func TestInitsFiles(t *testing.T) {
 	assert.Equal(t, map[docker.UploadToContainerOptions]struct{}{
 		{
 			ContainerID: dkcs[0].ID,
-			UploadPath:  "",
+			UploadPath:  ".",
 			TarPath:     "File",
 			Contents:    "Contents",
 		}: {},

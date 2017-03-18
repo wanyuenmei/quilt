@@ -244,15 +244,21 @@ func TestRunFilepathToContent(t *testing.T) {
 	md, dk := NewMock()
 
 	fileMap := map[string]string{
-		"foo": "bar",
-		"baz": "qux",
+		"foo":      "bar",
+		"/baz":     "qux",
+		"a/b/c/d":  "e",
+		"/a/b/c/d": "e",
+		"../a":     "b",
 	}
 	id, err := dk.Run(RunOptions{Name: "name1", FilepathToContent: fileMap})
 	assert.NoError(t, err)
 
 	assert.Equal(t, map[UploadToContainerOptions]struct{}{
-		{ContainerID: id, UploadPath: "", TarPath: "baz", Contents: "qux"}: {},
-		{ContainerID: id, UploadPath: "", TarPath: "foo", Contents: "bar"}: {},
+		{ContainerID: id, UploadPath: ".", TarPath: "foo", Contents: "bar"}:   {},
+		{ContainerID: id, UploadPath: "/", TarPath: "baz", Contents: "qux"}:   {},
+		{ContainerID: id, UploadPath: ".", TarPath: "a/b/c/d", Contents: "e"}: {},
+		{ContainerID: id, UploadPath: "/", TarPath: "a/b/c/d", Contents: "e"}: {},
+		{ContainerID: id, UploadPath: ".", TarPath: "../a", Contents: "b"}:    {},
 	}, md.Uploads)
 
 	md.UploadError = true
