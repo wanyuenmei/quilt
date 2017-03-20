@@ -39,21 +39,6 @@ COV_SKIP= /api/client/mocks \
 	  /minion/pprofile \
 	  /minion/ovsdb/mocks \
 	  /minion/network/mocks \
-	  /quilt-tester \
-	  /quilt-tester/tests/10-network \
-	  /quilt-tester/tests/15-bandwidth \
-	  /quilt-tester/tests/20-spark \
-	  /quilt-tester/tests/30-mean \
-	  /quilt-tester/tests/40-stop \
-	  /quilt-tester/tests/100-logs \
-	  /quilt-tester/tests/75-network \
-	  /quilt-tester/tests/60-duplicate-cluster-setup \
-	  /quilt-tester/tests/61-duplicate-cluster \
-	  /quilt-tester/tests/elasticsearch \
-	  /quilt-tester/tests/etcd \
-	  /quilt-tester/tests/build-dockerfile \
-	  /quilt-tester/tests/inbound-public \
-	  /quilt-tester/tests/outbound-public \
 	  /quiltctl/testutils \
 	  /scripts \
 	  /scripts/format \
@@ -125,16 +110,6 @@ go-get: get-build-tools
 	    github.com/golang/protobuf/{proto,protoc-gen-go} \
 	    github.com/vektra/mockery/.../
 
-tests:
-	cd -P quilt-tester && \
-	for suite in tests/* ; do \
-		for f in $$suite/* ; do \
-			if [ $${f: -3} == ".go" ] ; then \
-				CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o $${f%???} $$f ; \
-			fi \
-		done \
-	done
-
 docker-build-quilt:
 	cd -P . && git show --pretty=medium --no-patch > buildinfo \
 		&& CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build . \
@@ -142,12 +117,6 @@ docker-build-quilt:
 
 docker-push-quilt:
 	${DOCKER} push ${REPO}/quilt
-
-docker-build-tester: tests
-	cd -P quilt-tester \
-	    && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-	       go build -o bin/quilt-tester . \
-	    && ${DOCKER} build -t ${REPO}/tester .
 
 docker-build-ovs:
 	cd -P ovs && docker build -t ${REPO}/ovs .

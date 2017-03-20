@@ -42,20 +42,20 @@ func testSpec(specPath string) error {
 // TestSpecs checks that the listed Quilt specs compile.
 func TestSpecs() error {
 	specs := []string{
-		"./quilt-tester/tests/100-logs/logs.js",
-		"./quilt-tester/tests/61-duplicate-cluster/duplicate-cluster.js",
-		"./quilt-tester/tests/60-duplicate-cluster-setup/" +
+		"github.com/quilt/tester/tests/100-logs/logs.js",
+		"github.com/quilt/tester/tests/61-duplicate-cluster/duplicate-cluster.js",
+		"github.com/quilt/tester/tests/60-duplicate-cluster-setup/" +
 			"duplicate-cluster-setup.js",
-		"./quilt-tester/tests/40-stop/stop.js",
-		"./quilt-tester/tests/30-mean/mean.js",
-		"./quilt-tester/tests/20-spark/spark.js",
-		"./quilt-tester/tests/15-bandwidth/bandwidth.js",
-		"./quilt-tester/tests/10-network/network.js",
-		"./quilt-tester/tests/outbound-public/outbound-public.js",
-		"./quilt-tester/tests/inbound-public/inbound-public.js",
-		"./quilt-tester/tests/elasticsearch/elasticsearch.js",
-		"./quilt-tester/tests/build-dockerfile/build-dockerfile.js",
-		"./quilt-tester/tests/etcd/etcd.js",
+		"github.com/quilt/tester/tests/40-stop/stop.js",
+		"github.com/quilt/tester/tests/30-mean/mean.js",
+		"github.com/quilt/tester/tests/20-spark/spark.js",
+		"github.com/quilt/tester/tests/15-bandwidth/bandwidth.js",
+		"github.com/quilt/tester/tests/10-network/network.js",
+		"github.com/quilt/tester/tests/outbound-public/outbound-public.js",
+		"github.com/quilt/tester/tests/inbound-public/inbound-public.js",
+		"github.com/quilt/tester/tests/elasticsearch/elasticsearch.js",
+		"github.com/quilt/tester/tests/build-dockerfile/build-dockerfile.js",
+		"github.com/quilt/tester/tests/etcd/etcd.js",
 
 		"github.com/quilt/nginx/main.js",
 		"github.com/quilt/spark/sparkPI.js",
@@ -69,6 +69,7 @@ func TestSpecs() error {
 		"github.com/quilt/django/django-example.js",
 		"github.com/quilt/php-apache/main.js",
 		"github.com/quilt/mongo/example.js",
+		"github.com/quilt/tester/tester-runner-example.js",
 	}
 
 	for _, specPath := range specs {

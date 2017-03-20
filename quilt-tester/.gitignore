@@ -1,6 +1,0 @@
-bin/quilt-tester
-tests/100-basic/check_docker
-tests/100-basic/check_logs
-tests/spark/check_spark
-tests/75-network/check_network
-vagrant/.vagrant/
