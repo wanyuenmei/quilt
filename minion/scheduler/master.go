@@ -23,12 +23,13 @@ type context struct {
 }
 
 func runMaster(conn db.Conn) {
-	conn.Txn(db.ContainerTable, db.EtcdTable, db.MinionTable, db.ImageTable,
-		db.PlacementTable).Run(func(view db.Database) error {
+	if !conn.EtcdLeader() {
+		return
+	}
 
-		if view.EtcdLeader() {
-			placeContainers(view)
-		}
+	conn.Txn(db.ContainerTable, db.MinionTable, db.ImageTable,
+		db.PlacementTable).Run(func(view db.Database) error {
+		placeContainers(view)
 		return nil
 	})
 }
