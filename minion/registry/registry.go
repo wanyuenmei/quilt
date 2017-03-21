@@ -41,24 +41,33 @@ func runOnce(conn db.Conn, dk docker.Client) {
 		return
 	}
 
+	var toBuild []db.Image
 	conn.Txn(db.ImageTable).Run(func(view db.Database) error {
-		for _, img := range view.SelectFromImage(nil) {
-			if img.DockerID != "" {
-				continue
-			}
-
-			id, err := updateRegistry(dk, img)
-			if err != nil {
-				log.WithError(err).WithField("image", img.Name).
-					Error("Failed to update registry")
-				continue
-			}
-
-			img.DockerID = id
-			view.Commit(img)
-		}
+		toBuild = view.SelectFromImage(func(img db.Image) bool {
+			return img.DockerID == ""
+		})
 		return nil
 	})
+
+	for _, img := range toBuild {
+		id, err := updateRegistry(dk, img)
+		if err != nil {
+			log.WithError(err).WithField("image", img.Name).
+				Error("Failed to update registry")
+			continue
+		}
+
+		conn.Txn(db.ImageTable).Run(func(view db.Database) error {
+			dbImgs := view.SelectFromImage(func(dbImg db.Image) bool {
+				return img == dbImg
+			})
+			if len(dbImgs) != 0 {
+				dbImgs[0].DockerID = id
+				view.Commit(dbImgs[0])
+			}
+			return nil
+		})
+	}
 }
 
 func updateRegistry(dk docker.Client, img db.Image) (string, error) {
