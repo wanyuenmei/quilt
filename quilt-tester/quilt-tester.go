@@ -13,7 +13,11 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
+	"github.com/quilt/quilt/api"
+	"github.com/quilt/quilt/api/client/getter"
+	apiUtil "github.com/quilt/quilt/api/util"
 	"github.com/quilt/quilt/stitch"
+	"github.com/quilt/quilt/util"
 )
 
 const (
@@ -219,11 +223,6 @@ func (t *tester) setup() error {
 }
 
 func (t tester) runTestSuites() error {
-	l := log.testerLogger
-
-	l.infoln("Wait 5 minutes for containers to start up")
-	time.Sleep(5 * time.Minute)
-
 	var err error
 	for _, suite := range t.testSuites {
 		if e := suite.run(); e != nil && err == nil {
@@ -323,12 +322,20 @@ func (ts *testSuite) run() error {
 	contents, _ := fileContents(ts.spec)
 	l.println(contents)
 	l.infoln("End " + ts.name + ".js")
+	defer l.infoln(fmt.Sprintf("Finished Test Suite: %s", ts.name))
 
 	runSpec(ts.spec)
 
-	// Wait for the containers to start
-	l.infoln("Waiting 5 minutes for containers to start up")
-	time.Sleep(5 * time.Minute)
+	l.infoln("Waiting for containers to start up")
+	if err := waitForContainers(ts.spec); err != nil {
+		l.println(".. Containers never started: " + err.Error())
+		ts.failed = 1
+		return err
+	}
+
+	// Wait a little bit longer for any container bootstrapping after boot.
+	time.Sleep(30 * time.Second)
+
 	l.infoln("Starting Tests")
 	var err error
 	for _, test := range ts.tests {
@@ -347,9 +354,36 @@ func (ts *testSuite) run() error {
 	}
 
 	l.infoln("Finished Tests")
-	l.infoln(fmt.Sprintf("Finished Test Suite: %s", ts.name))
 
 	return err
+}
+
+func waitForContainers(specPath string) error {
+	stc, err := stitch.FromFile(specPath, stitch.NewImportGetter(quiltPath))
+	if err != nil {
+		return err
+	}
+
+	localClient, err := getter.New().Client(api.DefaultSocket)
+	if err != nil {
+		return err
+	}
+
+	return util.WaitFor(func() bool {
+		for _, exp := range stc.Containers {
+			containerClient, err := getter.New().ContainerClient(localClient,
+				exp.ID)
+			if err != nil {
+				return false
+			}
+
+			actual, err := apiUtil.GetContainer(containerClient, exp.ID)
+			if err != nil || actual.Created.IsZero() {
+				return false
+			}
+		}
+		return true
+	}, 15*time.Second, 10*time.Minute)
 }
 
 func runTest(testPath string) error {
