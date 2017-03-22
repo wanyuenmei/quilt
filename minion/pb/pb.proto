@@ -19,8 +19,9 @@ message MinionConfig {
     string Provider = 5;
     string Size = 6;
     string Region = 7;
-    repeated string EtcdMembers = 8;
-    repeated string AuthorizedKeys = 9;
+    string FloatingIP = 8;
+    repeated string EtcdMembers = 9;
+    repeated string AuthorizedKeys = 10;
 }
 
 message Reply {

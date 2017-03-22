@@ -74,6 +74,7 @@ func (s server) SetMinionConfig(ctx context.Context,
 		minion.Provider = msg.Provider
 		minion.Size = msg.Size
 		minion.Region = msg.Region
+		minion.FloatingIP = msg.FloatingIP
 		minion.AuthorizedKeys = strings.Join(msg.AuthorizedKeys, "\n")
 		minion.Self = true
 		view.Commit(minion)

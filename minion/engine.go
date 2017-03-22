@@ -33,6 +33,7 @@ func updatePlacements(view db.Database, spec stitch.Stitch) {
 			Provider:    sp.Provider,
 			Size:        sp.Size,
 			Region:      sp.Region,
+			FloatingIP:  sp.FloatingIP,
 		})
 	}
 
