@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -103,12 +104,28 @@ func ReadFile(filename string) (string, error) {
 	return string(fileBytes), nil
 }
 
+// RemoveAll deletes the entire directory tree rooted at path.
+func RemoveAll(path string) error {
+	a := afero.Afero{
+		Fs: AppFs,
+	}
+	return a.RemoveAll(path)
+}
+
 // Mkdir creates a new aero directory.
 func Mkdir(path string, perm os.FileMode) error {
 	a := afero.Afero{
 		Fs: AppFs,
 	}
 	return a.Mkdir(path, perm)
+}
+
+// Stat returns file info on the given path.
+func Stat(path string) (os.FileInfo, error) {
+	a := afero.Afero{
+		Fs: AppFs,
+	}
+	return a.Stat(path)
 }
 
 // FileExists checks if the given path corresponds to an existing file in the Afero
@@ -118,6 +135,14 @@ func FileExists(path string) (bool, error) {
 		Fs: AppFs,
 	}
 	return a.Exists(path)
+}
+
+// Walk performs a traversal of the directory tree rooted at root.
+func Walk(root string, walkFn filepath.WalkFunc) error {
+	a := afero.Afero{
+		Fs: AppFs,
+	}
+	return afero.Walk(a, root, walkFn)
 }
 
 // StrSliceEqual returns true of the string slices 'x' and 'y' are identical.

@@ -1,9 +1,12 @@
 package command
 
 import (
+	"archive/tar"
+	"bytes"
 	"errors"
 	"flag"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -35,6 +38,7 @@ type Debug struct {
 	all        bool
 	containers bool
 	machines   bool
+	tar        bool
 	ids        []string
 
 	common       *commonFlags
@@ -93,12 +97,13 @@ func NewDebugCommand() *Debug {
 	}
 }
 
-var debugUsage = `usage: quilt debug-logs [-v] [-i <keyfile>]` +
+var debugUsage = `usage: quilt debug-logs [-v] [-tar=<true/false>] [-i <keyfile>]` +
 	` <-all | -containers | -machines | <id> ...>
 
 Fetch logs for a set of machines or containers, placing
 the contents in appropriately named file inside a
-timestamped folder.
+timestamped tarball. To store the contents in a folder
+instead, use the flag '-tar=false'.
 
 If the -all option is supplied, logs from all machines
 and containers will be fetched. Else if the -containers
@@ -132,6 +137,8 @@ func (dCmd *Debug) InstallFlags(flags *flag.FlagSet) {
 	flags.BoolVar(&dCmd.machines, "machines", false,
 		"if provided, fetch all debug logs for machines"+
 			" (including quilt system containers)")
+	flags.BoolVar(&dCmd.tar, "tar", true,
+		"if true (default), compress the logs into a tarball")
 
 	flags.Usage = func() {
 		fmt.Println(debugUsage)
@@ -292,6 +299,10 @@ func (dCmd Debug) downloadLogs(targets []logTarget) int {
 	if errno > 0 {
 		log.Error("Some downloads failed")
 	}
+
+	if dCmd.tar {
+		errno += tarball(rootDir)
+	}
 	return errno
 }
 
@@ -374,4 +385,54 @@ func findTarget(targets []logTarget, id string) (logTarget, error) {
 	}
 
 	return choice, nil
+}
+
+func tarball(root string) int {
+	buf := new(bytes.Buffer)
+	tw := tar.NewWriter(buf)
+	ballUp := func(path string, info os.FileInfo, err error) error {
+		hdr, err := tar.FileInfoHeader(info, info.Name())
+		if err != nil {
+			return err
+		}
+		hdr.Name = path
+
+		if err := tw.WriteHeader(hdr); err != nil {
+			return err
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		contents, err := util.ReadFile(path)
+		if err != nil {
+			return err
+		}
+
+		_, err = tw.Write([]byte(contents))
+		return err
+	}
+
+	if err := util.Walk(root, ballUp); err != nil {
+		log.WithError(err).Errorf("Failed to tarball directory %s", root)
+		return 1
+	}
+
+	if err := tw.Close(); err != nil {
+		log.WithError(err).Error("Failed to close tar writer")
+		return 1
+	}
+
+	if err := util.RemoveAll(root); err != nil {
+		log.WithError(err).Error("Failed to remove temporary log directory")
+		return 1
+	}
+
+	if err := util.WriteFile(root+".tar", buf.Bytes(), 0644); err != nil {
+		log.WithError(err).Error("Failed to write tarball")
+		return 1
+	}
+
+	return 0
 }

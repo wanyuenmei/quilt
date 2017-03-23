@@ -41,42 +41,55 @@ func TestDebugFlags(t *testing.T) {
 	checkDebugParsing(t, []string{"-i", "key", "1"},
 		Debug{
 			privateKey: "key",
+			tar:        true,
 			ids:        []string{"1"},
 		}, "")
 	checkDebugParsing(t, []string{"-i", "key", "-all"},
 		Debug{
 			privateKey: "key",
+			tar:        true,
 			all:        true,
 			ids:        []string{},
 		}, "")
 	checkDebugParsing(t, []string{"-i", "key", "-containers"},
 		Debug{
 			privateKey: "key",
+			tar:        true,
 			containers: true,
 			ids:        []string{},
 		}, "")
 	checkDebugParsing(t, []string{"-i", "key", "-machines"},
 		Debug{
 			privateKey: "key",
+			tar:        true,
 			machines:   true,
 			ids:        []string{},
 		}, "")
 	checkDebugParsing(t, []string{"-i", "key", "id1", "id2"},
 		Debug{
 			privateKey: "key",
+			tar:        true,
 			ids:        []string{"id1", "id2"},
 		}, "")
 	checkDebugParsing(t, []string{"-all", "-machines", "id1", "id2"},
 		Debug{
+			tar:      true,
 			all:      true,
 			machines: true,
 			ids:      []string{"id1", "id2"},
 		}, "")
 	checkDebugParsing(t, []string{"-containers", "-machines", "id1", "id2"},
 		Debug{
+			tar:        true,
 			containers: true,
 			machines:   true,
 			ids:        []string{"id1", "id2"},
+		}, "")
+	checkDebugParsing(t, []string{"-tar=false", "-machines"},
+		Debug{
+			tar:      false,
+			machines: true,
+			ids:      []string{},
 		}, "")
 	checkDebugParsing(t, []string{}, Debug{},
 		"must supply at least one ID or set option")
@@ -115,6 +128,7 @@ func TestDebug(t *testing.T) {
 		// Check that all logs are fetched.
 		{
 			cmd: Debug{
+				tar:    false,
 				all:    true,
 				common: &commonFlags{},
 			},
@@ -139,6 +153,7 @@ func TestDebug(t *testing.T) {
 		// Check that all logs are fetched with -machines and -containers.
 		{
 			cmd: Debug{
+				tar:        false,
 				machines:   true,
 				containers: true,
 				common:     &commonFlags{},
@@ -164,6 +179,7 @@ func TestDebug(t *testing.T) {
 		// Check that just container logs are fetched.
 		{
 			cmd: Debug{
+				tar:        false,
 				containers: true,
 				common:     &commonFlags{},
 			},
@@ -187,6 +203,7 @@ func TestDebug(t *testing.T) {
 		// Check that just machine logs are fetched.
 		{
 			cmd: Debug{
+				tar:      false,
 				machines: true,
 				common:   &commonFlags{},
 			},
@@ -217,6 +234,7 @@ func TestDebug(t *testing.T) {
 		// Check that we can get logs by specific stitch ids
 		{
 			cmd: Debug{
+				tar:    false,
 				ids:    []string{"2", "4", "5"},
 				common: &commonFlags{},
 			},
@@ -243,6 +261,7 @@ func TestDebug(t *testing.T) {
 		// Check that we can get logs by specific stitch ids in arbitrary order
 		{
 			cmd: Debug{
+				tar:    false,
 				ids:    []string{"4", "2", "1"},
 				common: &commonFlags{},
 			},
@@ -269,6 +288,7 @@ func TestDebug(t *testing.T) {
 		// Check that we error on arbitrary stitch IDs.
 		{
 			cmd: Debug{
+				tar:    false,
 				ids:    []string{"4", "2"},
 				common: &commonFlags{},
 			},
@@ -294,6 +314,7 @@ func TestDebug(t *testing.T) {
 		// Check that we error on non-existent stitch IDs.
 		{
 			cmd: Debug{
+				tar:    false,
 				ids:    []string{"6"},
 				common: &commonFlags{},
 			},
@@ -319,6 +340,7 @@ func TestDebug(t *testing.T) {
 		// Check that containers without a minion aren't reported.
 		{
 			cmd: Debug{
+				tar:        false,
 				containers: true,
 				common:     &commonFlags{},
 			},
@@ -345,6 +367,7 @@ func TestDebug(t *testing.T) {
 		// Check that machines without an IP aren't reported.
 		{
 			cmd: Debug{
+				tar:      false,
 				machines: true,
 				common:   &commonFlags{},
 			},
@@ -399,7 +422,9 @@ func TestDebug(t *testing.T) {
 
 		assert.Equal(t, test.expReturn, testCmd.Run())
 
-		if test.expReturn == 0 {
+		// There should only be daemon files if the fetch succeeded and we didn't
+		// tarball the results.
+		if test.expReturn == 0 && !test.cmd.tar {
 			for _, cmd := range daemonCmds {
 				file := filepath.Join(debugFolder, cmd.name)
 				exists, err := util.FileExists(file)
