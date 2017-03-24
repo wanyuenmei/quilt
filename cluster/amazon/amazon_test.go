@@ -47,12 +47,36 @@ func TestList(t *testing.T) {
 				Name: aws.String(ec2.InstanceStateNameRunning),
 			},
 		},
+		// A reserved instance.
+		{
+			InstanceId:   aws.String("inst3"),
+			InstanceType: aws.String("size2"),
+			State: &ec2.InstanceState{
+				Name: aws.String(ec2.InstanceStateNameRunning),
+			},
+			BlockDeviceMappings: []*ec2.InstanceBlockDeviceMapping{
+				{
+					Ebs: &ec2.EbsInstanceBlockDevice{
+						VolumeId: aws.String("volume-id"),
+					},
+				},
+			},
+		},
 	}
 	mc.On("DescribeInstances", mock.Anything).Return(
 		&ec2.DescribeInstancesOutput{
 			Reservations: []*ec2.Reservation{
 				{
 					Instances: instances,
+				},
+			},
+		}, nil,
+	)
+	mc.On("DescribeVolumes", mock.Anything).Return(
+		&ec2.DescribeVolumesOutput{
+			Volumes: []*ec2.Volume{
+				{
+					Size: aws.Int64(32),
 				},
 			},
 		}, nil,
@@ -115,28 +139,30 @@ func TestList(t *testing.T) {
 					InstanceId: aws.String("inst2"),
 					PublicIp:   aws.String("xx.xxx.xxx.xxx"),
 				},
+				{
+					InstanceId: aws.String("inst3"),
+					PublicIp:   aws.String("8.8.8.8"),
+				},
 			},
 		}, nil,
-	)
-
-	emptyClient := new(mockClient)
-	emptyClient.On("DescribeInstances", mock.Anything).Return(
-		&ec2.DescribeInstancesOutput{}, nil,
-	)
-	emptyClient.On("DescribeSpotInstanceRequests", mock.Anything).Return(
-		&ec2.DescribeSpotInstanceRequestsOutput{}, nil,
-	)
-	emptyClient.On("DescribeAddresses", mock.Anything).Return(
-		&ec2.DescribeAddressesOutput{}, nil,
 	)
 
 	amazonCluster := newAmazon(testNamespace, DefaultRegion)
 	amazonCluster.client = mc
 
-	spots, err := amazonCluster.List()
+	machines, err := amazonCluster.List()
 
 	assert.Nil(t, err)
 	assert.Equal(t, []machine.Machine{
+		{
+			ID:         "inst3",
+			Provider:   db.Amazon,
+			Region:     DefaultRegion,
+			Size:       "size2",
+			DiskSize:   32,
+			FloatingIP: "8.8.8.8",
+			Reserved:   true,
+		},
 		{
 			ID:        "spot1",
 			Provider:  db.Amazon,
@@ -157,7 +183,7 @@ func TestList(t *testing.T) {
 			Provider: db.Amazon,
 			Region:   DefaultRegion,
 		},
-	}, spots)
+	}, machines)
 }
 
 func TestNewACLs(t *testing.T) {
@@ -340,6 +366,20 @@ func TestBoot(t *testing.T) {
 				Name: aws.String(ec2.InstanceStateNameRunning),
 			},
 		},
+		{
+			InstanceId:   aws.String("reserved1"),
+			InstanceType: aws.String("m4.large"),
+			State: &ec2.InstanceState{
+				Name: aws.String(ec2.InstanceStateNameRunning),
+			},
+		},
+		{
+			InstanceId:   aws.String("reserved2"),
+			InstanceType: aws.String("m4.large"),
+			State: &ec2.InstanceState{
+				Name: aws.String(ec2.InstanceStateNameRunning),
+			},
+		},
 	}
 	mc := new(mockClient)
 	mc.On("DescribeSecurityGroups", mock.Anything).Return(
@@ -359,6 +399,18 @@ func TestBoot(t *testing.T) {
 				},
 				{
 					SpotInstanceRequestId: aws.String("spot2"),
+				},
+			},
+		}, nil,
+	)
+	mc.On("RunInstances", mock.Anything).Return(
+		&ec2.Reservation{
+			Instances: []*ec2.Instance{
+				{
+					InstanceId: aws.String("reserved1"),
+				},
+				{
+					InstanceId: aws.String("reserved2"),
 				},
 			},
 		}, nil,
@@ -416,12 +468,28 @@ func TestBoot(t *testing.T) {
 			Size:     "m4.large",
 			DiskSize: 32,
 			Role:     db.Master,
+			Reserved: false,
 		},
 		{
 			Region:   DefaultRegion,
 			Size:     "m4.large",
 			DiskSize: 32,
 			Role:     db.Master,
+			Reserved: false,
+		},
+		{
+			Region:   DefaultRegion,
+			Size:     "m4.large",
+			DiskSize: 32,
+			Role:     db.Master,
+			Reserved: true,
+		},
+		{
+			Region:   DefaultRegion,
+			Size:     "m4.large",
+			DiskSize: 32,
+			Role:     db.Master,
+			Reserved: true,
 		},
 	})
 	assert.Nil(t, err)
@@ -442,6 +510,17 @@ func TestBoot(t *testing.T) {
 			InstanceCount: aws.Int64(2),
 		},
 	)
+	mc.AssertCalled(t, "RunInstances", &ec2.RunInstancesInput{
+		ImageId:      aws.String(amis[DefaultRegion]),
+		InstanceType: aws.String("m4.large"),
+		UserData: aws.String(base64.StdEncoding.EncodeToString(
+			[]byte(cfg))),
+		SecurityGroupIds: aws.StringSlice([]string{"groupId"}),
+		BlockDeviceMappings: []*ec2.BlockDeviceMapping{
+			blockDevice(32)},
+		MaxCount: aws.Int64(2),
+		MinCount: aws.Int64(2),
+	})
 	mc.AssertCalled(t, "CreateTags",
 		&ec2.CreateTagsInput{
 			Tags: []*ec2.Tag{
@@ -453,6 +532,7 @@ func TestBoot(t *testing.T) {
 			Resources: aws.StringSlice([]string{"spot1", "spot2"}),
 		},
 	)
+	mc.AssertExpectations(t)
 }
 
 func TestStop(t *testing.T) {
@@ -460,22 +540,23 @@ func TestStop(t *testing.T) {
 
 	sleep = func(t time.Duration) {}
 	mc := new(mockClient)
-	toStopIDs := []string{"spot1", "spot2"}
+	spotIDs := []string{"spot1", "spot2"}
+	reservedIDs := []string{"reserved1"}
 	// When we're getting information about what machines to stop.
 	mc.On("DescribeSpotInstanceRequests",
 		&ec2.DescribeSpotInstanceRequestsInput{
-			SpotInstanceRequestIds: aws.StringSlice(toStopIDs),
+			SpotInstanceRequestIds: aws.StringSlice(spotIDs),
 		}).Return(
 		&ec2.DescribeSpotInstanceRequestsOutput{
 			SpotInstanceRequests: []*ec2.SpotInstanceRequest{
 				{
-					SpotInstanceRequestId: aws.String(toStopIDs[0]),
+					SpotInstanceRequestId: aws.String(spotIDs[0]),
 					InstanceId:            aws.String("inst1"),
 					State: aws.String(
 						ec2.SpotInstanceStateActive),
 				},
 				{
-					SpotInstanceRequestId: aws.String(toStopIDs[1]),
+					SpotInstanceRequestId: aws.String(spotIDs[1]),
 					State: aws.String(ec2.SpotInstanceStateActive),
 				},
 			},
@@ -503,25 +584,32 @@ func TestStop(t *testing.T) {
 
 	err := amazonCluster.Stop([]machine.Machine{
 		{
-			Region: DefaultRegion,
-			ID:     toStopIDs[0],
+			Region:   DefaultRegion,
+			ID:       spotIDs[0],
+			Reserved: false,
 		},
 		{
-			Region: DefaultRegion,
-			ID:     toStopIDs[1],
+			Region:   DefaultRegion,
+			ID:       spotIDs[1],
+			Reserved: false,
+		},
+		{
+			Region:   DefaultRegion,
+			ID:       reservedIDs[0],
+			Reserved: true,
 		},
 	})
 	assert.Nil(t, err)
 
 	mc.AssertCalled(t, "TerminateInstances",
 		&ec2.TerminateInstancesInput{
-			InstanceIds: aws.StringSlice([]string{"inst1"}),
+			InstanceIds: aws.StringSlice([]string{reservedIDs[0], "inst1"}),
 		},
 	)
 
 	mc.AssertCalled(t, "CancelSpotInstanceRequests",
 		&ec2.CancelSpotInstanceRequestsInput{
-			SpotInstanceRequestIds: aws.StringSlice(toStopIDs),
+			SpotInstanceRequestIds: aws.StringSlice(spotIDs),
 		},
 	)
 }
@@ -770,17 +858,40 @@ func TestUpdateFloatingIPs(t *testing.T) {
 		{
 			ID:         "sir-1",
 			FloatingIP: "x.x.x.x",
+			Reserved:   false,
 		},
 		// Quilt should disassociate all floating IPs from spot instance sir-2.
 		{
 			ID:         "sir-2",
 			FloatingIP: "",
+			Reserved:   false,
 		},
 		// Quilt is asked to disassociate floating IPs from sir-3. sir-3 no longer
 		// has IP associations, but Quilt should not error.
 		{
 			ID:         "sir-3",
 			FloatingIP: "",
+			Reserved:   false,
+		},
+		// Quilt should assign "x.x.x.x" to reserved-1.
+		{
+			ID:         "reserved-1",
+			FloatingIP: "reservedAdd",
+			Reserved:   true,
+		},
+		// Quilt should disassociate all floating IPs from reserved-2.
+		{
+			ID:         "reserved-2",
+			FloatingIP: "",
+			Reserved:   true,
+		},
+		// Quilt is asked to disassociate floating IPs from reserved-3.
+		// reserved-3 no longer has IP associations, but Quilt should not
+		// error.
+		{
+			ID:         "reserved-3",
+			FloatingIP: "",
+			Reserved:   true,
 		},
 	}
 
@@ -798,6 +909,16 @@ func TestUpdateFloatingIPs(t *testing.T) {
 					PublicIp:      aws.String("y.y.y.y"),
 					AssociationId: aws.String("assoc-2"),
 					InstanceId:    aws.String("i-2"),
+				},
+				{
+					AllocationId: aws.String("alloc-reservedAdd"),
+					PublicIp:     aws.String("reservedAdd"),
+				},
+				{
+					AllocationId:  aws.String("alloc-reservedRemove"),
+					PublicIp:      aws.String("reservedRemove"),
+					AssociationId: aws.String("assoc-reservedRemove"),
+					InstanceId:    aws.String("reserved-2"),
 				},
 				// Quilt should ignore z.z.z.z.
 				{
@@ -864,6 +985,15 @@ func TestUpdateFloatingIPs(t *testing.T) {
 
 	mockClient.On("DisassociateAddress", &ec2.DisassociateAddressInput{
 		AssociationId: aws.String("assoc-2"),
+	}).Return(nil, nil)
+
+	mockClient.On("AssociateAddress", &ec2.AssociateAddressInput{
+		InstanceId:   aws.String("reserved-1"),
+		AllocationId: aws.String("alloc-reservedAdd"),
+	}).Return(nil, nil)
+
+	mockClient.On("DisassociateAddress", &ec2.DisassociateAddressInput{
+		AssociationId: aws.String("assoc-reservedRemove"),
 	}).Return(nil, nil)
 
 	err := amazonCluster.UpdateFloatingIPs(mockMachines)

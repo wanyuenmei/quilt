@@ -33,6 +33,8 @@ type client interface {
 	RevokeSecurityGroupIngress(*ec2.RevokeSecurityGroupIngressInput) (
 		*ec2.RevokeSecurityGroupIngressOutput, error)
 
+	RunInstances(*ec2.RunInstancesInput) (*ec2.Reservation, error)
+
 	TerminateInstances(*ec2.TerminateInstancesInput) (
 		*ec2.TerminateInstancesOutput, error)
 

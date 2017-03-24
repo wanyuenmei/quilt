@@ -27,6 +27,14 @@ type Cluster struct {
 	client    client
 }
 
+type awsMachine struct {
+	namespace  string
+	instanceID string
+	spotID     string
+
+	machine machine.Machine
+}
+
 const (
 	// DefaultRegion is the preferred location for machines which haven't a
 	// user specified region preference.
@@ -70,125 +78,219 @@ func newAmazon(namespace, region string) *Cluster {
 	return clst
 }
 
+type bootReq struct {
+	groupID  string
+	cfg      string
+	size     string
+	diskSize int
+	reserved bool
+}
+
 // Boot creates instances in the `clst` configured according to the `bootSet`.
 func (clst *Cluster) Boot(bootSet []machine.Machine) error {
 	if len(bootSet) <= 0 {
 		return nil
 	}
 
-	type bootReq struct {
-		cfg      string
-		size     string
-		diskSize int
+	groupID, _, err := clst.getCreateSecurityGroup()
+	if err != nil {
+		return err
 	}
 
 	bootReqMap := make(map[bootReq]int64) // From boot request to an instance count.
 	for _, m := range bootSet {
-		if m.Reserved {
-			return errors.New("reserved instances are not yet implemented")
-		}
-
 		br := bootReq{
+			groupID:  groupID,
 			cfg:      cloudcfg.Ubuntu(m.SSHKeys, "xenial", m.Role),
 			size:     m.Size,
 			diskSize: m.DiskSize,
+			reserved: m.Reserved,
 		}
 		bootReqMap[br] = bootReqMap[br] + 1
 	}
 
 	var ids []string
 	for br, count := range bootReqMap {
-		groupID, _, err := clst.getCreateSecurityGroup()
-		if err != nil {
-			return err
+		var newIDs []string
+		if br.reserved {
+			newIDs, err = clst.bootReserved(br, count)
+		} else {
+			newIDs, err = clst.bootSpot(br, count)
 		}
-
-		cloudConfig64 := base64.StdEncoding.EncodeToString([]byte(br.cfg))
-		resp, err := clst.client.RequestSpotInstances(
-			&ec2.RequestSpotInstancesInput{
-				SpotPrice: aws.String(spotPrice),
-				LaunchSpecification: &ec2.RequestSpotLaunchSpecification{
-					ImageId:          aws.String(amis[clst.region]),
-					InstanceType:     aws.String(br.size),
-					UserData:         &cloudConfig64,
-					SecurityGroupIds: []*string{aws.String(groupID)},
-					BlockDeviceMappings: []*ec2.BlockDeviceMapping{
-						blockDevice(br.diskSize),
-					},
-				},
-				InstanceCount: &count,
-			})
 
 		if err != nil {
 			return err
 		}
-
-		for _, request := range resp.SpotInstanceRequests {
-			ids = append(ids, *request.SpotInstanceRequestId)
-		}
-	}
-
-	if err := clst.tagSpotRequests(ids); err != nil {
-		return err
+		ids = append(ids, newIDs...)
 	}
 
 	return clst.wait(ids, true)
 }
 
-// Stop shuts down `machines` in `clst.
-func (clst *Cluster) Stop(machines []machine.Machine) error {
-	var ids []string
-	for _, m := range machines {
-		ids = append(ids, m.ID)
+func (clst *Cluster) bootReserved(br bootReq, count int64) (ids []string, err error) {
+	cloudConfig64 := base64.StdEncoding.EncodeToString([]byte(br.cfg))
+	resp, err := clst.client.RunInstances(&ec2.RunInstancesInput{
+		ImageId:          aws.String(amis[clst.region]),
+		InstanceType:     aws.String(br.size),
+		UserData:         &cloudConfig64,
+		SecurityGroupIds: []*string{aws.String(br.groupID)},
+		BlockDeviceMappings: []*ec2.BlockDeviceMapping{
+			blockDevice(br.diskSize)},
+		MaxCount: &count,
+		MinCount: &count,
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	spots, err := clst.client.DescribeSpotInstanceRequests(
-		&ec2.DescribeSpotInstanceRequestsInput{
-			SpotInstanceRequestIds: aws.StringSlice(ids),
+	for _, inst := range resp.Instances {
+		ids = append(ids, *inst.InstanceId)
+	}
+	return ids, nil
+}
+
+func (clst *Cluster) bootSpot(br bootReq, count int64) (ids []string, err error) {
+	cloudConfig64 := base64.StdEncoding.EncodeToString([]byte(br.cfg))
+	resp, err := clst.client.RequestSpotInstances(
+		&ec2.RequestSpotInstancesInput{
+			SpotPrice:     aws.String(spotPrice),
+			InstanceCount: &count,
+			LaunchSpecification: &ec2.RequestSpotLaunchSpecification{
+				ImageId:          aws.String(amis[clst.region]),
+				InstanceType:     aws.String(br.size),
+				UserData:         &cloudConfig64,
+				SecurityGroupIds: []*string{aws.String(br.groupID)},
+				BlockDeviceMappings: []*ec2.BlockDeviceMapping{
+					blockDevice(br.diskSize),
+				},
+			},
 		})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	instIds := []string{}
-	for _, spot := range spots.SpotInstanceRequests {
-		if spot.InstanceId != nil {
-			instIds = append(instIds, *spot.InstanceId)
+	for _, request := range resp.SpotInstanceRequests {
+		ids = append(ids, *request.SpotInstanceRequestId)
+	}
+	return ids, clst.tagSpotRequests(ids)
+}
+
+// Stop shuts down `machines` in `clst.
+func (clst *Cluster) Stop(machines []machine.Machine) (err error) {
+	var ids, spotIDs, instIDs []string
+	for _, m := range machines {
+		ids = append(ids, m.ID)
+		if m.Reserved {
+			instIDs = append(instIDs, m.ID)
+		} else {
+			spotIDs = append(spotIDs, m.ID)
 		}
 	}
 
-	if len(instIds) > 0 {
+	if len(spotIDs) != 0 {
+		spots, err := clst.client.DescribeSpotInstanceRequests(
+			&ec2.DescribeSpotInstanceRequestsInput{
+				SpotInstanceRequestIds: aws.StringSlice(spotIDs),
+			})
+		if err != nil {
+			return err
+		}
+
+		for _, spot := range spots.SpotInstanceRequests {
+			if spot.InstanceId != nil {
+				instIDs = append(instIDs, *spot.InstanceId)
+			}
+		}
+
+		_, err = clst.client.CancelSpotInstanceRequests(
+			&ec2.CancelSpotInstanceRequestsInput{
+				SpotInstanceRequestIds: aws.StringSlice(spotIDs),
+			})
+		if err != nil {
+			return err
+		}
+	}
+
+	if len(instIDs) > 0 {
 		_, err = clst.client.TerminateInstances(&ec2.TerminateInstancesInput{
-			InstanceIds: aws.StringSlice(instIds),
+			InstanceIds: aws.StringSlice(instIDs),
 		})
 		if err != nil {
 			return err
 		}
 	}
 
-	_, err = clst.client.CancelSpotInstanceRequests(
-		&ec2.CancelSpotInstanceRequestsInput{
-			SpotInstanceRequestIds: aws.StringSlice(ids),
-		})
-	if err != nil {
-		return err
-	}
-
-	if err := clst.wait(ids, false); err != nil {
-		return err
-	}
-
-	return nil
+	return clst.wait(ids, false)
 }
 
-// List queries `clst` for the list of booted machines.
-func (clst *Cluster) List() ([]machine.Machine, error) {
-	machines := []machine.Machine{}
-	spots, err := clst.client.DescribeSpotInstanceRequests(nil)
+var trackedSpotStates = aws.StringSlice(
+	[]string{ec2.SpotInstanceStateActive, ec2.SpotInstanceStateOpen})
+
+// `allSpots` fetches and parses all spot requests into a list of `awsMachine`s.
+func (clst *Cluster) allSpots() (machines []awsMachine, err error) {
+	spotsResp, err := clst.client.DescribeSpotInstanceRequests(
+		&ec2.DescribeSpotInstanceRequestsInput{
+			Filters: []*ec2.Filter{
+				{
+					Name:   aws.String("state"),
+					Values: trackedSpotStates,
+				},
+			},
+		})
 	if err != nil {
 		return nil, err
 	}
 
+	for _, spot := range spotsResp.SpotInstanceRequests {
+		var namespace string
+		for _, tag := range spot.Tags {
+			if tag != nil &&
+				resolveString(tag.Key) == namespaceTagKey {
+				namespace = resolveString(tag.Value)
+				break
+			}
+		}
+		machines = append(machines, awsMachine{
+			namespace: namespace,
+			spotID:    resolveString(spot.SpotInstanceRequestId),
+		})
+	}
+	return machines, nil
+}
+
+func (clst *Cluster) parseDiskSize(inst ec2.Instance) (int, error) {
+	if len(inst.BlockDeviceMappings) == 0 {
+		return 0, nil
+	}
+
+	volumeID := inst.BlockDeviceMappings[0].Ebs.VolumeId
+	filters := []*ec2.Filter{
+		{
+			Name: aws.String("volume-id"),
+			Values: []*string{
+				aws.String(*volumeID),
+			},
+		},
+	}
+
+	volumeInfo, err := clst.client.DescribeVolumes(
+		&ec2.DescribeVolumesInput{
+			Filters: filters,
+		})
+	if err != nil {
+		return 0, err
+	}
+
+	if len(volumeInfo.Volumes) == 0 {
+		return 0, nil
+	}
+
+	return int(*volumeInfo.Volumes[0].Size), nil
+}
+
+// `listInstances` fetches and parses all machines in the namespace into a list
+// of `awsMachine`s
+func (clst *Cluster) listInstances() (instances []awsMachine, err error) {
 	insts, err := clst.client.DescribeInstances(&ec2.DescribeInstancesInput{
 		Filters: []*ec2.Filter{
 			{
@@ -199,13 +301,6 @@ func (clst *Cluster) List() ([]machine.Machine, error) {
 	})
 	if err != nil {
 		return nil, err
-	}
-
-	instMap := make(map[string]*ec2.Instance)
-	for _, res := range insts.Reservations {
-		for _, inst := range res.Instances {
-			instMap[*inst.InstanceId] = inst
-		}
 	}
 
 	addrResp, err := clst.client.DescribeAddresses(nil)
@@ -219,101 +314,93 @@ func (clst *Cluster) List() ([]machine.Machine, error) {
 		}
 	}
 
-	for _, spot := range spots.SpotInstanceRequests {
-		if *spot.State != ec2.SpotInstanceStateActive &&
-			*spot.State != ec2.SpotInstanceStateOpen {
-			continue
-		}
-
-		var inst *ec2.Instance
-		if spot.InstanceId != nil {
-			inst = instMap[*spot.InstanceId]
-		}
-
-		// Due to a race condition in the AWS API, it's possible that
-		// spot requests might lose their Tags. If handled naively,
-		// those spot requests would technically be without a namespace,
-		// meaning the instances they create would be live forever as
-		// zombies.
-		//
-		// To mitigate this issue, we rely not only on the spot request
-		// tags, but additionally on the instance security group. If a
-		// spot request has a running instance in the appropriate
-		// security group, it is by definition in our namespace.
-		// Thus, we only check the tags for spot requests without
-		// running instances.
-		if inst == nil {
-			var isOurs bool
-			for _, tag := range spot.Tags {
-				if tag != nil && tag.Key != nil &&
-					*tag.Key == namespaceTagKey {
-					isOurs = *tag.Value == clst.namespace
-					break
-				}
+	for _, res := range insts.Reservations {
+		for _, inst := range res.Instances {
+			diskSize, err := clst.parseDiskSize(*inst)
+			if err != nil {
+				log.WithError(err).
+					Warn("Error retrieving Amazon machine " +
+						"disk information.")
 			}
 
-			if !isOurs {
-				continue
-			}
-		}
-
-		machine := machine.Machine{
-			ID:       *spot.SpotInstanceRequestId,
-			Region:   clst.region,
-			Provider: db.Amazon,
-		}
-
-		if inst != nil {
-			if *inst.State.Name != ec2.InstanceStateNamePending &&
-				*inst.State.Name != ec2.InstanceStateNameRunning {
-				continue
-			}
-
-			if inst.PublicIpAddress != nil {
-				machine.PublicIP = *inst.PublicIpAddress
-			}
-
-			if inst.PrivateIpAddress != nil {
-				machine.PrivateIP = *inst.PrivateIpAddress
-			}
-
-			if inst.InstanceType != nil {
-				machine.Size = *inst.InstanceType
-			}
-
-			if len(inst.BlockDeviceMappings) != 0 {
-				volumeID := inst.BlockDeviceMappings[0].
-					Ebs.VolumeId
-				filters := []*ec2.Filter{
-					{
-						Name: aws.String("volume-id"),
-						Values: []*string{
-							aws.String(*volumeID),
-						},
-					},
-				}
-
-				volumeInfo, err := clst.client.DescribeVolumes(
-					&ec2.DescribeVolumesInput{
-						Filters: filters,
-					})
-				if err != nil {
-					return nil, err
-				}
-				if len(volumeInfo.Volumes) == 1 {
-					machine.DiskSize = int(
-						*volumeInfo.Volumes[0].Size)
-				}
-			}
-
+			var floatingIP string
 			if ip := ipMap[*inst.InstanceId]; ip != nil {
-				machine.FloatingIP = *ip.PublicIp
+				floatingIP = *ip.PublicIp
 			}
-		}
 
-		machines = append(machines, machine)
+			instances = append(instances, awsMachine{
+				instanceID: resolveString(inst.InstanceId),
+				spotID: resolveString(
+					inst.SpotInstanceRequestId),
+				machine: machine.Machine{
+					PublicIP:   resolveString(inst.PublicIpAddress),
+					PrivateIP:  resolveString(inst.PrivateIpAddress),
+					FloatingIP: floatingIP,
+					Size:       resolveString(inst.InstanceType),
+					DiskSize:   diskSize,
+				},
+			})
+		}
+	}
+	return instances, nil
+}
+
+// List queries `clst` for the list of booted machines.
+func (clst *Cluster) List() (machines []machine.Machine, err error) {
+	allSpots, err := clst.allSpots()
+	if err != nil {
+		return nil, err
+	}
+	ourInsts, err := clst.listInstances()
+	if err != nil {
+		return nil, err
 	}
 
+	spotIDKey := func(intf interface{}) interface{} {
+		return intf.(awsMachine).spotID
+	}
+	bootedSpots, nonbootedSpots, reservedInstances :=
+		join.HashJoin(awsMachineSlice(allSpots), awsMachineSlice(ourInsts),
+			spotIDKey, spotIDKey)
+
+	var awsMachines []awsMachine
+	for _, mIntf := range reservedInstances {
+		awsMachines = append(awsMachines, mIntf.(awsMachine))
+	}
+
+	// Due to a race condition in the AWS API, it's possible that
+	// spot requests might lose their Tags. If handled naively,
+	// those spot requests would technically be without a namespace,
+	// meaning the instances they create would be live forever as
+	// zombies.
+	//
+	// To mitigate this issue, we rely not only on the spot request
+	// tags, but additionally on the instance security group. If a
+	// spot request has a running instance in the appropriate
+	// security group, it is by definition in our namespace.
+	// Thus, we only check the tags for spot requests without
+	// running instances.
+	for _, pair := range bootedSpots {
+		awsMachines = append(awsMachines, pair.R.(awsMachine))
+	}
+	for _, mIntf := range nonbootedSpots {
+		m := mIntf.(awsMachine)
+		if m.namespace == clst.namespace {
+			awsMachines = append(awsMachines, m)
+		}
+	}
+
+	for _, awsm := range awsMachines {
+		cm := awsm.machine
+		cm.Provider = db.Amazon
+		cm.Region = clst.region
+		cm.Reserved = awsm.spotID == ""
+		cm.ID = awsm.spotID
+		if cm.Reserved {
+			cm.ID = awsm.instanceID
+		}
+		machines = append(machines, cm)
+	}
 	return machines, nil
 }
 
@@ -335,20 +422,22 @@ func (clst *Cluster) UpdateFloatingIPs(machines []machine.Machine) error {
 		}
 	}
 
-	// Map spot request ID to EC2 instance ID.
-	var spotIDs []string
-	for _, machine := range machines {
-		spotIDs = append(spotIDs, machine.ID)
-	}
-	instances, err := clst.getInstances(clst.region, spotIDs)
-	if err != nil {
-		return err
+	// Map machine ID to EC2 instance ID.
+	instances := map[string]string{}
+	for _, m := range machines {
+		if m.Reserved {
+			instances[m.ID] = m.ID
+		} else {
+			instances[m.ID], err = clst.getInstanceID(m.ID)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	for _, machine := range machines {
 		if machine.FloatingIP == "" {
-			instanceID := *instances[machine.ID].InstanceId
-			associationID := associations[instanceID]
+			associationID := associations[instances[machine.ID]]
 			if associationID == nil {
 				continue
 			}
@@ -363,7 +452,7 @@ func (clst *Cluster) UpdateFloatingIPs(machines []machine.Machine) error {
 		} else {
 			allocationID := addresses[machine.FloatingIP]
 			input := ec2.AssociateAddressInput{
-				InstanceId:   instances[machine.ID].InstanceId,
+				InstanceId:   aws.String(instances[machine.ID]),
 				AllocationId: allocationID,
 			}
 			if _, err := clst.client.AssociateAddress(&input); err != nil {
@@ -375,43 +464,20 @@ func (clst *Cluster) UpdateFloatingIPs(machines []machine.Machine) error {
 	return nil
 }
 
-func (clst Cluster) getInstances(region string, spotIDs []string) (
-	map[string]*ec2.Instance, error) {
-
-	instances := map[string]*ec2.Instance{}
-
+func (clst Cluster) getInstanceID(spotID string) (string, error) {
 	spotQuery := ec2.DescribeSpotInstanceRequestsInput{
-		SpotInstanceRequestIds: aws.StringSlice(spotIDs),
+		SpotInstanceRequestIds: aws.StringSlice([]string{spotID}),
 	}
 	spotResp, err := clst.client.DescribeSpotInstanceRequests(&spotQuery)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	var instanceIDs []string
-	for _, spot := range spotResp.SpotInstanceRequests {
-		if spot.InstanceId == nil {
-			instances[*spot.SpotInstanceRequestId] = nil
-		} else {
-			instanceIDs = append(instanceIDs, *spot.InstanceId)
-		}
+	if len(spotResp.SpotInstanceRequests) == 0 {
+		return "", fmt.Errorf("no spot requests with ID %s", spotID)
 	}
 
-	instQuery := ec2.DescribeInstancesInput{
-		InstanceIds: aws.StringSlice(instanceIDs),
-	}
-	instResp, err := clst.client.DescribeInstances(&instQuery)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, reservation := range instResp.Reservations {
-		for _, instance := range reservation.Instances {
-			instances[*instance.SpotInstanceRequestId] = instance
-		}
-	}
-
-	return instances, nil
+	return *spotResp.SpotInstanceRequests[0].InstanceId, nil
 }
 
 func (clst *Cluster) tagSpotRequests(ids []string) error {
@@ -441,7 +507,7 @@ func (clst *Cluster) tagSpotRequests(ids []string) error {
 	return err
 }
 
-/* Wait for the spot request 'ids' to have booted or terminated depending on the value
+/* Wait for the 'ids' to have booted or terminated depending on the value
  * of 'boot' */
 func (clst *Cluster) wait(ids []string, boot bool) error {
 	return util.WaitFor(func() bool {
@@ -687,6 +753,23 @@ func blockDevice(diskSize int) *ec2.BlockDeviceMapping {
 			VolumeType:          aws.String("gp2"),
 		},
 	}
+}
+
+func resolveString(ptr *string) string {
+	if ptr == nil {
+		return ""
+	}
+	return *ptr
+}
+
+type awsMachineSlice []awsMachine
+
+func (ams awsMachineSlice) Get(ii int) interface{} {
+	return ams[ii]
+}
+
+func (ams awsMachineSlice) Len() int {
+	return len(ams)
 }
 
 type ipPermissionKey struct {
