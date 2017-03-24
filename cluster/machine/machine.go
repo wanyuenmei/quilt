@@ -23,6 +23,7 @@ type Machine struct {
 	PublicIP   string
 	PrivateIP  string
 	FloatingIP string
+	Reserved   bool
 	Size       string
 	DiskSize   int
 	SSHKeys    []string

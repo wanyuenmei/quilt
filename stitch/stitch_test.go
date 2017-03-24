@@ -30,7 +30,7 @@ func TestMachine(t *testing.T) {
 	})])`,
 		[]Machine{
 			{
-				ID:       "93e93257df71a41050032714b35b20736994c713",
+				ID:       "03b7ed9a5fcd544f2423f6d4e28af0f963d8f2e8",
 				Role:     "Worker",
 				Provider: "Amazon",
 				Region:   "us-west-2",
@@ -39,6 +39,7 @@ func TestMachine(t *testing.T) {
 				RAM:      Range{4, 8},
 				DiskSize: 32,
 				SSHKeys:  []string{"key1", "key2"},
+				Reserved: true,
 			}})
 
 	// Check that changing the SSH keys doesn't change the hash.
@@ -54,7 +55,7 @@ func TestMachine(t *testing.T) {
 	})])`,
 		[]Machine{
 			{
-				ID:       "93e93257df71a41050032714b35b20736994c713",
+				ID:       "03b7ed9a5fcd544f2423f6d4e28af0f963d8f2e8",
 				Role:     "Worker",
 				Provider: "Amazon",
 				Region:   "us-west-2",
@@ -63,22 +64,25 @@ func TestMachine(t *testing.T) {
 				RAM:      Range{4, 8},
 				DiskSize: 32,
 				SSHKeys:  []string{"key3"},
+				Reserved: true,
 			}})
 
 	checkMachines(t, `var baseMachine = new Machine({provider: "Amazon"});
 		deployment.deploy(baseMachine.asMaster().replicate(2));`,
 		[]Machine{
 			{
-				ID:       "404c03a697ed922c6108db21ce2cd1ad5d212d96",
+				ID:       "8dc0b8fc052e246014dc098cb24a35d53336a96f",
 				Role:     "Master",
 				Provider: "Amazon",
 				SSHKeys:  []string{},
+				Reserved: true,
 			},
 			{
-				ID:       "52577e8362c035260bcab31e3700c8718a345053",
+				ID:       "95451f737a4b08f3130c88cf9cb86840469e12dd",
 				Role:     "Master",
 				Provider: "Amazon",
 				SSHKeys:  []string{},
+				Reserved: true,
 			},
 		},
 	)
@@ -89,16 +93,18 @@ func TestMachine(t *testing.T) {
 		deployment.deploy(machines);`,
 		[]Machine{
 			{
-				ID:       "404c03a697ed922c6108db21ce2cd1ad5d212d96",
+				ID:       "8dc0b8fc052e246014dc098cb24a35d53336a96f",
 				Role:     "Master",
 				Provider: "Amazon",
 				SSHKeys:  []string{"key"},
+				Reserved: true,
 			},
 			{
-				ID:       "52577e8362c035260bcab31e3700c8718a345053",
+				ID:       "95451f737a4b08f3130c88cf9cb86840469e12dd",
 				Role:     "Master",
 				Provider: "Amazon",
 				SSHKeys:  []string{},
+				Reserved: true,
 			},
 		},
 	)
@@ -110,11 +116,27 @@ func TestMachine(t *testing.T) {
 	deployment.deploy(baseMachine.asMaster());`,
 		[]Machine{
 			{
-				ID:         "a905d3dffcf2587b6ad785055064ca4a0a1fa2e8",
+				ID:         "a29e69b85268b4aa294c290ffa4057f614ee348a",
 				Role:       "Master",
 				Provider:   "Amazon",
 				FloatingIP: "xxx.xxx.xxx.xxx",
 				SSHKeys:    []string{},
+				Reserved:   true,
+			},
+		})
+
+	checkMachines(t, `var baseMachine = new Machine({
+	  provider: "Amazon",
+	  reserved: false
+	});
+	deployment.deploy(baseMachine.asMaster());`,
+		[]Machine{
+			{
+				ID:       "5a986c0b649e431ec6c9209a8953682376733a91",
+				Role:     "Master",
+				Provider: "Amazon",
+				SSHKeys:  []string{},
+				Reserved: false,
 			},
 		})
 }

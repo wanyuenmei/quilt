@@ -244,6 +244,13 @@ func TestSyncDB(t *testing.T) {
 		stop: []machine.Machine{cmMaster},
 	})
 
+	// Test reserved instances.
+	checkSyncDB([]machine.Machine{{Reserved: true}}, []db.Machine{{Reserved: false}},
+		syncDBResult{
+			boot: []machine.Machine{{Reserved: false}},
+			stop: []machine.Machine{{Reserved: true}},
+		})
+
 	// Test matching role as priority over PublicIP
 	dbMaster.PublicIP = "worker"
 	cmMaster.PublicIP = "master"

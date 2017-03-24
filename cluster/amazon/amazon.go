@@ -84,6 +84,10 @@ func (clst *Cluster) Boot(bootSet []machine.Machine) error {
 
 	bootReqMap := make(map[bootReq]int64) // From boot request to an instance count.
 	for _, m := range bootSet {
+		if m.Reserved {
+			return errors.New("reserved instances are not yet implemented")
+		}
+
 		br := bootReq{
 			cfg:      cloudcfg.Ubuntu(m.SSHKeys, "xenial", m.Role),
 			size:     m.Size,

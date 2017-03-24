@@ -148,6 +148,10 @@ func (clst *Cluster) Boot(bootSet []machine.Machine) error {
 	// XXX: should probably have a better clean up routine if an error is encountered
 	var names []string
 	for _, m := range bootSet {
+		if !m.Reserved {
+			return errors.New("preemptible instances are not yet implemented")
+		}
+
 		name := "quilt-" + uuid.NewV4().String()
 		_, err := clst.instanceNew(name, m.Size,
 			cloudcfg.Ubuntu(m.SSHKeys, "xenial", m.Role))

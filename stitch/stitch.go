@@ -97,6 +97,7 @@ type Machine struct {
 	Region     string   `json:",omitempty"`
 	SSHKeys    []string `json:",omitempty"`
 	FloatingIP string   `json:",omitempty"`
+	Reserved   bool     `json:",omitempty"`
 }
 
 // A Range defines a range of acceptable values for a Machine attribute

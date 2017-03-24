@@ -20,6 +20,7 @@ type Machine struct {
 	DiskSize   int
 	SSHKeys    []string `rowStringer:"omit"`
 	FloatingIP string
+	Reserved   bool
 
 	/* Populated by the cloud provider. */
 	CloudID   string //Cloud Provider ID
@@ -74,7 +75,11 @@ func (m Machine) String() string {
 		tags = append(tags, string(m.Role))
 	}
 
-	tags = append(tags, string(m.Provider)+" "+m.Region+" "+m.Size)
+	machineAttrs := []string{string(m.Provider), m.Region, m.Size}
+	if m.Reserved {
+		machineAttrs = append(machineAttrs, "reserved")
+	}
+	tags = append(tags, strings.Join(machineAttrs, " "))
 
 	if m.CloudID != "" {
 		tags = append(tags, m.CloudID)

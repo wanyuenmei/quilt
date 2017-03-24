@@ -90,6 +90,7 @@ func toDBMachine(machines []stitch.Machine, maxPrice float64) []db.Machine {
 		}
 		m.Provider = p
 		m.Size = stitchm.Size
+		m.Reserved = stitchm.Reserved
 
 		if m.Size == "" {
 			m.Size = cluster.ChooseSize(p, stitchm.RAM, stitchm.CPU,
@@ -142,6 +143,8 @@ func machineTxn(view db.Database, stitch stitch.Stitch) {
 			return -1
 		case dbMachine.Region != stitchMachine.Region:
 			return -1
+		case dbMachine.Reserved != stitchMachine.Reserved:
+			return -1
 		case dbMachine.Size != "" && stitchMachine.Size != dbMachine.Size:
 			return -1
 		case dbMachine.FloatingIP != "" &&
@@ -185,6 +188,7 @@ func machineTxn(view db.Database, stitch stitch.Stitch) {
 		dbMachine.Region = stitchMachine.Region
 		dbMachine.SSHKeys = stitchMachine.SSHKeys
 		dbMachine.FloatingIP = stitchMachine.FloatingIP
+		dbMachine.Reserved = stitchMachine.Reserved
 		view.Commit(dbMachine)
 	}
 }
