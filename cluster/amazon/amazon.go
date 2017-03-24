@@ -29,14 +29,17 @@ type Cluster struct {
 	newClient func(string) client
 }
 
-// DefaultRegion is the preferred location for machines which haven't a user specified
-// region preference.
-const DefaultRegion = "us-west-1"
+const (
+	// DefaultRegion is the preferred location for machines which haven't a
+	// user specified region preference.
+	DefaultRegion = "us-west-1"
+
+	namespaceTagKey = "namespace"
+	spotPrice       = "0.5"
+)
 
 // Regions is the list of supported AWS regions.
 var Regions = []string{"ap-southeast-2", "us-west-1", "us-west-2"}
-
-const spotPrice = "0.5"
 
 // Ubuntu 16.04, 64-bit hvm:ebs-ssd
 var amis = map[string]string{
@@ -246,10 +249,9 @@ func (clst *Cluster) List() ([]machine.Machine, error) {
 		if inst == nil {
 			var isOurs bool
 			for _, tag := range spot.Tags {
-				ns := clst.namespace
 				if tag != nil && tag.Key != nil &&
-					*tag.Key == ns {
-					isOurs = true
+					*tag.Key == namespaceTagKey {
+					isOurs = *tag.Value == clst.namespace
 					break
 				}
 			}
@@ -430,8 +432,8 @@ func (clst *Cluster) tagSpotRequests(ids []string) error {
 		_, err = clst.client.CreateTags(&ec2.CreateTagsInput{
 			Tags: []*ec2.Tag{
 				{
-					Key:   aws.String(clst.namespace),
-					Value: aws.String(""),
+					Key:   aws.String(namespaceTagKey),
+					Value: aws.String(clst.namespace),
 				},
 			},
 			Resources: aws.StringSlice(ids),

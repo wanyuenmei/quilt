@@ -66,8 +66,9 @@ func TestList(t *testing.T) {
 					State: aws.String(ec2.SpotInstanceStateActive),
 					Tags: []*ec2.Tag{
 						{
-							Key:   aws.String(testNamespace),
-							Value: aws.String(""),
+							Key: aws.String(
+								namespaceTagKey),
+							Value: aws.String(testNamespace),
 						},
 					},
 					InstanceId: aws.String("inst1"),
@@ -86,8 +87,9 @@ func TestList(t *testing.T) {
 					State: aws.String(ec2.SpotInstanceStateOpen),
 					Tags: []*ec2.Tag{
 						{
-							Key:   aws.String(testNamespace),
-							Value: aws.String(""),
+							Key: aws.String(
+								namespaceTagKey),
+							Value: aws.String(testNamespace),
 						},
 					},
 				},
@@ -97,8 +99,9 @@ func TestList(t *testing.T) {
 					State: aws.String(ec2.SpotInstanceStateOpen),
 					Tags: []*ec2.Tag{
 						{
-							Key:   aws.String("notOurs"),
-							Value: aws.String(""),
+							Key: aws.String(
+								namespaceTagKey),
+							Value: aws.String("notOurs"),
 						},
 					},
 				},
@@ -452,8 +455,8 @@ func TestBoot(t *testing.T) {
 		&ec2.CreateTagsInput{
 			Tags: []*ec2.Tag{
 				{
-					Key:   aws.String(testNamespace),
-					Value: aws.String(""),
+					Key:   aws.String(namespaceTagKey),
+					Value: aws.String(testNamespace),
 				},
 			},
 			Resources: aws.StringSlice([]string{"spot1", "spot2"}),
