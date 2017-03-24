@@ -80,3 +80,23 @@ can be reached.
 
 If multiple containers have the same hostname, an error is thrown during the
 vetting process.
+
+## Machine
+The Machine object represents a machine to be deployed.
+
+Its attributes are:
+- `role` *string*: The Quilt role the machine will run as. *required*
+    - Master
+    - Worker
+- `provider` *string*: The machine provider. *required*
+    - Amazon
+    - Google
+- `region` *string*: The region the machine will run in. *optional*
+    - Provider-specific
+- `size` *string*: The instance type. *optional*
+    - Provider-specific
+- `cpu` *Range* or *int*: The desired number of CPUs. *optional*
+- `ram` *Range* or *int*: The desired amount of RAM in Gib. *optional*
+- `diskSize` *int*: The desired amount of disk space in GB. *optional*
+- `floatingIp` *string*: A reserved IP to associate with the machine. *optional*
+- `sshKeys` *[]string*: Public keys to allow login into the machine. *optional*
