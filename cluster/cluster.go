@@ -476,15 +476,6 @@ func validRegionsImpl(p db.Provider) []string {
 	}
 }
 
-func groupByRegion(machines []machine.Machine) map[string][]machine.Machine {
-	groups := map[string][]machine.Machine{}
-	for _, m := range machines {
-		groups[m.Region] = append(groups[m.Region], m)
-	}
-
-	return groups
-}
-
 // Stored in variables so they may be mocked out
 var newProvider = newProviderImpl
 var validRegions = validRegionsImpl

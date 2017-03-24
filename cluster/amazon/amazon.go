@@ -501,38 +501,6 @@ func (clst *Cluster) wait(awsIDs []awsID, boot bool) error {
 	}, 10*time.Second, timeout)
 }
 
-func (clst *Cluster) isDoneWaiting(awsIDs []awsID, boot bool) (bool, error) {
-	machines, err := clst.List()
-	if err != nil {
-		log.WithError(err).Warn("Failed to get machines.")
-		return true, err
-	}
-
-	exists := make(map[awsID]struct{})
-	for _, inst := range machines {
-		// If the machine wasn't configured completely when the List()
-		// call was made, the cluster will fail to join and boot them
-		// twice.
-		if inst.Size == "" {
-			continue
-		}
-
-		id := awsID{
-			spotID: inst.ID,
-			region: inst.Region,
-		}
-		exists[id] = struct{}{}
-	}
-
-	for _, id := range awsIDs {
-		if _, ok := exists[id]; ok != boot {
-			return false, nil
-		}
-	}
-
-	return true, nil
-}
-
 // SetACLs adds and removes acls in `clst` so that it conforms to `acls`.
 func (clst *Cluster) SetACLs(acls []acl.ACL) error {
 	clst.connectClient()
@@ -755,19 +723,6 @@ func getSpotIDs(ids []awsID) []string {
 	}
 
 	return spotIDs
-}
-
-func groupByRegion(ids []awsID) map[string][]awsID {
-	grouped := make(map[string][]awsID)
-	for _, id := range ids {
-		region := id.region
-		if _, ok := grouped[region]; !ok {
-			grouped[region] = []awsID{}
-		}
-		grouped[region] = append(grouped[region], id)
-	}
-
-	return grouped
 }
 
 type ipPermissionKey struct {
