@@ -25,8 +25,6 @@ type Cluster struct {
 	namespace string
 	region    string
 	client    client
-
-	newClient func(string) client
 }
 
 const (
@@ -66,7 +64,7 @@ func newAmazon(namespace, region string) *Cluster {
 	clst := &Cluster{
 		namespace: strings.ToLower(namespace),
 		region:    region,
-		newClient: newClient,
+		client:    newClient(region),
 	}
 
 	return clst
@@ -74,8 +72,6 @@ func newAmazon(namespace, region string) *Cluster {
 
 // Boot creates instances in the `clst` configured according to the `bootSet`.
 func (clst *Cluster) Boot(bootSet []machine.Machine) error {
-	clst.connectClient()
-
 	if len(bootSet) <= 0 {
 		return nil
 	}
@@ -137,8 +133,6 @@ func (clst *Cluster) Boot(bootSet []machine.Machine) error {
 
 // Stop shuts down `machines` in `clst.
 func (clst *Cluster) Stop(machines []machine.Machine) error {
-	clst.connectClient()
-
 	var ids []string
 	for _, m := range machines {
 		ids = append(ids, m.ID)
@@ -185,8 +179,6 @@ func (clst *Cluster) Stop(machines []machine.Machine) error {
 
 // List queries `clst` for the list of booted machines.
 func (clst *Cluster) List() ([]machine.Machine, error) {
-	clst.connectClient()
-
 	machines := []machine.Machine{}
 	spots, err := clst.client.DescribeSpotInstanceRequests(nil)
 	if err != nil {
@@ -323,7 +315,6 @@ func (clst *Cluster) List() ([]machine.Machine, error) {
 
 // UpdateFloatingIPs updates Elastic IPs <> EC2 instance associations.
 func (clst *Cluster) UpdateFloatingIPs(machines []machine.Machine) error {
-	clst.connectClient()
 	addressDesc, err := clst.client.DescribeAddresses(nil)
 	if err != nil {
 		return err
@@ -380,16 +371,9 @@ func (clst *Cluster) UpdateFloatingIPs(machines []machine.Machine) error {
 	return nil
 }
 
-func (clst *Cluster) connectClient() {
-	if clst.client == nil {
-		clst.client = clst.newClient(clst.region)
-	}
-}
-
 func (clst Cluster) getInstances(region string, spotIDs []string) (
 	map[string]*ec2.Instance, error) {
 
-	clst.connectClient()
 	instances := map[string]*ec2.Instance{}
 
 	spotQuery := ec2.DescribeSpotInstanceRequestsInput{
@@ -489,7 +473,6 @@ func (clst *Cluster) wait(ids []string, boot bool) error {
 
 // SetACLs adds and removes acls in `clst` so that it conforms to `acls`.
 func (clst *Cluster) SetACLs(acls []acl.ACL) error {
-	clst.connectClient()
 	groupID, ingress, err := clst.getCreateSecurityGroup()
 	if err != nil {
 		return err

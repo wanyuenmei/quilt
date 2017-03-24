@@ -48,7 +48,6 @@ type client interface {
 		*ec2.DisassociateAddressOutput, error)
 }
 
-// newClient is a variable so it can be easily replaced while unit testing
 func newClient(region string) client {
 	session := session.New()
 	session.Config.Region = aws.String(region)

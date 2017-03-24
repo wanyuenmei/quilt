@@ -131,12 +131,7 @@ func TestList(t *testing.T) {
 	)
 
 	amazonCluster := newAmazon(testNamespace, DefaultRegion)
-	amazonCluster.newClient = func(region string) client {
-		if region == DefaultRegion {
-			return mc
-		}
-		return emptyClient
-	}
+	amazonCluster.client = mc
 
 	spots, err := amazonCluster.List()
 
@@ -216,9 +211,7 @@ func TestNewACLs(t *testing.T) {
 	)
 
 	cluster := newAmazon(testNamespace, DefaultRegion)
-	cluster.newClient = func(region string) client {
-		return mc
-	}
+	cluster.client = mc
 
 	err := cluster.SetACLs([]acl.ACL{
 		{
@@ -415,9 +408,7 @@ func TestBoot(t *testing.T) {
 	)
 
 	amazonCluster := newAmazon(testNamespace, DefaultRegion)
-	amazonCluster.newClient = func(region string) client {
-		return mc
-	}
+	amazonCluster.client = mc
 
 	err := amazonCluster.Boot([]machine.Machine{
 		{
@@ -508,9 +499,7 @@ func TestStop(t *testing.T) {
 	)
 
 	amazonCluster := newAmazon(testNamespace, DefaultRegion)
-	amazonCluster.newClient = func(region string) client {
-		return mc
-	}
+	amazonCluster.client = mc
 
 	err := amazonCluster.Stop([]machine.Machine{
 		{
@@ -627,9 +616,7 @@ func TestWaitBoot(t *testing.T) {
 	)
 
 	amazonCluster := newAmazon(testNamespace, DefaultRegion)
-	amazonCluster.newClient = func(region string) client {
-		return mc
-	}
+	amazonCluster.client = mc
 
 	exp := []string{"spot1", "spot2"}
 	err := amazonCluster.wait(exp, true)
@@ -746,9 +733,7 @@ func TestWaitStop(t *testing.T) {
 	)
 
 	amazonCluster := newAmazon(testNamespace, DefaultRegion)
-	amazonCluster.newClient = func(region string) client {
-		return mc
-	}
+	amazonCluster.client = mc
 
 	exp := []string{"spot1", "spot2"}
 	err := amazonCluster.wait(exp, false)
@@ -778,9 +763,7 @@ func TestUpdateFloatingIPs(t *testing.T) {
 
 	mockClient := new(mockClient)
 	amazonCluster := newAmazon(testNamespace, DefaultRegion)
-	amazonCluster.newClient = func(region string) client {
-		return mockClient
-	}
+	amazonCluster.client = mockClient
 
 	mockMachines := []machine.Machine{
 		// Quilt should assign "x.x.x.x" to sir-1.
