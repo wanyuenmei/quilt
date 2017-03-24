@@ -628,7 +628,7 @@ func TestWaitBoot(t *testing.T) {
 		return mc
 	}
 
-	exp := []awsID{{"spot1", DefaultRegion}, {"spot2", DefaultRegion}}
+	exp := []string{"spot1", "spot2"}
 	err := amazonCluster.wait(exp, true)
 	assert.Error(t, err, "timed out")
 
@@ -747,7 +747,7 @@ func TestWaitStop(t *testing.T) {
 		return mc
 	}
 
-	exp := []awsID{{"spot1", DefaultRegion}, {"spot2", DefaultRegion}}
+	exp := []string{"spot1", "spot2"}
 	err := amazonCluster.wait(exp, false)
 	assert.Error(t, err, "timed out")
 

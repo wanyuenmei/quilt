@@ -29,11 +29,6 @@ type Cluster struct {
 	newClient func(string) client
 }
 
-type awsID struct {
-	spotID string
-	region string
-}
-
 // DefaultRegion is the preferred location for machines which haven't a user specified
 // region preference.
 const DefaultRegion = "us-west-1"
@@ -98,7 +93,7 @@ func (clst *Cluster) Boot(bootSet []machine.Machine) error {
 		bootReqMap[br] = bootReqMap[br] + 1
 	}
 
-	var awsIDs []awsID
+	var ids []string
 	for br, count := range bootReqMap {
 		groupID, _, err := clst.getCreateSecurityGroup()
 		if err != nil {
@@ -126,35 +121,29 @@ func (clst *Cluster) Boot(bootSet []machine.Machine) error {
 		}
 
 		for _, request := range resp.SpotInstanceRequests {
-			awsIDs = append(awsIDs, awsID{
-				spotID: *request.SpotInstanceRequestId,
-				region: clst.region})
+			ids = append(ids, *request.SpotInstanceRequestId)
 		}
 	}
 
-	if err := clst.tagSpotRequests(awsIDs); err != nil {
+	if err := clst.tagSpotRequests(ids); err != nil {
 		return err
 	}
 
-	return clst.wait(awsIDs, true)
+	return clst.wait(ids, true)
 }
 
 // Stop shuts down `machines` in `clst.
 func (clst *Cluster) Stop(machines []machine.Machine) error {
 	clst.connectClient()
 
-	var ids []awsID
+	var ids []string
 	for _, m := range machines {
-		ids = append(ids, awsID{
-			region: m.Region,
-			spotID: m.ID,
-		})
+		ids = append(ids, m.ID)
 	}
 
-	spotIDs := getSpotIDs(ids)
 	spots, err := clst.client.DescribeSpotInstanceRequests(
 		&ec2.DescribeSpotInstanceRequestsInput{
-			SpotInstanceRequestIds: aws.StringSlice(spotIDs),
+			SpotInstanceRequestIds: aws.StringSlice(ids),
 		})
 	if err != nil {
 		return err
@@ -178,7 +167,7 @@ func (clst *Cluster) Stop(machines []machine.Machine) error {
 
 	_, err = clst.client.CancelSpotInstanceRequests(
 		&ec2.CancelSpotInstanceRequestsInput{
-			SpotInstanceRequestIds: aws.StringSlice(spotIDs),
+			SpotInstanceRequestIds: aws.StringSlice(ids),
 		})
 	if err != nil {
 		return err
@@ -435,9 +424,8 @@ func (clst Cluster) getInstances(region string, spotIDs []string) (
 	return instances, nil
 }
 
-func (clst *Cluster) tagSpotRequests(awsIDs []awsID) error {
+func (clst *Cluster) tagSpotRequests(ids []string) error {
 	var err error
-	spotIDs := getSpotIDs(awsIDs)
 	for i := 0; i < 30; i++ {
 		_, err = clst.client.CreateTags(&ec2.CreateTagsInput{
 			Tags: []*ec2.Tag{
@@ -446,7 +434,7 @@ func (clst *Cluster) tagSpotRequests(awsIDs []awsID) error {
 					Value: aws.String(""),
 				},
 			},
-			Resources: aws.StringSlice(spotIDs),
+			Resources: aws.StringSlice(ids),
 		})
 		if err == nil {
 			return nil
@@ -457,7 +445,7 @@ func (clst *Cluster) tagSpotRequests(awsIDs []awsID) error {
 	log.Warn("Failed to tag spot requests: ", err)
 	clst.client.CancelSpotInstanceRequests(
 		&ec2.CancelSpotInstanceRequestsInput{
-			SpotInstanceRequestIds: aws.StringSlice(spotIDs),
+			SpotInstanceRequestIds: aws.StringSlice(ids),
 		})
 
 	return err
@@ -465,7 +453,7 @@ func (clst *Cluster) tagSpotRequests(awsIDs []awsID) error {
 
 /* Wait for the spot request 'ids' to have booted or terminated depending on the value
  * of 'boot' */
-func (clst *Cluster) wait(awsIDs []awsID, boot bool) error {
+func (clst *Cluster) wait(ids []string, boot bool) error {
 	return util.WaitFor(func() bool {
 		machines, err := clst.List()
 		if err != nil {
@@ -473,7 +461,7 @@ func (clst *Cluster) wait(awsIDs []awsID, boot bool) error {
 			return true
 		}
 
-		exists := make(map[awsID]struct{})
+		exists := make(map[string]struct{})
 		for _, inst := range machines {
 			// When booting, if the machine isn't configured completely
 			// when the List() call was made, the cluster will fail to join
@@ -484,14 +472,10 @@ func (clst *Cluster) wait(awsIDs []awsID, boot bool) error {
 				continue
 			}
 
-			id := awsID{
-				spotID: inst.ID,
-				region: inst.Region,
-			}
-			exists[id] = struct{}{}
+			exists[inst.ID] = struct{}{}
 		}
 
-		for _, id := range awsIDs {
+		for _, id := range ids {
 			if _, ok := exists[id]; ok != boot {
 				return false
 			}
@@ -714,15 +698,6 @@ func blockDevice(diskSize int) *ec2.BlockDeviceMapping {
 			VolumeType:          aws.String("gp2"),
 		},
 	}
-}
-
-func getSpotIDs(ids []awsID) []string {
-	var spotIDs []string
-	for _, id := range ids {
-		spotIDs = append(spotIDs, id.spotID)
-	}
-
-	return spotIDs
 }
 
 type ipPermissionKey struct {
