@@ -148,7 +148,7 @@ func (clst *Cluster) Boot(bootSet []machine.Machine) error {
 	// XXX: should probably have a better clean up routine if an error is encountered
 	var names []string
 	for _, m := range bootSet {
-		if !m.Reserved {
+		if m.Preemptible {
 			return errors.New("preemptible instances are not yet implemented")
 		}
 

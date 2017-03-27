@@ -155,33 +155,36 @@ func TestList(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, []machine.Machine{
 		{
-			ID:         "inst3",
-			Provider:   db.Amazon,
-			Region:     DefaultRegion,
-			Size:       "size2",
-			DiskSize:   32,
-			FloatingIP: "8.8.8.8",
-			Reserved:   true,
+			ID:          "inst3",
+			Provider:    db.Amazon,
+			Region:      DefaultRegion,
+			Size:        "size2",
+			DiskSize:    32,
+			FloatingIP:  "8.8.8.8",
+			Preemptible: false,
 		},
 		{
-			ID:        "spot1",
-			Provider:  db.Amazon,
-			PublicIP:  "publicIP",
-			PrivateIP: "privateIP",
-			Size:      "size",
-			Region:    DefaultRegion,
+			ID:          "spot1",
+			Provider:    db.Amazon,
+			PublicIP:    "publicIP",
+			PrivateIP:   "privateIP",
+			Size:        "size",
+			Region:      DefaultRegion,
+			Preemptible: true,
 		},
 		{
-			ID:         "spot2",
-			Provider:   db.Amazon,
-			Region:     DefaultRegion,
-			Size:       "size2",
-			FloatingIP: "xx.xxx.xxx.xxx",
+			ID:          "spot2",
+			Provider:    db.Amazon,
+			Region:      DefaultRegion,
+			Size:        "size2",
+			FloatingIP:  "xx.xxx.xxx.xxx",
+			Preemptible: true,
 		},
 		{
-			ID:       "spot3",
-			Provider: db.Amazon,
-			Region:   DefaultRegion,
+			ID:          "spot3",
+			Provider:    db.Amazon,
+			Region:      DefaultRegion,
+			Preemptible: true,
 		},
 	}, machines)
 }
@@ -464,32 +467,32 @@ func TestBoot(t *testing.T) {
 
 	err := amazonCluster.Boot([]machine.Machine{
 		{
-			Region:   DefaultRegion,
-			Size:     "m4.large",
-			DiskSize: 32,
-			Role:     db.Master,
-			Reserved: false,
+			Region:      DefaultRegion,
+			Size:        "m4.large",
+			DiskSize:    32,
+			Role:        db.Master,
+			Preemptible: true,
 		},
 		{
-			Region:   DefaultRegion,
-			Size:     "m4.large",
-			DiskSize: 32,
-			Role:     db.Master,
-			Reserved: false,
+			Region:      DefaultRegion,
+			Size:        "m4.large",
+			DiskSize:    32,
+			Role:        db.Master,
+			Preemptible: true,
 		},
 		{
-			Region:   DefaultRegion,
-			Size:     "m4.large",
-			DiskSize: 32,
-			Role:     db.Master,
-			Reserved: true,
+			Region:      DefaultRegion,
+			Size:        "m4.large",
+			DiskSize:    32,
+			Role:        db.Master,
+			Preemptible: false,
 		},
 		{
-			Region:   DefaultRegion,
-			Size:     "m4.large",
-			DiskSize: 32,
-			Role:     db.Master,
-			Reserved: true,
+			Region:      DefaultRegion,
+			Size:        "m4.large",
+			DiskSize:    32,
+			Role:        db.Master,
+			Preemptible: false,
 		},
 	})
 	assert.Nil(t, err)
@@ -584,19 +587,19 @@ func TestStop(t *testing.T) {
 
 	err := amazonCluster.Stop([]machine.Machine{
 		{
-			Region:   DefaultRegion,
-			ID:       spotIDs[0],
-			Reserved: false,
+			Region:      DefaultRegion,
+			ID:          spotIDs[0],
+			Preemptible: true,
 		},
 		{
-			Region:   DefaultRegion,
-			ID:       spotIDs[1],
-			Reserved: false,
+			Region:      DefaultRegion,
+			ID:          spotIDs[1],
+			Preemptible: true,
 		},
 		{
-			Region:   DefaultRegion,
-			ID:       reservedIDs[0],
-			Reserved: true,
+			Region:      DefaultRegion,
+			ID:          reservedIDs[0],
+			Preemptible: false,
 		},
 	})
 	assert.Nil(t, err)
@@ -856,42 +859,42 @@ func TestUpdateFloatingIPs(t *testing.T) {
 	mockMachines := []machine.Machine{
 		// Quilt should assign "x.x.x.x" to sir-1.
 		{
-			ID:         "sir-1",
-			FloatingIP: "x.x.x.x",
-			Reserved:   false,
+			ID:          "sir-1",
+			FloatingIP:  "x.x.x.x",
+			Preemptible: true,
 		},
 		// Quilt should disassociate all floating IPs from spot instance sir-2.
 		{
-			ID:         "sir-2",
-			FloatingIP: "",
-			Reserved:   false,
+			ID:          "sir-2",
+			FloatingIP:  "",
+			Preemptible: true,
 		},
 		// Quilt is asked to disassociate floating IPs from sir-3. sir-3 no longer
 		// has IP associations, but Quilt should not error.
 		{
-			ID:         "sir-3",
-			FloatingIP: "",
-			Reserved:   false,
+			ID:          "sir-3",
+			FloatingIP:  "",
+			Preemptible: true,
 		},
 		// Quilt should assign "x.x.x.x" to reserved-1.
 		{
-			ID:         "reserved-1",
-			FloatingIP: "reservedAdd",
-			Reserved:   true,
+			ID:          "reserved-1",
+			FloatingIP:  "reservedAdd",
+			Preemptible: false,
 		},
 		// Quilt should disassociate all floating IPs from reserved-2.
 		{
-			ID:         "reserved-2",
-			FloatingIP: "",
-			Reserved:   true,
+			ID:          "reserved-2",
+			FloatingIP:  "",
+			Preemptible: false,
 		},
 		// Quilt is asked to disassociate floating IPs from reserved-3.
 		// reserved-3 no longer has IP associations, but Quilt should not
 		// error.
 		{
-			ID:         "reserved-3",
-			FloatingIP: "",
-			Reserved:   true,
+			ID:          "reserved-3",
+			FloatingIP:  "",
+			Preemptible: false,
 		},
 	}
 

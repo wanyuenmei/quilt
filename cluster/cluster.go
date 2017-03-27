@@ -364,7 +364,7 @@ func syncDB(cms []machine.Machine, dbms []db.Machine) syncDBResult {
 
 		// Don't join if m.ID and dbm.CloudID are empty.
 		if m.ID != "" && dbm.CloudID == m.ID &&
-			dbm.Provider == m.Provider && dbm.Reserved == m.Reserved &&
+			dbm.Provider == m.Provider && dbm.Preemptible == m.Preemptible &&
 			dbm.Region == m.Region && dbm.Size == m.Size &&
 			(m.DiskSize == 0 || dbm.DiskSize == m.DiskSize) &&
 			(m.Role == db.None || dbm.Role == m.Role) {
@@ -382,7 +382,7 @@ func syncDB(cms []machine.Machine, dbms []db.Machine) syncDBResult {
 		case dbm.Provider != m.Provider ||
 			dbm.Region != m.Region ||
 			dbm.Size != m.Size ||
-			dbm.Reserved != m.Reserved ||
+			dbm.Preemptible != m.Preemptible ||
 			(m.DiskSize != 0 && dbm.DiskSize != m.DiskSize) ||
 			(m.Role != db.None && dbm.Role != m.Role):
 			return -1
@@ -406,13 +406,13 @@ func syncDB(cms []machine.Machine, dbms []db.Machine) syncDBResult {
 	for _, dbm := range dbmis {
 		m := dbm.(db.Machine)
 		ret.boot = append(ret.boot, machine.Machine{
-			Size:     m.Size,
-			Provider: m.Provider,
-			Region:   m.Region,
-			DiskSize: m.DiskSize,
-			SSHKeys:  m.SSHKeys,
-			Reserved: m.Reserved,
-			Role:     m.Role,
+			Size:        m.Size,
+			Provider:    m.Provider,
+			Region:      m.Region,
+			DiskSize:    m.DiskSize,
+			SSHKeys:     m.SSHKeys,
+			Preemptible: m.Preemptible,
+			Role:        m.Role,
 		})
 	}
 

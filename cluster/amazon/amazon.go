@@ -79,11 +79,11 @@ func newAmazon(namespace, region string) *Cluster {
 }
 
 type bootReq struct {
-	groupID  string
-	cfg      string
-	size     string
-	diskSize int
-	reserved bool
+	groupID     string
+	cfg         string
+	size        string
+	diskSize    int
+	preemptible bool
 }
 
 // Boot creates instances in the `clst` configured according to the `bootSet`.
@@ -100,11 +100,11 @@ func (clst *Cluster) Boot(bootSet []machine.Machine) error {
 	bootReqMap := make(map[bootReq]int64) // From boot request to an instance count.
 	for _, m := range bootSet {
 		br := bootReq{
-			groupID:  groupID,
-			cfg:      cloudcfg.Ubuntu(m.SSHKeys, "xenial", m.Role),
-			size:     m.Size,
-			diskSize: m.DiskSize,
-			reserved: m.Reserved,
+			groupID:     groupID,
+			cfg:         cloudcfg.Ubuntu(m.SSHKeys, "xenial", m.Role),
+			size:        m.Size,
+			diskSize:    m.DiskSize,
+			preemptible: m.Preemptible,
 		}
 		bootReqMap[br] = bootReqMap[br] + 1
 	}
@@ -112,10 +112,10 @@ func (clst *Cluster) Boot(bootSet []machine.Machine) error {
 	var ids []string
 	for br, count := range bootReqMap {
 		var newIDs []string
-		if br.reserved {
-			newIDs, err = clst.bootReserved(br, count)
-		} else {
+		if br.preemptible {
 			newIDs, err = clst.bootSpot(br, count)
+		} else {
+			newIDs, err = clst.bootReserved(br, count)
 		}
 
 		if err != nil {
@@ -180,10 +180,10 @@ func (clst *Cluster) Stop(machines []machine.Machine) (err error) {
 	var ids, spotIDs, instIDs []string
 	for _, m := range machines {
 		ids = append(ids, m.ID)
-		if m.Reserved {
-			instIDs = append(instIDs, m.ID)
-		} else {
+		if m.Preemptible {
 			spotIDs = append(spotIDs, m.ID)
+		} else {
+			instIDs = append(instIDs, m.ID)
 		}
 	}
 
@@ -394,9 +394,9 @@ func (clst *Cluster) List() (machines []machine.Machine, err error) {
 		cm := awsm.machine
 		cm.Provider = db.Amazon
 		cm.Region = clst.region
-		cm.Reserved = awsm.spotID == ""
+		cm.Preemptible = awsm.spotID != ""
 		cm.ID = awsm.spotID
-		if cm.Reserved {
+		if !cm.Preemptible {
 			cm.ID = awsm.instanceID
 		}
 		machines = append(machines, cm)
@@ -425,7 +425,7 @@ func (clst *Cluster) UpdateFloatingIPs(machines []machine.Machine) error {
 	// Map machine ID to EC2 instance ID.
 	instances := map[string]string{}
 	for _, m := range machines {
-		if m.Reserved {
+		if !m.Preemptible {
 			instances[m.ID] = m.ID
 		} else {
 			instances[m.ID], err = clst.getInstanceID(m.ID)

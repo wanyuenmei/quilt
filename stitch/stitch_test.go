@@ -30,16 +30,16 @@ func TestMachine(t *testing.T) {
 	})])`,
 		[]Machine{
 			{
-				ID:       "03b7ed9a5fcd544f2423f6d4e28af0f963d8f2e8",
-				Role:     "Worker",
-				Provider: "Amazon",
-				Region:   "us-west-2",
-				Size:     "m4.large",
-				CPU:      Range{2, 4},
-				RAM:      Range{4, 8},
-				DiskSize: 32,
-				SSHKeys:  []string{"key1", "key2"},
-				Reserved: true,
+				ID:          "0dba3e899652cc7280485c75ad82e7ac7fd6b26e",
+				Role:        "Worker",
+				Provider:    "Amazon",
+				Region:      "us-west-2",
+				Size:        "m4.large",
+				CPU:         Range{2, 4},
+				RAM:         Range{4, 8},
+				DiskSize:    32,
+				SSHKeys:     []string{"key1", "key2"},
+				Preemptible: false,
 			}})
 
 	// Check that changing the SSH keys doesn't change the hash.
@@ -55,34 +55,34 @@ func TestMachine(t *testing.T) {
 	})])`,
 		[]Machine{
 			{
-				ID:       "03b7ed9a5fcd544f2423f6d4e28af0f963d8f2e8",
-				Role:     "Worker",
-				Provider: "Amazon",
-				Region:   "us-west-2",
-				Size:     "m4.large",
-				CPU:      Range{2, 4},
-				RAM:      Range{4, 8},
-				DiskSize: 32,
-				SSHKeys:  []string{"key3"},
-				Reserved: true,
+				ID:          "0dba3e899652cc7280485c75ad82e7ac7fd6b26e",
+				Role:        "Worker",
+				Provider:    "Amazon",
+				Region:      "us-west-2",
+				Size:        "m4.large",
+				CPU:         Range{2, 4},
+				RAM:         Range{4, 8},
+				DiskSize:    32,
+				SSHKeys:     []string{"key3"},
+				Preemptible: false,
 			}})
 
 	checkMachines(t, `var baseMachine = new Machine({provider: "Amazon"});
 		deployment.deploy(baseMachine.asMaster().replicate(2));`,
 		[]Machine{
 			{
-				ID:       "8dc0b8fc052e246014dc098cb24a35d53336a96f",
-				Role:     "Master",
-				Provider: "Amazon",
-				SSHKeys:  []string{},
-				Reserved: true,
+				ID:          "4a364f325f7143db589a507cd3defb41a385d1bd",
+				Role:        "Master",
+				Provider:    "Amazon",
+				SSHKeys:     []string{},
+				Preemptible: false,
 			},
 			{
-				ID:       "95451f737a4b08f3130c88cf9cb86840469e12dd",
-				Role:     "Master",
-				Provider: "Amazon",
-				SSHKeys:  []string{},
-				Reserved: true,
+				ID:          "6595fa48111eec0c9cef2367f370b20f96d4a38c",
+				Role:        "Master",
+				Provider:    "Amazon",
+				SSHKeys:     []string{},
+				Preemptible: false,
 			},
 		},
 	)
@@ -93,18 +93,18 @@ func TestMachine(t *testing.T) {
 		deployment.deploy(machines);`,
 		[]Machine{
 			{
-				ID:       "8dc0b8fc052e246014dc098cb24a35d53336a96f",
-				Role:     "Master",
-				Provider: "Amazon",
-				SSHKeys:  []string{"key"},
-				Reserved: true,
+				ID:          "4a364f325f7143db589a507cd3defb41a385d1bd",
+				Role:        "Master",
+				Provider:    "Amazon",
+				SSHKeys:     []string{"key"},
+				Preemptible: false,
 			},
 			{
-				ID:       "95451f737a4b08f3130c88cf9cb86840469e12dd",
-				Role:     "Master",
-				Provider: "Amazon",
-				SSHKeys:  []string{},
-				Reserved: true,
+				ID:          "6595fa48111eec0c9cef2367f370b20f96d4a38c",
+				Role:        "Master",
+				Provider:    "Amazon",
+				SSHKeys:     []string{},
+				Preemptible: false,
 			},
 		},
 	)
@@ -116,27 +116,27 @@ func TestMachine(t *testing.T) {
 	deployment.deploy(baseMachine.asMaster());`,
 		[]Machine{
 			{
-				ID:         "a29e69b85268b4aa294c290ffa4057f614ee348a",
-				Role:       "Master",
-				Provider:   "Amazon",
-				FloatingIP: "xxx.xxx.xxx.xxx",
-				SSHKeys:    []string{},
-				Reserved:   true,
+				ID:          "632f9edd209f2fcda1e9d407832f169abf66a1a2",
+				Role:        "Master",
+				Provider:    "Amazon",
+				FloatingIP:  "xxx.xxx.xxx.xxx",
+				SSHKeys:     []string{},
+				Preemptible: false,
 			},
 		})
 
 	checkMachines(t, `var baseMachine = new Machine({
 	  provider: "Amazon",
-	  reserved: false
+	  preemptible: true
 	});
 	deployment.deploy(baseMachine.asMaster());`,
 		[]Machine{
 			{
-				ID:       "5a986c0b649e431ec6c9209a8953682376733a91",
-				Role:     "Master",
-				Provider: "Amazon",
-				SSHKeys:  []string{},
-				Reserved: false,
+				ID:          "8a0d2198229c09b8b5ec1bdba7105a9e08f8ef0b",
+				Role:        "Master",
+				Provider:    "Amazon",
+				SSHKeys:     []string{},
+				Preemptible: true,
 			},
 		})
 }

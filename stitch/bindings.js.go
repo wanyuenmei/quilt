@@ -395,7 +395,7 @@ function Machine(optionalArgs) {
     this.sshKeys = optionalArgs.sshKeys || [];
     this.cpu = boxRange(optionalArgs.cpu);
     this.ram = boxRange(optionalArgs.ram);
-    this.reserved = optionalArgs.reserved !== undefined ? optionalArgs.reserved : true;
+    this.preemptible = optionalArgs.preemptible !== undefined ? optionalArgs.preemptible : false;
 }
 
 Machine.prototype.deploy = function(deployment) {

@@ -123,22 +123,22 @@ func TestList(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, machines, []machine.Machine{
 		{
-			ID:        "123",
-			Provider:  db.DigitalOcean,
-			PublicIP:  "publicIP",
-			PrivateIP: "privateIP",
-			Size:      "size",
-			Region:    "sfo1",
-			Reserved:  true,
+			ID:          "123",
+			Provider:    db.DigitalOcean,
+			PublicIP:    "publicIP",
+			PrivateIP:   "privateIP",
+			Size:        "size",
+			Region:      "sfo1",
+			Preemptible: false,
 		},
 		{
-			ID:        "125",
-			Provider:  db.DigitalOcean,
-			PublicIP:  "publicIP",
-			PrivateIP: "privateIP",
-			Size:      "size",
-			Region:    "sfo1",
-			Reserved:  true,
+			ID:          "125",
+			Provider:    db.DigitalOcean,
+			PublicIP:    "publicIP",
+			PrivateIP:   "privateIP",
+			Size:        "size",
+			Region:      "sfo1",
+			Preemptible: false,
 		},
 	})
 

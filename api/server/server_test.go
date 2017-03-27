@@ -38,7 +38,7 @@ func TestMachineResponse(t *testing.T) {
 
 	exp := `[{"ID":1,"StitchID":"","Role":"Master","Provider":"Amazon","Region":"",` +
 		`"Size":"size","DiskSize":0,"SSHKeys":null,"FloatingIP":"",` +
-		`"Reserved":false,"CloudID":"","PublicIP":"8.8.8.8",` +
+		`"Preemptible":false,"CloudID":"","PublicIP":"8.8.8.8",` +
 		`"PrivateIP":"9.9.9.9","Connected":false}]`
 
 	checkQuery(t, server{conn}, db.MachineTable, exp)

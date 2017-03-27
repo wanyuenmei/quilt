@@ -87,17 +87,17 @@ type ConnectionSlice []Connection
 
 // A Machine specifies the type of VM that should be booted.
 type Machine struct {
-	ID         string   `json:",omitempty"`
-	Provider   string   `json:",omitempty"`
-	Role       string   `json:",omitempty"`
-	Size       string   `json:",omitempty"`
-	CPU        Range    `json:",omitempty"`
-	RAM        Range    `json:",omitempty"`
-	DiskSize   int      `json:",omitempty"`
-	Region     string   `json:",omitempty"`
-	SSHKeys    []string `json:",omitempty"`
-	FloatingIP string   `json:",omitempty"`
-	Reserved   bool     `json:",omitempty"`
+	ID          string   `json:",omitempty"`
+	Provider    string   `json:",omitempty"`
+	Role        string   `json:",omitempty"`
+	Size        string   `json:",omitempty"`
+	CPU         Range    `json:",omitempty"`
+	RAM         Range    `json:",omitempty"`
+	DiskSize    int      `json:",omitempty"`
+	Region      string   `json:",omitempty"`
+	SSHKeys     []string `json:",omitempty"`
+	FloatingIP  string   `json:",omitempty"`
+	Preemptible bool     `json:",omitempty"`
 }
 
 // A Range defines a range of acceptable values for a Machine attribute

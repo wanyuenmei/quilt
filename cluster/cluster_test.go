@@ -245,10 +245,11 @@ func TestSyncDB(t *testing.T) {
 	})
 
 	// Test reserved instances.
-	checkSyncDB([]machine.Machine{{Reserved: true}}, []db.Machine{{Reserved: false}},
+	checkSyncDB([]machine.Machine{{Preemptible: true}},
+		[]db.Machine{{Preemptible: false}},
 		syncDBResult{
-			boot: []machine.Machine{{Reserved: false}},
-			stop: []machine.Machine{{Reserved: true}},
+			boot: []machine.Machine{{Preemptible: false}},
+			stop: []machine.Machine{{Preemptible: true}},
 		})
 
 	// Test matching role as priority over PublicIP

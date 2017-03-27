@@ -101,6 +101,6 @@ Its attributes are:
 - `diskSize` *int*: The desired amount of disk space in GB. *optional*
 - `floatingIp` *string*: A reserved IP to associate with the machine. *optional*
 - `sshKeys` *[]string*: Public keys to allow login into the machine. *optional*
-- `reserved` *bool*: Whether the machine should run as a reserved instance. *optional*
-    - Defaults to `true`
-    - Non-reserved instances are only supported on the `Amazon` provider.
+- `preemptible` *bool*: Whether the machine should be preemptible. *optional*
+    - Defaults to `false`
+    - Preemptible instances are only supported on the `Amazon` provider.

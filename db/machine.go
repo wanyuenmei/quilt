@@ -12,15 +12,15 @@ type Machine struct {
 	ID int //Database ID
 
 	/* Populated by the policy engine. */
-	StitchID   string
-	Role       Role
-	Provider   Provider
-	Region     string
-	Size       string
-	DiskSize   int
-	SSHKeys    []string `rowStringer:"omit"`
-	FloatingIP string
-	Reserved   bool
+	StitchID    string
+	Role        Role
+	Provider    Provider
+	Region      string
+	Size        string
+	DiskSize    int
+	SSHKeys     []string `rowStringer:"omit"`
+	FloatingIP  string
+	Preemptible bool
 
 	/* Populated by the cloud provider. */
 	CloudID   string //Cloud Provider ID
@@ -76,8 +76,8 @@ func (m Machine) String() string {
 	}
 
 	machineAttrs := []string{string(m.Provider), m.Region, m.Size}
-	if m.Reserved {
-		machineAttrs = append(machineAttrs, "reserved")
+	if m.Preemptible {
+		machineAttrs = append(machineAttrs, "preemptible")
 	}
 	tags = append(tags, strings.Join(machineAttrs, " "))
 

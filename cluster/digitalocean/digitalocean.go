@@ -103,13 +103,13 @@ func (clst Cluster) List() ([]machine.Machine, error) {
 			}
 
 			machine := machine.Machine{
-				ID:        strconv.Itoa(d.ID),
-				PublicIP:  pubIP,
-				PrivateIP: privIP,
-				Size:      d.SizeSlug,
-				Provider:  db.DigitalOcean,
-				Region:    d.Region.Slug,
-				Reserved:  true,
+				ID:          strconv.Itoa(d.ID),
+				PublicIP:    pubIP,
+				PrivateIP:   privIP,
+				Size:        d.SizeSlug,
+				Provider:    db.DigitalOcean,
+				Region:      d.Region.Slug,
+				Preemptible: false,
 			}
 			machines = append(machines, machine)
 		}
