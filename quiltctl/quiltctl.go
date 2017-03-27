@@ -19,6 +19,7 @@ var commands = map[string]command.SubCommand{
 	"run":     command.NewRunCommand(),
 	"ssh":     command.NewSSHCommand(),
 	"stop":    command.NewStopCommand(),
+	"version": &command.Version{},
 }
 
 // Run parses and runs the quiltctl subcommand given the command line arguments.

@@ -25,8 +25,6 @@ func Run(role db.Role) {
 	// XXX Uncomment the following line to run the profiler
 	//runProfiler(5 * time.Minute)
 
-	log.Info("Minion Start")
-
 	conn := db.New()
 	dk := docker.New("unix:///var/run/docker.sock")
 

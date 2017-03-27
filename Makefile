@@ -58,7 +58,8 @@ COV_SKIP= /api/client/mocks \
 	  /scripts/format \
 	  /scripts/specs-tester \
 	  /scripts/specs-tester/tests \
-	  /minion/pb
+	  /minion/pb \
+	  /version
 
 COV_PKG = $(subst github.com/quilt/quilt,,$(PACKAGES))
 coverage: $(addsuffix .cov, $(filter-out $(COV_SKIP), $(COV_PKG)))

@@ -8,6 +8,9 @@ import (
 
 	"github.com/quilt/quilt/db"
 	"github.com/quilt/quilt/minion"
+	"github.com/quilt/quilt/version"
+
+	log "github.com/Sirupsen/logrus"
 )
 
 // Minion contains the options for running the Quilt minion.
@@ -39,6 +42,7 @@ func (mCmd *Minion) Parse(args []string) error {
 
 // Run starts the minion.
 func (mCmd *Minion) Run() int {
+	log.WithField("version", version.Version).Info("Starting Quilt minion")
 	if err := mCmd.run(); err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
 		return 1

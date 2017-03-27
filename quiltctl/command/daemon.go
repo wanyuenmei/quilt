@@ -8,6 +8,9 @@ import (
 	"github.com/quilt/quilt/cluster"
 	"github.com/quilt/quilt/db"
 	"github.com/quilt/quilt/engine"
+	"github.com/quilt/quilt/version"
+
+	log "github.com/Sirupsen/logrus"
 )
 
 // Daemon contains the options for running the Quilt daemon.
@@ -41,6 +44,7 @@ func (dCmd *Daemon) Parse(args []string) error {
 
 // Run starts the daemon.
 func (dCmd *Daemon) Run() int {
+	log.WithField("version", version.Version).Info("Starting Quilt daemon")
 	conn := db.New()
 	go engine.Run(conn)
 	go server.Run(conn, dCmd.common.host)
