@@ -78,8 +78,7 @@ type Cluster struct {
 func New(namespace, zone string) (*Cluster, error) {
 	gce, err := newClient()
 	if err != nil {
-		log.WithError(err).Error("Failed to initialize GCE client")
-		return nil, err
+		return nil, fmt.Errorf("failed to initialize GCE client: %s", err.Error())
 	}
 
 	clst := Cluster{
