@@ -15,6 +15,7 @@ import (
 	"github.com/quilt/quilt/util"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/defaults"
 	"github.com/aws/aws-sdk-go/service/ec2"
 
 	log "github.com/Sirupsen/logrus"
@@ -62,7 +63,23 @@ var timeout = 5 * time.Minute
 func New(namespace, region string) (*Cluster, error) {
 	clst := newAmazon(namespace, region)
 	if _, err := clst.List(); err != nil {
-		return nil, errors.New("AWS failed to connect")
+		errorPrefix := "AWS failed to connect"
+
+		// Attempt to add information about the AWS access key to the error
+		// message.
+		awsCreds := defaults.Get().Config.Credentials
+		if credValue, credErr := awsCreds.Get(); credErr == nil {
+			errorPrefix += fmt.Sprintf(" (using access key ID: %s)",
+				credValue.AccessKeyID)
+		} else {
+			// AWS probably failed to connect because no access credentials
+			// were found. AWS's error message is not very helpful, so try to
+			// point the user in the right direction.
+			errorPrefix += " (No access credentials were found! Make sure " +
+				"your AWS credentials are in ~/.aws/credentials.)"
+		}
+
+		return nil, fmt.Errorf("%s: %s", errorPrefix, err.Error())
 	}
 	return clst, nil
 }
