@@ -530,7 +530,7 @@ func (clst *Cluster) wait(ids []string, boot bool) error {
 	return util.WaitFor(func() bool {
 		machines, err := clst.List()
 		if err != nil {
-			log.WithError(err).Warn("Failed to get machines.")
+			log.WithError(err).Warn("Failed to list machines in the cluster.")
 			return false
 		}
 
