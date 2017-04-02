@@ -10,7 +10,7 @@ coverage:
   round: down
   status:
     changes: false
-    patch: true
+    patch: false
     project: true
 parsers:
   gcov:
