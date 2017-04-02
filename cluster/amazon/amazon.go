@@ -531,7 +531,7 @@ func (clst *Cluster) wait(ids []string, boot bool) error {
 		machines, err := clst.List()
 		if err != nil {
 			log.WithError(err).Warn("Failed to get machines.")
-			return true
+			return false
 		}
 
 		exists := make(map[string]struct{})
