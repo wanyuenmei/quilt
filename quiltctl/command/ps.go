@@ -311,7 +311,7 @@ func containerStr(image string, args []string, truncate bool) string {
 
 	container := fmt.Sprintf("%s %s", image, strings.Join(args, " "))
 	if truncate && len(container) > truncLength {
-		return container[:truncLength]
+		return container[:truncLength] + "..."
 	}
 
 	return container

@@ -418,9 +418,9 @@ ________________________________________________________________________________
 	var e bytes.Buffer
 	writeContainers(&e, containers, machines, connections, true)
 	result = string(e.Bytes())
-	expected = `CONTAINER____MACHINE____COMMAND___________________________LABELS_` +
-		`___STATUS_____CREATED______________PUBLIC_IP
-3_______________________image1_cmd_1_&&_cmd_9128340347______________running____` +
+	expected = `CONTAINER____MACHINE____COMMAND_____________________________` +
+		`_LABELS____STATUS_____CREATED______________PUBLIC_IP
+3_______________________image1_cmd_1_&&_cmd_9128340347...______________running____` +
 		mockCreatedString + `____
 `
 	result = strings.Replace(result, " ", "_", -1)
