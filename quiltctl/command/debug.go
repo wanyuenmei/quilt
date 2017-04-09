@@ -35,6 +35,7 @@ const (
 // Debug contains the options for downloading debug logs from machines and containers.
 type Debug struct {
 	privateKey string
+	outPath    string
 	all        bool
 	containers bool
 	machines   bool
@@ -98,7 +99,7 @@ func NewDebugCommand() *Debug {
 }
 
 var debugUsage = `usage: quilt debug-logs [-v] [-tar=<true/false>] [-i <keyfile>]` +
-	` <-all | -containers | -machines | <id> ...>
+	` [-o=<path>] <-all | -containers | -machines | <id> ...>
 
 Fetch logs for a set of machines or containers, placing
 the contents in appropriately named file inside a
@@ -113,6 +114,10 @@ none of the above options are given, a list of IDs can
 be supplied, which may be a mix of machines and
 containers in any order. Either one of these options
 or a list of IDs must be supplied.
+
+The -o option may be provided to optionally specify a
+name for the tar file (or folder) instead of using a
+timestamped name.
 
 If -all is supplied, all other arguments are ignored. If
 -containers or -machines are supplied, the list of IDs
@@ -131,6 +136,8 @@ func (dCmd *Debug) InstallFlags(flags *flag.FlagSet) {
 	dCmd.common.InstallFlags(flags)
 	flags.StringVar(&dCmd.privateKey, "i", "",
 		"the private key to use to connect to the host")
+	flags.StringVar(&dCmd.outPath, "o", "",
+		"output path for the logs (defaults to timestamped path)")
 	flags.BoolVar(&dCmd.all, "all", false, "if provided, fetch all debug logs")
 	flags.BoolVar(&dCmd.containers, "containers", false,
 		"if provided, fetch all debug logs for application containers")
@@ -158,6 +165,15 @@ func (dCmd *Debug) Parse(args []string) error {
 
 // Run downloads debug logs from the relevant machines and containers.
 func (dCmd Debug) Run() int {
+	if dCmd.outPath == "" {
+		dCmd.outPath = fmt.Sprintf("debug_logs_%s",
+			timestamp().Format("Mon_Jan_02_15-04-05"))
+	}
+	if err := util.Mkdir(dCmd.outPath, 0755); err != nil {
+		log.Error(err)
+		return 1
+	}
+
 	c, err := dCmd.clientGetter.Client(dCmd.common.host)
 	if err != nil {
 		log.Error(err)
@@ -220,12 +236,7 @@ func (dCmd Debug) Run() int {
 }
 
 func (dCmd Debug) downloadLogs(targets []logTarget) int {
-	rootDir := fmt.Sprintf("debug_logs_%s", timestamp().Format("Mon_Jan_02_15-04-05"))
-	if err := util.Mkdir(rootDir, 0755); err != nil {
-		log.Error(err)
-		return 1
-	}
-
+	rootDir := dCmd.outPath
 	if err := util.Mkdir(filepath.Join(rootDir, machineDir), 0755); err != nil {
 		log.Error(err)
 		return 1
