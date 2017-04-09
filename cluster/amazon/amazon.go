@@ -118,7 +118,7 @@ func (clst *Cluster) Boot(bootSet []machine.Machine) error {
 	for _, m := range bootSet {
 		br := bootReq{
 			groupID:     groupID,
-			cfg:         cloudcfg.Ubuntu(m.SSHKeys, "xenial", m.Role),
+			cfg:         cloudcfg.Ubuntu(m.SSHKeys, m.Role),
 			size:        m.Size,
 			diskSize:    m.DiskSize,
 			preemptible: m.Preemptible,

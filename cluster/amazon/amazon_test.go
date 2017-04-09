@@ -497,7 +497,7 @@ func TestBoot(t *testing.T) {
 	})
 	assert.Nil(t, err)
 
-	cfg := cloudcfg.Ubuntu(nil, "xenial", db.Master)
+	cfg := cloudcfg.Ubuntu(nil, db.Master)
 	mc.AssertCalled(t, "RequestSpotInstances",
 		&ec2.RequestSpotInstancesInput{
 			SpotPrice: aws.String(spotPrice),

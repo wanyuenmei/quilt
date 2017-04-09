@@ -10,14 +10,14 @@ func TestCloudConfig(t *testing.T) {
 	cfgTemplate = "({{.QuiltImage}}) ({{.SSHKeys}}) ({{.UbuntuVersion}}) " +
 		"({{.Role}})"
 
-	res := Ubuntu([]string{"a", "b"}, "1", db.Master)
-	exp := "(quilt/quilt:latest) (a\nb) (1) (Master)"
+	res := Ubuntu([]string{"a", "b"}, db.Master)
+	exp := "(quilt/quilt:latest) (a\nb) (xenial) (Master)"
 	if res != exp {
 		t.Errorf("res: %s\nexp: %s", res, exp)
 	}
 
-	res = Ubuntu([]string{"a", "b"}, "1", db.Worker)
-	exp = "(quilt/quilt:latest) (a\nb) (1) (Worker)"
+	res = Ubuntu([]string{"a", "b"}, db.Worker)
+	exp = "(quilt/quilt:latest) (a\nb) (xenial) (Worker)"
 	if res != exp {
 		t.Errorf("res: %s\nexp: %s", res, exp)
 	}

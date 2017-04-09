@@ -14,7 +14,7 @@ const (
 
 // Ubuntu generates a cloud config file for the Ubuntu operating system with the
 // corresponding `version`.
-func Ubuntu(keys []string, version string, role db.Role) string {
+func Ubuntu(keys []string, role db.Role) string {
 	t := template.Must(template.New("cloudConfig").Parse(cfgTemplate))
 
 	var cloudConfigBytes bytes.Buffer
@@ -25,7 +25,7 @@ func Ubuntu(keys []string, version string, role db.Role) string {
 		Role          string
 	}{
 		QuiltImage:    quiltImage,
-		UbuntuVersion: version,
+		UbuntuVersion: "xenial",
 		SSHKeys:       strings.Join(keys, "\n"),
 		Role:          string(role),
 	})

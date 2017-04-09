@@ -153,7 +153,7 @@ func (clst *Cluster) Boot(bootSet []machine.Machine) error {
 
 		name := "quilt-" + uuid.NewV4().String()
 		_, err := clst.instanceNew(name, m.Size,
-			cloudcfg.Ubuntu(m.SSHKeys, "xenial", m.Role))
+			cloudcfg.Ubuntu(m.SSHKeys, m.Role))
 		if err != nil {
 			log.WithFields(log.Fields{
 				"error": err,
