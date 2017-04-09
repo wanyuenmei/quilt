@@ -6,16 +6,26 @@ import (
 	"text/template"
 
 	"github.com/quilt/quilt/db"
+	"github.com/quilt/quilt/version"
 )
 
 const (
-	quiltImage = "quilt/quilt:latest"
+	quiltImage = "quilt/quilt"
 )
+
+// Allow mocking out for the unit tests.
+var ver = version.Version
 
 // Ubuntu generates a cloud config file for the Ubuntu operating system with the
 // corresponding `version`.
 func Ubuntu(keys []string, role db.Role) string {
 	t := template.Must(template.New("cloudConfig").Parse(cfgTemplate))
+
+	img := quiltImage + ":"
+	if ver != "master" {
+		img += "v"
+	}
+	img += ver
 
 	var cloudConfigBytes bytes.Buffer
 	err := t.Execute(&cloudConfigBytes, struct {
@@ -24,7 +34,7 @@ func Ubuntu(keys []string, role db.Role) string {
 		SSHKeys       string
 		Role          string
 	}{
-		QuiltImage:    quiltImage,
+		QuiltImage:    img,
 		UbuntuVersion: "xenial",
 		SSHKeys:       strings.Join(keys, "\n"),
 		Role:          string(role),
