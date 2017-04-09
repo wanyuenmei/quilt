@@ -5,7 +5,7 @@ sudo: required
 services:
     - docker
 go:
-    - 1.7
+    - 1.x
 
 install:
     - make get-build-tools
