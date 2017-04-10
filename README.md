@@ -37,28 +37,28 @@ web proxy:
 
 [//]: # (b1)
 ```javascript
-    var Node = require("github.com/quilt/nodejs");
-    var HaProxy = require("github.com/quilt/haproxy").Haproxy;
-    var Mongo = require("github.com/quilt/mongo");
+var Node = require("github.com/quilt/nodejs");
+var HaProxy = require("github.com/quilt/haproxy").Haproxy;
+var Mongo = require("github.com/quilt/mongo");
 
-    // Create 3 replicated instances of each service.
-    var mongo = new Mongo(3);
-    // `app` is a Node.js application using Express, AngluarJS, and MongoDB.
-    var app = new Node({
-      nWorker: 3,
-      repo: "https://github.com/tejasmanohar/node-todo.git",
-      env: {
-        PORT: "80",
-        MONGO_URI: mongo.uri("mean-example")
-      }
-    });
-    var haproxy = new HaProxy(3, app.services());
+// Create 3 replicated instances of each service.
+var mongo = new Mongo(3);
+// `app` is a Node.js application using Express, AngluarJS, and MongoDB.
+var app = new Node({
+  nWorker: 3,
+  repo: "https://github.com/tejasmanohar/node-todo.git",
+  env: {
+    PORT: "80",
+    MONGO_URI: mongo.uri("mean-example")
+  }
+});
+var haproxy = new HaProxy(3, app.services());
 
-    // Connect the app and database.
-    mongo.connect(27017, app);
-    app.connect(27017, mongo);
-    // Make the proxy accessible from the public internet on port 80.
-    haproxy.public();
+// Connect the app and database.
+mongo.connect(27017, app);
+app.connect(27017, mongo);
+// Make the proxy accessible from the public internet on port 80.
+haproxy.public();
 ```
 
 The application is infrastructure agnostic, so it can be deployed on any - and
@@ -67,28 +67,28 @@ possible multi-node setup on AWS:
 
 [//]: # (b1)
 ```javascript
-    var namespace = createDeployment({});
+var namespace = createDeployment({});
 
-    // An AWS VM with 1-2 CPUs and 1-2 GiB RAM.
-    // The Github user `ejj` can ssh into the VMs.
-    var baseMachine = new Machine({
-        provider: "Amazon",
-        cpu: new Range(2),
-        ram: new Range(8),
-        sshKeys: githubKeys("ejj"),
-    });
+// An AWS VM with 1-2 CPUs and 1-2 GiB RAM.
+// The Github user `ejj` can ssh into the VMs.
+var baseMachine = new Machine({
+    provider: "Amazon",
+    cpu: new Range(2),
+    ram: new Range(8),
+    sshKeys: githubKeys("ejj"),
+});
 
-    // Boot VMs with the properties of `baseMachine`.
-    namespace.deploy(baseMachine.asMaster());
-    namespace.deploy(baseMachine.asWorker().replicate(3));
+// Boot VMs with the properties of `baseMachine`.
+namespace.deploy(baseMachine.asMaster());
+namespace.deploy(baseMachine.asWorker().replicate(3));
 ```
 All that is left is to deploy the application on the specified infrastructure:
 
 [//]: # (b1)
 ```javascript
-    namespace.deploy(app);
-    namespace.deploy(mongo);
-    namespace.deploy(haproxy);
+namespace.deploy(app);
+namespace.deploy(mongo);
+namespace.deploy(haproxy);
 ```
 
 This spec can be found in
