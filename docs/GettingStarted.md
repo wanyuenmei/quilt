@@ -153,11 +153,17 @@ modify the specification to remove all of the Machines, or use the command,
 `quilt stop`. Both options will cause Quilt to destroy all of the
 Machines in the deployment.
 
-## Next Steps: Starting Spark
-A starter Spark example to explore is [SparkPI](https://github.com/quilt/spark).
-
 ## Next Steps: Downloading Other Specs
 You can download specs into your `QUILT_PATH` by executing
 `quilt get <IMPORT_PATH>`, where `<IMPORT_PATH>` is a path to a repository
 containing specs (e.g. `github.com/quilt/nginx`). You can read more about this
 functionality [here](https://github.com/quilt/quilt/blob/master/docs/Stitch.md#quilt_path).
+
+## Next Steps: Writing your own Quilt Spec
+
+This guide illustrated how to use Quilt to run an application that already had a
+spec written.  Next, you can try writing your own Quilt specs for new applications
+that don't yet have specs written; to do that, check out the
+[guide to writing Quilt specs](https://github.com/quilt/docs/spec-writing-guide.md).
+
+
