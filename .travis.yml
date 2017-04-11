@@ -20,7 +20,7 @@ after_success:
           docker login -e="$DOCKER_EMAIL" -u="$DOCKER_USERNAME" -p="$DOCKER_PASSWORD";
           if [ "$TRAVIS_BRANCH" == "master" ]; then
               docker push quilt/quilt:latest;
-          fi
+          fi;
           docker tag quilt/quilt quilt/quilt:$TRAVIS_BRANCH;
           docker push quilt/quilt:$TRAVIS_BRANCH;
       fi
