@@ -742,6 +742,22 @@ func TestReadDir(t *testing.T) {
 		})
 }
 
+func TestDirExists(t *testing.T) {
+	t.Parallel()
+
+	util.AppFs = afero.NewMemMapFs()
+	checkJavascript(t, `dirExists("/foo");`, false)
+
+	util.AppFs.Mkdir("/foo", 0755)
+	checkJavascript(t, `dirExists("/foo");`, true)
+	checkJavascript(t, `dirExists("/foo/bar");`, false)
+
+	util.WriteFile("/foo/bar", []byte("baz"), 0644)
+	checkJavascript(t, `dirExists("/foo/bar");`, false)
+
+	checkError(t, `dirExists();`, "RangeError: no path supplied")
+}
+
 func checkJavascript(t *testing.T, code string, exp interface{}) {
 	resultKey := "result"
 

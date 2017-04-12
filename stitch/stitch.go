@@ -144,6 +144,9 @@ func newVM(getter ImportGetter) (*otto.Otto, error) {
 	if err := vm.Set("readDir", toOttoFunc(readDirImpl)); err != nil {
 		return vm, err
 	}
+	if err := vm.Set("dirExists", toOttoFunc(dirExistsImpl)); err != nil {
+		return vm, err
+	}
 
 	_, err := run(vm, "<javascript_bindings>", javascriptBindings)
 	return vm, err
@@ -317,6 +320,20 @@ func readDirImpl(call otto.FunctionCall) (otto.Value, error) {
 	}
 
 	return call.Otto.ToValue(filesJS)
+}
+
+func dirExistsImpl(call otto.FunctionCall) (otto.Value, error) {
+	path, err := getPath(call)
+	if err != nil {
+		return otto.Value{}, err
+	}
+
+	exists, err := afero.Afero{Fs: util.AppFs}.DirExists(path)
+	if err != nil {
+		return otto.Value{}, err
+	}
+
+	return call.Otto.ToValue(exists)
 }
 
 func getPath(call otto.FunctionCall) (string, error) {
