@@ -164,6 +164,6 @@ functionality [here](https://github.com/quilt/quilt/blob/master/docs/Stitch.md#q
 This guide illustrated how to use Quilt to run an application that already had a
 spec written.  Next, you can try writing your own Quilt specs for new applications
 that don't yet have specs written; to do that, check out the
-[guide to writing Quilt specs](https://github.com/quilt/docs/spec-writing-guide.md).
+[guide to writing Quilt specs](https://github.com/quilt/quilt/blob/master/docs/spec-writers-guide.md).
 
 
