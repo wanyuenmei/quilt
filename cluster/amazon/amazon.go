@@ -63,23 +63,24 @@ var timeout = 5 * time.Minute
 func New(namespace, region string) (*Cluster, error) {
 	clst := newAmazon(namespace, region)
 	if _, err := clst.List(); err != nil {
-		errorPrefix := "AWS failed to connect"
-
 		// Attempt to add information about the AWS access key to the error
 		// message.
-		awsCreds := defaults.Get().Config.Credentials
-		if credValue, credErr := awsCreds.Get(); credErr == nil {
-			errorPrefix += fmt.Sprintf(" (using access key ID: %s)",
-				credValue.AccessKeyID)
-		} else {
-			// AWS probably failed to connect because no access credentials
-			// were found. AWS's error message is not very helpful, so try to
-			// point the user in the right direction.
-			errorPrefix += " (No access credentials were found! Make sure " +
-				"your AWS credentials are in ~/.aws/credentials.)"
+		awsConfig := defaults.Config().WithCredentialsChainVerboseErrors(true)
+		handlers := defaults.Handlers()
+		awsCreds := defaults.CredChain(awsConfig, handlers)
+		credValue, credErr := awsCreds.Get()
+		if credErr == nil {
+			return nil, fmt.Errorf(
+				"AWS failed to connect (using access key ID: %s): %s",
+				credValue.AccessKeyID, err.Error())
 		}
-
-		return nil, fmt.Errorf("%s: %s", errorPrefix, err.Error())
+		// AWS probably failed to connect because no access credentials
+		// were found. AWS's error message is not very helpful, so try to
+		// point the user in the right direction.
+		return nil, fmt.Errorf("AWS failed to find access "+
+			"credentials. At least one method for finding access "+
+			"credentials must succeed, but they all failed: %s)",
+			credErr.Error())
 	}
 	return clst, nil
 }
