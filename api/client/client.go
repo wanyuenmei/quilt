@@ -51,6 +51,9 @@ type Client interface {
 	// Deploy makes a request to the Quilt daemon to deploy the given deployment.
 	Deploy(deployment string) error
 
+	// Version retrieves the Quilt version of the remote daemon.
+	Version() (string, error)
+
 	// Host returns the server address the Client is connected to.
 	Host() string
 }
@@ -219,6 +222,16 @@ func (c clientImpl) Deploy(deployment string) error {
 	ctx, _ := context.WithTimeout(context.Background(), requestTimeout)
 	_, err := c.pbClient.Deploy(ctx, &pb.DeployRequest{Deployment: deployment})
 	return err
+}
+
+// Version retrieves the Quilt version of the remote daemon.
+func (c clientImpl) Version() (string, error) {
+	ctx, _ := context.WithTimeout(context.Background(), requestTimeout)
+	version, err := c.pbClient.Version(ctx, &pb.VersionRequest{})
+	if err != nil {
+		return "", err
+	}
+	return version.Version, nil
 }
 
 func (c clientImpl) Host() string {

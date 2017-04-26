@@ -14,6 +14,7 @@ import (
 	"github.com/quilt/quilt/api/pb"
 	"github.com/quilt/quilt/db"
 	"github.com/quilt/quilt/stitch"
+	"github.com/quilt/quilt/version"
 
 	"github.com/docker/distribution/reference"
 	"golang.org/x/net/context"
@@ -130,4 +131,9 @@ func (s server) Deploy(cts context.Context, deployReq *pb.DeployRequest) (
 	}
 
 	return &pb.DeployReply{}, nil
+}
+
+func (s server) Version(_ context.Context, _ *pb.VersionRequest) (
+	*pb.VersionReply, error) {
+	return &pb.VersionReply{Version: version.Version}, nil
 }

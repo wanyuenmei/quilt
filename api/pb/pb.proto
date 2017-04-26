@@ -3,6 +3,7 @@ syntax = "proto3";
 service API {
 	rpc Query(DBQuery) returns(QueryReply) {}
 	rpc Deploy(DeployRequest) returns(DeployReply) {}
+	rpc Version(VersionRequest) returns(VersionReply) {}
 }
 
 message DBQuery {
@@ -18,4 +19,10 @@ message DeployRequest {
 }
 
 message DeployReply {
+}
+
+message VersionRequest {}
+
+message VersionReply {
+    string Version = 1;
 }

@@ -29,6 +29,12 @@ func (c mockAPIClient) Deploy(ctx context.Context, in *pb.DeployRequest,
 	return &pb.DeployReply{}, nil
 }
 
+func (c mockAPIClient) Version(ctx context.Context, in *pb.VersionRequest,
+	opts ...grpc.CallOption) (*pb.VersionReply, error) {
+
+	return &pb.VersionReply{}, nil
+}
+
 func TestUnmarshalMachine(t *testing.T) {
 	t.Parallel()
 

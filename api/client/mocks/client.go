@@ -12,9 +12,10 @@ type Client struct {
 	ClusterReturn   []db.Cluster
 	HostReturn      string
 	DeployArg       string
+	VersionReturn   string
 
 	MachineErr, ContainerErr, EtcdErr, ClusterErr, HostErr error
-	DeployErr, ConnectionErr                               error
+	DeployErr, ConnectionErr, VersionErr                   error
 }
 
 // QueryMachines retrieves the machines tracked by the Quilt daemon.
@@ -75,6 +76,11 @@ func (c *Client) Deploy(depl string) error {
 	}
 	c.DeployArg = depl
 	return nil
+}
+
+// Version retrieves the Quilt version of the remote daemon.
+func (c *Client) Version() (string, error) {
+	return c.VersionReturn, c.VersionErr
 }
 
 // Host returns the server address the Client is connected to.
