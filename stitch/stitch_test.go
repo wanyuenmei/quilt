@@ -645,8 +645,6 @@ func TestHash(t *testing.T) {
 }
 
 func TestRead(t *testing.T) {
-	t.Parallel()
-
 	util.AppFs = afero.NewMemMapFs()
 	checkError(t, `read("foo");`, "StitchError: open foo: file does not exist")
 
@@ -743,8 +741,6 @@ func TestReadDir(t *testing.T) {
 }
 
 func TestDirExists(t *testing.T) {
-	t.Parallel()
-
 	util.AppFs = afero.NewMemMapFs()
 	checkJavascript(t, `dirExists("/foo");`, false)
 
