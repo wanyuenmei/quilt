@@ -59,35 +59,45 @@ type logCmd struct {
 	cmd  string
 }
 
-// A list of commands to run on the daemon. These must be formatted with the host address
-// of the daemon. They will be prepended with 'quilt'.
-var daemonCmds = []logCmd{
-	{"ps", "ps -H=%s"},
-	{"version", "version -H=%s"},
-}
+var (
+	// A list of commands to run on the daemon. These must be formatted with
+	// the host address of the daemon. They will be prepended with 'quilt'.
+	daemonCmds = []logCmd{
+		{"ps", "ps -H=%s"},
+		{"version", "version -H=%s"},
+	}
 
-// A list of commands to output various machine logs.
-var machineCmds = []logCmd{
-	{"docker-ps", "docker ps -a"},
-	{"minion", "docker logs minion"},
-	{images.Etcd, "docker logs " + images.Etcd},
-	{images.Ovncontroller, "docker logs " + images.Ovncontroller},
-	{images.Ovnnorthd, "docker logs " + images.Ovnnorthd},
-	{images.Ovsdb, "docker logs " + images.Ovsdb},
-	{images.Ovsvswitchd, "docker logs " + images.Ovsvswitchd},
-	{images.Registry, "docker logs " + images.Registry},
-	{"syslog", "sudo cat /var/log/syslog"},
-	{"journalctl", "sudo journalctl -xe"},
-	{"uname", "uname"},
-	{"dmesg", "dmesg"},
-	{"uptime", "uptime"},
-}
+	// A list of commands to output various machine logs.
+	machineCmds = []logCmd{
+		{"docker-ps", "docker ps -a"},
+		{"minion", "docker logs minion"},
+		{images.Etcd, "docker logs " + images.Etcd},
+		{images.Ovsdb, "docker logs " + images.Ovsdb},
+		{"syslog", "sudo cat /var/log/syslog"},
+		{"journalctl", "sudo journalctl -xe"},
+		{"uname", "uname"},
+		{"dmesg", "dmesg"},
+		{"uptime", "uptime"},
+	}
 
-// A list of commands to output various container logs. Container commands need to be
-// formatted with the DockerID.
-var containerCmds = []logCmd{
-	{"logs", "docker logs %s"},
-}
+	// A list of commands to output machine logs specific to Master machines.
+	masterMachineCmds = []logCmd{
+		{images.Ovnnorthd, "docker logs " + images.Ovnnorthd},
+		{images.Registry, "docker logs " + images.Registry},
+	}
+
+	// A list of commands to output machine logs specific to Worker machines.
+	workerMachineCmds = []logCmd{
+		{images.Ovncontroller, "docker logs " + images.Ovncontroller},
+		{images.Ovsvswitchd, "docker logs " + images.Ovsvswitchd},
+	}
+
+	// A list of commands to output various container logs. Container commands
+	// need to be formatted with the DockerID.
+	containerCmds = []logCmd{
+		{"logs", "docker logs %s"},
+	}
+)
 
 // NewDebugCommand creates a new Debug command instance.
 func NewDebugCommand() *Debug {
@@ -324,13 +334,17 @@ func machinesToTargets(machines []db.Machine) []logTarget {
 			continue
 		}
 
+		roleCmds := masterMachineCmds
+		if m.Role == db.Worker {
+			roleCmds = workerMachineCmds
+		}
+
 		t := logTarget{
 			ip:       m.PublicIP,
 			dir:      machineDir,
 			stitchID: m.StitchID,
-			cmds:     nil,
+			cmds:     append(machineCmds, roleCmds...),
 		}
-		t.cmds = append(t.cmds, machineCmds...)
 		targets = append(targets, t)
 	}
 	return targets

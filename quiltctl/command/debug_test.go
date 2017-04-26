@@ -147,6 +147,12 @@ func TestDebug(t *testing.T) {
 					PrivateIP: "4.3.2.1",
 					Role:      db.Worker,
 				},
+				{
+					StitchID:  "4",
+					PublicIP:  "8.8.8.8",
+					PrivateIP: "9.9.9.9",
+					Role:      db.Master,
+				},
 			},
 			containers: []db.Container{
 				{StitchID: "2", DockerID: "a", Minion: "4.3.2.1"},
@@ -154,10 +160,11 @@ func TestDebug(t *testing.T) {
 			},
 			expSSH:    true,
 			expReturn: 0,
-			expFiles: append(machineFiles(debugFolder, "1"),
-				append(containerFiles(debugFolder, "2"),
-					append(containerFiles(debugFolder, "3"),
-						daemonFiles(debugFolder)...)...)...),
+			expFiles: flatten(workerMachineFiles(debugFolder, "1"),
+				masterMachineFiles(debugFolder, "4"),
+				containerFiles(debugFolder, "2"),
+				containerFiles(debugFolder, "3"),
+				daemonFiles(debugFolder)),
 		},
 		// Check that all logs are fetched with -machines and -containers.
 		{
@@ -181,10 +188,10 @@ func TestDebug(t *testing.T) {
 			},
 			expSSH:    true,
 			expReturn: 0,
-			expFiles: append(machineFiles(debugFolder, "1"),
-				append(containerFiles(debugFolder, "2"),
-					append(containerFiles(debugFolder, "3"),
-						daemonFiles(debugFolder)...)...)...),
+			expFiles: flatten(workerMachineFiles(debugFolder, "1"),
+				containerFiles(debugFolder, "2"),
+				containerFiles(debugFolder, "3"),
+				daemonFiles(debugFolder)),
 		},
 		// Check that just container logs are fetched.
 		{
@@ -207,9 +214,9 @@ func TestDebug(t *testing.T) {
 			},
 			expSSH:    true,
 			expReturn: 0,
-			expFiles: append(containerFiles(debugFolder, "2"),
-				append(containerFiles(debugFolder, "3"),
-					daemonFiles(debugFolder)...)...),
+			expFiles: flatten(containerFiles(debugFolder, "2"),
+				containerFiles(debugFolder, "3"),
+				daemonFiles(debugFolder)),
 		},
 		// Check that just machine logs are fetched.
 		{
@@ -238,9 +245,9 @@ func TestDebug(t *testing.T) {
 			},
 			expSSH:    true,
 			expReturn: 0,
-			expFiles: append(machineFiles(debugFolder, "1"),
-				append(machineFiles(debugFolder, "4"),
-					daemonFiles(debugFolder)...)...),
+			expFiles: flatten(workerMachineFiles(debugFolder, "1"),
+				workerMachineFiles(debugFolder, "4"),
+				daemonFiles(debugFolder)),
 		},
 		// Check that we can get logs by specific stitch ids
 		{
@@ -265,10 +272,10 @@ func TestDebug(t *testing.T) {
 			},
 			expSSH:    true,
 			expReturn: 0,
-			expFiles: append(containerFiles(debugFolder, "2"),
-				append(containerFiles(debugFolder, "4"),
-					append(containerFiles(debugFolder, "5"),
-						daemonFiles(debugFolder)...)...)...),
+			expFiles: flatten(containerFiles(debugFolder, "2"),
+				containerFiles(debugFolder, "4"),
+				containerFiles(debugFolder, "5"),
+				daemonFiles(debugFolder)),
 		},
 		// Check that we can get logs by specific stitch ids in arbitrary order
 		{
@@ -293,10 +300,10 @@ func TestDebug(t *testing.T) {
 			},
 			expSSH:    true,
 			expReturn: 0,
-			expFiles: append(machineFiles(debugFolder, "1"),
-				append(containerFiles(debugFolder, "4"),
-					append(containerFiles(debugFolder, "2"),
-						daemonFiles(debugFolder)...)...)...),
+			expFiles: flatten(workerMachineFiles(debugFolder, "1"),
+				containerFiles(debugFolder, "4"),
+				containerFiles(debugFolder, "2"),
+				daemonFiles(debugFolder)),
 		},
 		// Check that we error on arbitrary stitch IDs.
 		{
@@ -369,10 +376,10 @@ func TestDebug(t *testing.T) {
 			},
 			expSSH:    true,
 			expReturn: 0,
-			expFiles: append(containerFiles(debugFolder, "2"),
-				append(containerFiles(debugFolder, "3"),
-					append(containerFiles(debugFolder, "4"),
-						daemonFiles(debugFolder)...)...)...),
+			expFiles: flatten(containerFiles(debugFolder, "2"),
+				containerFiles(debugFolder, "3"),
+				containerFiles(debugFolder, "4"),
+				daemonFiles(debugFolder)),
 		},
 		// Check that machines without an IP aren't reported.
 		{
@@ -400,8 +407,8 @@ func TestDebug(t *testing.T) {
 			},
 			expSSH:    true,
 			expReturn: 0,
-			expFiles: append(machineFiles(debugFolder, "1"),
-				daemonFiles(debugFolder)...),
+			expFiles: flatten(workerMachineFiles(debugFolder, "1"),
+				daemonFiles(debugFolder)),
 		},
 		// Check that a supplied path is respected.
 		{
@@ -425,10 +432,10 @@ func TestDebug(t *testing.T) {
 			},
 			expSSH:    true,
 			expReturn: 0,
-			expFiles: append(machineFiles("tmp_folder", "1"),
-				append(containerFiles("tmp_folder", "2"),
-					append(containerFiles("tmp_folder", "3"),
-						daemonFiles("tmp_folder")...)...)...),
+			expFiles: flatten(workerMachineFiles("tmp_folder", "1"),
+				containerFiles("tmp_folder", "2"),
+				containerFiles("tmp_folder", "3"),
+				daemonFiles("tmp_folder")),
 		},
 	}
 
@@ -505,8 +512,18 @@ func containerFiles(rootDir, id string) []string {
 	return withParentFolder(rootDir, containerDir, id, containerCmds)
 }
 
-func machineFiles(rootDir, id string) []string {
+func commonMachineFiles(rootDir, id string) []string {
 	return withParentFolder(rootDir, machineDir, id, machineCmds)
+}
+
+func masterMachineFiles(rootDir, id string) []string {
+	return append(commonMachineFiles(rootDir, id),
+		withParentFolder(rootDir, machineDir, id, masterMachineCmds)...)
+}
+
+func workerMachineFiles(rootDir, id string) []string {
+	return append(commonMachineFiles(rootDir, id),
+		withParentFolder(rootDir, machineDir, id, workerMachineCmds)...)
 }
 
 func daemonFiles(rootDir string) (exp []string) {
@@ -521,4 +538,11 @@ func withParentFolder(rootDir, typeDir, id string, cmds []logCmd) (exp []string)
 		exp = append(exp, filepath.Join(rootDir, typeDir, id, cmd.name))
 	}
 	return exp
+}
+
+func flatten(fileLists ...[]string) (files []string) {
+	for _, lst := range fileLists {
+		files = append(files, lst...)
+	}
+	return files
 }
