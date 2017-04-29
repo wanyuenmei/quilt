@@ -166,8 +166,15 @@ func ReplaceFlows(containers []Container) error {
 	}
 
 	flows := allFlows(resolveContainers(ofports, containers))
-	if err := ofctl("replace-flows", flows); err != nil {
-		return fmt.Errorf("ovs-ofctl: %s", err)
+	// XXX: Due to a bug in `ovs-ofctl replace-flows`, certain flows are
+	// replaced even if they do not differ. `diff-flows` already has a fix to
+	// this problem, so for now we only run `replace-flows` when `diff-flows`
+	// reports no changes.  The `diff-flows` check should be removed once
+	// `replace-flows` is fixed upstream.
+	if ofctl("diff-flows", flows) != nil {
+		if err := ofctl("replace-flows", flows); err != nil {
+			return fmt.Errorf("ovs-ofctl: %s", err)
+		}
 	}
 
 	return nil
@@ -242,7 +249,7 @@ func openflowPorts() (map[string]int, error) {
 
 var ofctl = func(action string, flows []string) error {
 	cmd := exec.Command("ovs-ofctl", "-O", "OpenFlow13", action,
-		ipdef.QuiltBridge, "-")
+		ipdef.QuiltBridge, "/dev/stdin")
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {

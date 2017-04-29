@@ -20,11 +20,13 @@ func TestAddReplaceFlows(t *testing.T) {
 		return client, nil
 	}
 
-	var action string
-	var flows []string
+	actionsToFlows := map[string][]string{}
+	diffFlowsShouldErr := true
 	ofctl = func(a string, f []string) error {
-		action = a
-		flows = f
+		actionsToFlows[a] = f
+		if a == "diff-flows" && diffFlowsShouldErr {
+			return errors.New("flows differ")
+		}
 		return nil
 	}
 
@@ -33,15 +35,27 @@ func TestAddReplaceFlows(t *testing.T) {
 	assert.NoError(t, ReplaceFlows(nil))
 	client.AssertCalled(t, "Disconnect")
 	client.AssertCalled(t, "OpenFlowPorts")
-	assert.Equal(t, "replace-flows", action)
-	assert.Equal(t, allFlows(nil), flows)
+	assert.Equal(t, map[string][]string{
+		"diff-flows":    allFlows(nil),
+		"replace-flows": allFlows(nil),
+	}, actionsToFlows)
 
+	// Test that we don't call replace-flows when there are no differences.
+	actionsToFlows = map[string][]string{}
+	diffFlowsShouldErr = false
+	assert.NoError(t, ReplaceFlows(nil))
+	assert.Equal(t, map[string][]string{
+		"diff-flows": allFlows(nil),
+	}, actionsToFlows)
+
+	actionsToFlows = map[string][]string{}
 	assert.NoError(t, AddFlows(nil))
 	client.AssertCalled(t, "Disconnect")
 	client.AssertCalled(t, "OpenFlowPorts")
 
-	assert.Equal(t, "add-flows", action)
-	assert.Equal(t, containerFlows(nil), flows)
+	assert.Equal(t, map[string][]string{
+		"add-flows": containerFlows(nil),
+	}, actionsToFlows)
 
 	ofctl = func(a string, f []string) error { return anErr }
 	assert.EqualError(t, ReplaceFlows(nil), "ovs-ofctl: err")
