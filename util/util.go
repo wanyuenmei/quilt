@@ -41,9 +41,10 @@ func ToTar(name string, permissions int, content string) (io.Reader, error) {
 	buf := new(bytes.Buffer)
 	tw := tar.NewWriter(buf)
 	hdr := &tar.Header{
-		Name: name,
-		Mode: int64(permissions),
-		Size: int64(len(content)),
+		Name:    name,
+		Mode:    int64(permissions),
+		Size:    int64(len(content)),
+		ModTime: time.Now(),
 	}
 
 	if err := tw.WriteHeader(hdr); err != nil {
