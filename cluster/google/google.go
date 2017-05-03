@@ -1,20 +1,5 @@
 package google
 
-////// SET UP API ACCESS:
-//
-// 1) In the Google Developer Console navigate to:
-//    Permissions > Service accounts
-//
-// 2) Create or use an existing Service Account
-//
-// 3) For your Service Account, create and save a key as "~/.gce/quilt.json"
-//
-// 4) In the Google Developer Console navigate to:
-//    Permissions > Permissions
-//
-// 5) If the Service Account is not already, assign it the "Editor" role.
-//    You select the account by email.
-
 import (
 	"errors"
 	"fmt"
