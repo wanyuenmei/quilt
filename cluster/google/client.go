@@ -1,6 +1,8 @@
 package google
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -35,7 +37,8 @@ type client interface {
 }
 
 type clientImpl struct {
-	gce *compute.Service
+	gce    *compute.Service
+	projID string
 }
 
 func newClient() (*clientImpl, error) {
@@ -50,7 +53,28 @@ func newClient() (*clientImpl, error) {
 		return nil, err
 	}
 
-	return &clientImpl{gce: service}, nil
+	projID, err := getProjectID(configStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get project ID: %s", err)
+	}
+
+	return &clientImpl{gce: service, projID: projID}, nil
+}
+
+const projectIDKey = "project_id"
+
+func getProjectID(configStr string) (string, error) {
+	configFields := map[string]string{}
+	if err := json.Unmarshal([]byte(configStr), &configFields); err != nil {
+		return "", err
+	}
+
+	projID, ok := configFields[projectIDKey]
+	if !ok {
+		return "", fmt.Errorf("missing field: %s", projectIDKey)
+	}
+
+	return projID, nil
 }
 
 /**
