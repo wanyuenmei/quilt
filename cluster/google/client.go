@@ -1,11 +1,12 @@
 package google
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 
 	compute "google.golang.org/api/compute/v1"
+
+	"github.com/quilt/quilt/util"
 )
 
 //go:generate mockery -inpkg -testonly -name=client
@@ -38,13 +39,13 @@ type clientImpl struct {
 }
 
 func newClient() (*clientImpl, error) {
-	keyfile := filepath.Join(os.Getenv("HOME"), ".gce", "quilt.json")
-	err := os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", keyfile)
+	configPath := filepath.Join(os.Getenv("HOME"), ".gce", "quilt.json")
+	configStr, err := util.ReadFile(configPath)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	service, err := newComputeService(context.Background())
+	service, err := newComputeService(configStr)
 	if err != nil {
 		return nil, err
 	}

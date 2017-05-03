@@ -566,16 +566,14 @@ func (clst *Cluster) firewallPatch(name string,
 	return clst.gce.PatchFirewall(clst.projID, name, firewall)
 }
 
-func newComputeService(ctx context.Context) (*compute.Service, error) {
-	client, err := google.DefaultClient(ctx, compute.ComputeScope)
+func newComputeService(configStr string) (*compute.Service, error) {
+	jwtConfig, err := google.JWTConfigFromJSON(
+		[]byte(configStr), compute.ComputeScope)
 	if err != nil {
 		return nil, err
 	}
-	computeService, err := compute.New(client)
-	if err != nil {
-		return nil, err
-	}
-	return computeService, nil
+
+	return compute.New(jwtConfig.Client(context.Background()))
 }
 
 // Initializes the network for the cluster
