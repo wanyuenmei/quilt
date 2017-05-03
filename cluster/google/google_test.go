@@ -20,15 +20,14 @@ type GoogleTestSuite struct {
 func (s *GoogleTestSuite) SetupTest() {
 	s.gce = &mockClient{}
 	s.clst = &Cluster{
-		gce:    s.gce,
-		projID: "project",
-		ns:     "namespace",
-		zone:   "zone-1",
+		gce:  s.gce,
+		ns:   "namespace",
+		zone: "zone-1",
 	}
 }
 
 func (s *GoogleTestSuite) TestList() {
-	s.gce.On("ListInstances", "project", "zone-1", apiOptions{
+	s.gce.On("ListInstances", "zone-1", apiOptions{
 		filter: "description eq namespace",
 	}).Return(&compute.InstanceList{
 		Items: []*compute.Instance{
