@@ -3,6 +3,7 @@ package digitalocean
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -109,6 +110,17 @@ func TestList(t *testing.T) {
 	}
 	mc.On("ListDroplets", reqLast).Return(dropLast, respLast, nil).Once()
 
+	floatingIPsFirst := []godo.FloatingIP{
+		{IP: "ignored"},
+		{Droplet: &godo.Droplet{ID: -1}, IP: "ignored"},
+	}
+	mc.On("ListFloatingIPs", reqFirst).Return(floatingIPsFirst, respFirst, nil).Once()
+
+	floatingIPsLast := []godo.FloatingIP{
+		{Droplet: &godo.Droplet{ID: 125}, IP: "floatingIP"},
+	}
+	mc.On("ListFloatingIPs", reqLast).Return(floatingIPsLast, respLast, nil).Once()
+
 	mc.On("GetVolume", mock.Anything).Return(
 		&godo.Volume{
 			SizeGigaBytes: 32,
@@ -136,6 +148,7 @@ func TestList(t *testing.T) {
 			Provider:    db.DigitalOcean,
 			PublicIP:    "publicIP",
 			PrivateIP:   "privateIP",
+			FloatingIP:  "floatingIP",
 			Size:        "size",
 			Region:      "sfo1",
 			Preemptible: false,
@@ -143,9 +156,15 @@ func TestList(t *testing.T) {
 	})
 
 	// Error ListDroplets.
+	mc.On("ListFloatingIPs", mock.Anything).Return(nil, &godo.Response{}, nil).Once()
 	mc.On("ListDroplets", mock.Anything).Return(nil, nil, errMock).Once()
 	machines, err = doClust.List()
 	assert.Nil(t, machines)
+	assert.EqualError(t, err, errMsg)
+
+	// Error ListFloatingIPs.
+	mc.On("ListFloatingIPs", mock.Anything).Return(nil, nil, errMock).Once()
+	_, err = doClust.List()
 	assert.EqualError(t, err, errMsg)
 
 	// Error PublicIPv4. We can't error PrivateIPv4 because of the two functions'
@@ -161,6 +180,7 @@ func TestList(t *testing.T) {
 		},
 	}
 	mc.On("ListDroplets", mock.Anything).Return(droplets, respLast, nil).Once()
+	mc.On("ListFloatingIPs", mock.Anything).Return(nil, &godo.Response{}, nil).Once()
 	machines, err = doClust.List()
 	assert.Nil(t, machines)
 	assert.EqualError(t, err, "no networks have been defined")
@@ -173,6 +193,7 @@ func TestList(t *testing.T) {
 			},
 		},
 	}
+	mc.On("ListFloatingIPs", mock.Anything).Return(nil, &godo.Response{}, nil).Once()
 	mc.On("ListDroplets", mock.Anything).Return([]godo.Droplet{}, respBad, nil).Once()
 	machines, err = doClust.List()
 	assert.Nil(t, machines)
@@ -336,10 +357,115 @@ func TestSetACLs(t *testing.T) {
 }
 
 func TestUpdateFloatingIPs(t *testing.T) {
-	doClust, err := newDigitalOcean(testNamespace, DefaultRegion)
-	assert.Nil(t, err)
-	err = doClust.UpdateFloatingIPs(nil)
-	assert.EqualError(t, err, "digitalOcean floating IPs are unimplemented")
+	mc := new(mockClient)
+	clst := &Cluster{client: mc}
+
+	mc.On("ListFloatingIPs", mock.Anything).Return(nil, nil, errMock).Once()
+	err := clst.UpdateFloatingIPs(nil)
+	assert.EqualError(t, err, fmt.Sprintf("list machines: %s", errMsg))
+	mc.AssertExpectations(t)
+
+	// Test assigning a floating IP.
+	mc.On("AssignFloatingIP", "ip", 1).Return(nil, nil, nil).Once()
+	err = clst.syncFloatingIPs(
+		[]machine.Machine{
+			{ID: "1"},
+			{ID: "2"},
+		},
+		[]machine.Machine{
+			{ID: "1", FloatingIP: "ip"},
+		},
+	)
+	assert.NoError(t, err)
+	mc.AssertExpectations(t)
+
+	// Test error when assigning a floating IP.
+	mc.On("AssignFloatingIP", "ip", 1).Return(nil, nil, errMock).Once()
+	err = clst.syncFloatingIPs(
+		[]machine.Machine{
+			{ID: "1"},
+		},
+		[]machine.Machine{
+			{ID: "1", FloatingIP: "ip"},
+		},
+	)
+	assert.EqualError(t, err, fmt.Sprintf("assign IP (ip to 1): %s", errMsg))
+	mc.AssertExpectations(t)
+
+	// Test assigning one floating IP, and unassigning another.
+	mc.On("AssignFloatingIP", "ip", 1).Return(nil, nil, nil).Once()
+	mc.On("UnassignFloatingIP", "remove").Return(nil, nil, nil).Once()
+	err = clst.syncFloatingIPs(
+		[]machine.Machine{
+			{ID: "1"},
+			{ID: "2", FloatingIP: "remove"},
+		},
+		[]machine.Machine{
+			{ID: "1", FloatingIP: "ip"},
+			{ID: "2"},
+		},
+	)
+	assert.NoError(t, err)
+	mc.AssertExpectations(t)
+
+	// Test error when unassigning a floating IP.
+	mc.On("UnassignFloatingIP", "remove").Return(nil, nil, errMock).Once()
+	err = clst.syncFloatingIPs(
+		[]machine.Machine{
+			{ID: "2", FloatingIP: "remove"},
+		},
+		[]machine.Machine{
+			{ID: "2"},
+		},
+	)
+	assert.EqualError(t, err, fmt.Sprintf("unassign IP (remove): %s", errMsg))
+	mc.AssertExpectations(t)
+
+	// Test changing a floating IP, which requires removing the old one, and
+	// assigning the new.
+	mc.On("UnassignFloatingIP", "changeme").Return(nil, nil, nil).Once()
+	mc.On("AssignFloatingIP", "ip", 1).Return(nil, nil, nil).Once()
+	err = clst.syncFloatingIPs(
+		[]machine.Machine{
+			{ID: "1", FloatingIP: "changeme"},
+		},
+		[]machine.Machine{
+			{ID: "1", FloatingIP: "ip"},
+		},
+	)
+	assert.NoError(t, err)
+	mc.AssertExpectations(t)
+
+	// Test machines that need no changes.
+	err = clst.syncFloatingIPs(
+		[]machine.Machine{
+			{ID: "1", FloatingIP: "ip"},
+		},
+		[]machine.Machine{
+			{ID: "1", FloatingIP: "ip"},
+		},
+	)
+	assert.NoError(t, err)
+	mc.AssertExpectations(t)
+
+	err = clst.syncFloatingIPs(
+		[]machine.Machine{},
+		[]machine.Machine{
+			{ID: "1", FloatingIP: "ip"},
+		},
+	)
+	assert.EqualError(t, err, "no machines match desired: "+
+		"[{ID:1 PublicIP: PrivateIP: FloatingIP:ip Preemptible:false "+
+		"Size: DiskSize:0 SSHKeys:[] Provider: Region: Role:}]")
+
+	err = clst.syncFloatingIPs(
+		[]machine.Machine{{ID: "NAN"}},
+		[]machine.Machine{
+			{ID: "NAN", FloatingIP: "ip"},
+		},
+	)
+	assert.EqualError(t, err,
+		"malformed id (NAN): strconv.Atoi: parsing \"NAN\": invalid syntax")
 }
 
 func TestNew(t *testing.T) {

@@ -91,3 +91,16 @@ func vagrantSize(ramRange, cpuRange stitch.Range) string {
 	}
 	return fmt.Sprintf("%g,%g", ram, cpu)
 }
+
+// Slice is an alias for []Machine to allow for joins.
+type Slice []Machine
+
+// Get returns the value contained at the given index.
+func (slc Slice) Get(ii int) interface{} {
+	return slc[ii]
+}
+
+// Len returns the number of items in the slice.
+func (slc Slice) Len() int {
+	return len(slc)
+}

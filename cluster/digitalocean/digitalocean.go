@@ -1,7 +1,7 @@
 package digitalocean
 
 import (
-	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -14,6 +14,7 @@ import (
 	"github.com/quilt/quilt/cluster/cloudcfg"
 	"github.com/quilt/quilt/cluster/machine"
 	"github.com/quilt/quilt/db"
+	"github.com/quilt/quilt/join"
 	"github.com/quilt/quilt/util"
 
 	"golang.org/x/oauth2"
@@ -67,18 +68,42 @@ var newDigitalOcean = func(namespace, region string) (*Cluster, error) {
 	clst := &Cluster{
 		namespace: namespace,
 		region:    region,
-		client:    doClient{droplets: api.Droplets}}
+		client: doClient{
+			droplets:          api.Droplets,
+			floatingIPs:       api.FloatingIPs,
+			floatingIPActions: api.FloatingIPActions,
+		},
+	}
 	return clst, nil
 }
 
 // List will fetch all droplets that have the same name as the cluster namespace.
-func (clst Cluster) List() ([]machine.Machine, error) {
-	machines := []machine.Machine{}
-	opt := &godo.ListOptions{} // Keep track of the page we're on.
+func (clst Cluster) List() (machines []machine.Machine, err error) {
+	floatingIPListOpt := &godo.ListOptions{}
+	floatingIPs := map[int]string{}
+	for {
+		ips, resp, err := clst.client.ListFloatingIPs(floatingIPListOpt)
+		if err != nil {
+			return nil, err
+		}
 
+		for _, ip := range ips {
+			if ip.Droplet == nil {
+				continue
+			}
+			floatingIPs[ip.Droplet.ID] = ip.IP
+		}
+
+		if resp.Links == nil || resp.Links.IsLastPage() {
+			break
+		}
+		floatingIPListOpt.Page++
+	}
+
+	dropletListOpt := &godo.ListOptions{} // Keep track of the page we're on.
 	// DigitalOcean's API has a paginated list of droplets.
 	for {
-		droplets, resp, err := clst.client.ListDroplets(opt)
+		droplets, resp, err := clst.client.ListDroplets(dropletListOpt)
 		if err != nil {
 			return nil, err
 		}
@@ -102,6 +127,7 @@ func (clst Cluster) List() ([]machine.Machine, error) {
 				ID:          strconv.Itoa(d.ID),
 				PublicIP:    pubIP,
 				PrivateIP:   privIP,
+				FloatingIP:  floatingIPs[d.ID],
 				Size:        d.SizeSlug,
 				Provider:    db.DigitalOcean,
 				Region:      d.Region.Slug,
@@ -119,7 +145,7 @@ func (clst Cluster) List() ([]machine.Machine, error) {
 			return nil, err
 		}
 
-		opt.Page = page + 1
+		dropletListOpt.Page = page + 1
 	}
 	return machines, nil
 }
@@ -169,9 +195,58 @@ func (clst Cluster) createAndAttach(m machine.Machine) error {
 	return util.WaitFor(pred, 10*time.Second, 2*time.Minute)
 }
 
-// UpdateFloatingIPs currently returns an error.
-func (clst Cluster) UpdateFloatingIPs(machines []machine.Machine) error {
-	return errors.New("digitalOcean floating IPs are unimplemented")
+// UpdateFloatingIPs updates Droplet to Floating IP associations.
+func (clst Cluster) UpdateFloatingIPs(desired []machine.Machine) error {
+	curr, err := clst.List()
+	if err != nil {
+		return fmt.Errorf("list machines: %s", err)
+	}
+
+	return clst.syncFloatingIPs(curr, desired)
+}
+
+func (clst Cluster) syncFloatingIPs(curr, targets []machine.Machine) error {
+	idKey := func(intf interface{}) interface{} {
+		return intf.(machine.Machine).ID
+	}
+	pairs, _, unmatchedDesired := join.HashJoin(
+		machine.Slice(curr), machine.Slice(targets), idKey, idKey)
+
+	if len(unmatchedDesired) != 0 {
+		return fmt.Errorf("no machines match desired: %+v", unmatchedDesired)
+	}
+
+	for _, pair := range pairs {
+		curr := pair.L.(machine.Machine)
+		desired := pair.R.(machine.Machine)
+
+		if curr.FloatingIP == desired.FloatingIP {
+			continue
+		}
+
+		if curr.FloatingIP != "" {
+			_, _, err := clst.client.UnassignFloatingIP(curr.FloatingIP)
+			if err != nil {
+				return fmt.Errorf("unassign IP (%s): %s",
+					curr.FloatingIP, err)
+			}
+		}
+
+		if desired.FloatingIP != "" {
+			id, err := strconv.Atoi(curr.ID)
+			if err != nil {
+				return fmt.Errorf("malformed id (%s): %s", curr.ID, err)
+			}
+
+			_, _, err = clst.client.AssignFloatingIP(desired.FloatingIP, id)
+			if err != nil {
+				return fmt.Errorf("assign IP (%s to %d): %s",
+					desired.FloatingIP, id, err)
+			}
+		}
+	}
+
+	return nil
 }
 
 // Stop stops each machine and deletes their attached volumes.
