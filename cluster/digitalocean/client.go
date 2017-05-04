@@ -16,7 +16,6 @@ type client interface {
 
 type doClient struct {
 	droplets godo.DropletsService
-	images   godo.ImagesService
 }
 
 func (client doClient) CreateDroplet(req *godo.DropletCreateRequest) (*godo.Droplet,

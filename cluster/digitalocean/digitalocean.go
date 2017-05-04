@@ -67,7 +67,7 @@ var newDigitalOcean = func(namespace, region string) (*Cluster, error) {
 	clst := &Cluster{
 		namespace: namespace,
 		region:    region,
-		client:    doClient{droplets: api.Droplets, images: api.Images}}
+		client:    doClient{droplets: api.Droplets}}
 	return clst, nil
 }
 
