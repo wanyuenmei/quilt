@@ -21,10 +21,6 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
-// Digital Ocean Setup
-// 1. Create a new key at cloud.digitalocean.com/settings/api/tokens
-// 2. Copy and paste the key into this file: ~/.digitalocean/key
-
 // DefaultRegion is assigned to Machines without a specified region
 const DefaultRegion string = "sfo1"
 
