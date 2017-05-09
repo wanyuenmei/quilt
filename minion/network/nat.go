@@ -3,11 +3,13 @@ package network
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/quilt/quilt/db"
 	"github.com/quilt/quilt/join"
 	"github.com/quilt/quilt/stitch"
+	"github.com/quilt/quilt/util"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/coreos/go-iptables/iptables"
@@ -76,6 +78,40 @@ func updateNAT(ipt IPTables, containers []db.Container,
 	return syncChain(ipt, "nat", "POSTROUTING", postrouting)
 }
 
+var flagRegex = regexp.MustCompile(`-{1,2}(\S+) (\S+)(.*)`)
+
+// ruleKey transforms an iptables rule into a string that is consistent between
+// changes to the order of options.
+// It handles rules of the form `-k v --another val -j target -with flags`. In
+// other words, we parse out key value pairs as denoted by hyphens, unless
+// we've reached the jump flag, in which case the value is the remaining
+// string.
+// The algorithm works by matching three parts: the flag name, the flag
+// value, and the remaining string. The remaining string will begin with
+// the next flag, and is processed on the next iteration.
+func ruleKey(intf interface{}) interface{} {
+	opts := map[string]string{}
+	remaining := intf.(string)
+	for remaining != "" {
+		matches := flagRegex.FindStringSubmatch(remaining)
+		if matches == nil {
+			log.WithField("rule", intf.(string)).Error("Failed to parse rule")
+			return nil
+		}
+
+		flagName, flagVal := matches[1], matches[2]
+		remaining = matches[3]
+
+		if flagName == "j" || flagName == "jump" {
+			flagVal += remaining
+			remaining = ""
+		}
+		opts[flagName] = flagVal
+	}
+
+	return util.MapAsString(opts)
+}
+
 func syncChain(ipt IPTables, table, chain string, target []string) error {
 	curr, err := getRules(ipt, table, chain)
 	if err != nil {
@@ -83,7 +119,7 @@ func syncChain(ipt IPTables, table, chain string, target []string) error {
 	}
 
 	_, rulesToDel, rulesToAdd := join.HashJoin(
-		join.StringSlice(curr), join.StringSlice(target), nil, nil)
+		join.StringSlice(curr), join.StringSlice(target), ruleKey, ruleKey)
 
 	for _, r := range rulesToDel {
 		ruleSpec := strings.Split(r.(string), " ")
