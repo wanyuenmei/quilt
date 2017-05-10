@@ -183,7 +183,8 @@ func postroutingRules(publicInterface string, containers []db.Container,
 			for port := range portsToWeb[label] {
 				for _, protocol := range []string{"tcp", "udp"} {
 					rules = append(rules, fmt.Sprintf(
-						"-s %s/32 -p %s --dport %d -o %s "+
+						"-s %[1]s/32 -p %[2]s -m %[2]s "+
+							"--dport %[3]d -o %[4]s "+
 							"-j MASQUERADE",
 						dbc.IP, protocol, port, publicInterface,
 					))

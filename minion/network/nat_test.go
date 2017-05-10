@@ -155,14 +155,14 @@ func TestPostroutingRules(t *testing.T) {
 	}
 
 	exp := []string{
-		"-s 8.8.8.8/32 -p tcp --dport 80 -o eth0 -j MASQUERADE",
-		"-s 8.8.8.8/32 -p tcp --dport 81 -o eth0 -j MASQUERADE",
-		"-s 8.8.8.8/32 -p udp --dport 80 -o eth0 -j MASQUERADE",
-		"-s 8.8.8.8/32 -p udp --dport 81 -o eth0 -j MASQUERADE",
-		"-s 9.9.9.9/32 -p tcp --dport 80 -o eth0 -j MASQUERADE",
-		"-s 9.9.9.9/32 -p tcp --dport 81 -o eth0 -j MASQUERADE",
-		"-s 9.9.9.9/32 -p udp --dport 80 -o eth0 -j MASQUERADE",
-		"-s 9.9.9.9/32 -p udp --dport 81 -o eth0 -j MASQUERADE",
+		"-s 8.8.8.8/32 -p tcp -m tcp --dport 80 -o eth0 -j MASQUERADE",
+		"-s 8.8.8.8/32 -p tcp -m tcp --dport 81 -o eth0 -j MASQUERADE",
+		"-s 8.8.8.8/32 -p udp -m udp --dport 80 -o eth0 -j MASQUERADE",
+		"-s 8.8.8.8/32 -p udp -m udp --dport 81 -o eth0 -j MASQUERADE",
+		"-s 9.9.9.9/32 -p tcp -m tcp --dport 80 -o eth0 -j MASQUERADE",
+		"-s 9.9.9.9/32 -p tcp -m tcp --dport 81 -o eth0 -j MASQUERADE",
+		"-s 9.9.9.9/32 -p udp -m udp --dport 80 -o eth0 -j MASQUERADE",
+		"-s 9.9.9.9/32 -p udp -m udp --dport 81 -o eth0 -j MASQUERADE",
 	}
 	actual := postroutingRules("eth0", containers, connections)
 	sort.Strings(actual)
