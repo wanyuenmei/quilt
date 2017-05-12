@@ -13,6 +13,7 @@ initialize_ovs() {
 	Requires=docker.service
 
 	[Service]
+	Type=oneshot
 	ExecStartPre=/sbin/modprobe gre
 	ExecStartPre=/sbin/modprobe nf_nat_ipv6
 	ExecStart=/usr/bin/docker run --rm --privileged {{.QuiltImage}} \
@@ -49,8 +50,8 @@ initialize_minion() {
 	cat <<- EOF > /etc/systemd/system/minion.service
 	[Unit]
 	Description=Quilt Minion
-	After=docker.service
-	Requires=docker.service
+	After=ovs.service
+	Requires=ovs.service
 
 	[Service]
 	TimeoutSec=1000
