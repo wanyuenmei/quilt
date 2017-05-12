@@ -1,0 +1,62 @@
+#!/bin/bash
+set -e
+
+build_dir="/build"
+ovs_ver="2.7.0"
+build_deps="build-essential libssl-dev python python-six curl"
+
+function setup_build() {
+    apt-get update && apt-get install -y ${build_deps}
+    mkdir ${build_dir}
+    curl http://openvswitch.org/releases/openvswitch-${ovs_ver}.tar.gz | tar xz -C ${build_dir}
+    cd ${build_dir}/openvswitch-${ovs_ver}
+}
+
+function cleanup_build() {
+    apt-get remove --purge -y ${build_deps}
+    apt-get autoremove -y --purge
+    rm -rf /var/lib/apt/lists/*
+    rm -rf ${build_dir}
+}
+
+function build_binaries() {
+    setup_build
+    ./configure --localstatedir="/var" --sysconfdir="/etc" --prefix="/usr" --enable-ssl
+    make all install
+    ovsdb-tool create /etc/openvswitch/conf.db /usr/share/openvswitch/vswitch.ovsschema
+    ovsdb-tool create /etc/openvswitch/ovnnb.db /usr/share/openvswitch/ovn-nb.ovsschema
+    ovsdb-tool create /etc/openvswitch/ovnsb.db /usr/share/openvswitch/ovn-sb.ovsschema
+    cleanup_build
+}
+
+function build_kernel_modules() {
+    kernel_versions=$@
+    setup_build
+    for kernel_ver in ${kernel_versions}; do
+       apt-get install -y linux-headers-${kernel_ver}
+       ./configure --with-linux=/lib/modules/${kernel_ver}/build
+
+       pushd datapath/linux
+       make
+       mkdir -p /modules/${kernel_ver}
+       cp openvswitch.ko vport-geneve.ko vport-stt.ko /modules/${kernel_ver}
+       popd
+
+       make clean
+       apt-get remove --purge -y linux-headers-${kernel_ver}
+    done
+    cleanup_build
+}
+
+case $1 in
+binaries)
+    build_binaries
+    ;;
+kernel_modules)
+    shift
+    build_kernel_modules "$@"
+    ;;
+*)
+    echo "Command not recognized"
+    exit 1
+esac

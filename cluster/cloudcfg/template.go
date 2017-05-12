@@ -16,8 +16,12 @@ initialize_ovs() {
 	Type=oneshot
 	ExecStartPre=/sbin/modprobe gre
 	ExecStartPre=/sbin/modprobe nf_nat_ipv6
-	ExecStart=/usr/bin/docker run --rm --privileged {{.QuiltImage}} \
-	bash -c "insmod /modules/$(uname -r)/openvswitch.ko \
+	ExecStart=/usr/bin/docker run --rm --privileged --net=host {{.QuiltImage}} \
+	bash -c "if [ ! -d /modules/$(uname -r) ]; then \
+			echo WARN No usable pre-built kernel module. Building now... >&2; \
+			/bin/bootstrap kernel_modules $(uname -r); \
+		fi ; \
+		insmod /modules/$(uname -r)/openvswitch.ko \
 	         && insmod /modules/$(uname -r)/vport-geneve.ko \
 	         && insmod /modules/$(uname -r)/vport-stt.ko"
 
