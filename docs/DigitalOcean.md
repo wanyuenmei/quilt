@@ -14,7 +14,7 @@ deployment.deploy(new Machine({
 
 ## Setup
 
-1. Create a new key [here](cloud.digitalocean.com/settings/api/tokens).
+1. Create a new key [here](https://cloud.digitalocean.com/settings/api/tokens).
 Both read and write permissions are required.
 
 2. Save the key in `~/.digitalocean/key` on the machine that will be running the
