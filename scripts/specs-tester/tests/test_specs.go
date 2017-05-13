@@ -56,6 +56,7 @@ func TestSpecs() error {
 		"github.com/quilt/tester/tests/elasticsearch/elasticsearch.js",
 		"github.com/quilt/tester/tests/build-dockerfile/build-dockerfile.js",
 		"github.com/quilt/tester/tests/etcd/etcd.js",
+		"github.com/quilt/tester/tests/zookeeper/zookeeper.js",
 
 		"github.com/quilt/nginx/main.js",
 		"github.com/quilt/spark/sparkPI.js",
@@ -70,6 +71,8 @@ func TestSpecs() error {
 		"github.com/quilt/php-apache/main.js",
 		"github.com/quilt/mongo/example.js",
 		"github.com/quilt/tester/tester-runner-example.js",
+		"github.com/quilt/lobsters/lobsters-example.js",
+		"github.com/quilt/infrastructure/floating-ip.js",
 	}
 
 	for _, specPath := range specs {
