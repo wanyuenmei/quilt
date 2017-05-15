@@ -16,86 +16,217 @@ func TestContainerTxn(t *testing.T) {
 	conn := db.New()
 	trigg := conn.Trigger(db.ContainerTable).C
 
-	spec := ""
-	testContainerTxn(t, conn, spec)
+	testContainerTxn(t, conn, stitch.Stitch{})
 	assert.False(t, fired(trigg))
 
-	spec = `deployment.deploy(
-		new Service("a", [new Container("alpine", ["tail"])])
-	)`
-	testContainerTxn(t, conn, spec)
+	stc := stitch.Stitch{
+		Containers: []stitch.Container{
+			{
+				ID:      "f133411ac23f45342a7b8b89bbe5e9efd0e711e5",
+				Image:   stitch.Image{Name: "alpine"},
+				Command: []string{"tail"},
+			},
+		},
+		Labels: []stitch.Label{
+			{
+				Name: "a",
+				IDs: []string{
+					"f133411ac23f45342a7b8b89bbe5e9efd0e711e5",
+				},
+			},
+		},
+	}
+	testContainerTxn(t, conn, stc)
 	assert.True(t, fired(trigg))
 
-	testContainerTxn(t, conn, spec)
+	testContainerTxn(t, conn, stc)
 	assert.False(t, fired(trigg))
 
-	spec = `var b = new Container("alpine", ["tail"]);
-	deployment.deploy([
-		new Service("b", [b]),
-		new Service("a", [b, new Container("alpine", ["tail"])])
-	]);`
-	testContainerTxn(t, conn, spec)
+	testContainerTxn(t, conn, stitch.Stitch{
+		Containers: []stitch.Container{
+			{
+				ID:      "f133411ac23f45342a7b8b89bbe5e9efd0e711e5",
+				Image:   stitch.Image{Name: "alpine"},
+				Command: []string{"tail"},
+			},
+			{
+				ID:      "6e24c8cbeb63dbffcc82730d01b439e2f5085f59",
+				Image:   stitch.Image{Name: "alpine"},
+				Command: []string{"tail"},
+			},
+		},
+		Labels: []stitch.Label{
+			{
+				Name: "b",
+				IDs: []string{
+					"f133411ac23f45342a7b8b89bbe5e9efd0e711e5",
+				},
+			},
+			{
+				Name: "a",
+				IDs: []string{
+					"f133411ac23f45342a7b8b89bbe5e9efd0e711e5",
+					"6e24c8cbeb63dbffcc82730d01b439e2f5085f59",
+				},
+			},
+		},
+	})
 	assert.True(t, fired(trigg))
 
-	spec = `var b = new Service("b", [new Container("alpine", ["cat"])]);
-	deployment.deploy([
-		b,
-		new Service("a",
-			b.containers.concat([new Container("alpine", ["tail"])])),
-	]);`
-	testContainerTxn(t, conn, spec)
+	testContainerTxn(t, conn, stitch.Stitch{
+		Containers: []stitch.Container{
+			{
+				ID:      "0b8a2ed7d14d78a388375025223b05d072bbaec3",
+				Image:   stitch.Image{Name: "alpine"},
+				Command: []string{"cat"},
+			},
+			{
+				ID:      "f133411ac23f45342a7b8b89bbe5e9efd0e711e5",
+				Image:   stitch.Image{Name: "alpine"},
+				Command: []string{"tail"},
+			},
+		},
+		Labels: []stitch.Label{
+			{
+				Name: "b",
+				IDs: []string{
+					"0b8a2ed7d14d78a388375025223b05d072bbaec3",
+				},
+			},
+			{
+				Name: "a",
+				IDs: []string{
+					"0b8a2ed7d14d78a388375025223b05d072bbaec3",
+					"f133411ac23f45342a7b8b89bbe5e9efd0e711e5",
+				},
+			},
+		},
+	})
 	assert.True(t, fired(trigg))
 
-	spec = `var b = new Service("b", [new Container("ubuntu", ["cat"])]);
-	deployment.deploy([
-		b,
-		new Service("a",
-			b.containers.concat([new Container("alpine", ["tail"])])),
-	]);`
-	testContainerTxn(t, conn, spec)
+	testContainerTxn(t, conn, stitch.Stitch{
+		Containers: []stitch.Container{
+			{
+				ID:      "7a6244b8d2bfa10ee2fcbe6836a0519e116aee31",
+				Image:   stitch.Image{Name: "ubuntu"},
+				Command: []string{"cat"},
+			},
+			{
+				ID:      "f133411ac23f45342a7b8b89bbe5e9efd0e711e5",
+				Image:   stitch.Image{Name: "alpine"},
+				Command: []string{"tail"},
+			},
+		},
+		Labels: []stitch.Label{
+			{
+				Name: "b",
+				IDs: []string{
+					"7a6244b8d2bfa10ee2fcbe6836a0519e116aee31",
+				},
+			},
+			{
+				Name: "a",
+				IDs: []string{
+					"7a6244b8d2bfa10ee2fcbe6836a0519e116aee31",
+					"f133411ac23f45342a7b8b89bbe5e9efd0e711e5",
+				},
+			},
+		},
+	})
 	assert.True(t, fired(trigg))
 
-	spec = `deployment.deploy(
-		new Service("a", [
-			new Container("alpine", ["cat"]),
-			new Container("alpine", ["cat"])
-		])
-	);`
-	testContainerTxn(t, conn, spec)
+	testContainerTxn(t, conn, stitch.Stitch{
+		Containers: []stitch.Container{
+			{
+				ID:      "0b8a2ed7d14d78a388375025223b05d072bbaec3",
+				Image:   stitch.Image{Name: "alpine"},
+				Command: []string{"cat"},
+			},
+			{
+				ID:      "d1c9f501efd7a348e54388358c5fe29690fb147d",
+				Image:   stitch.Image{Name: "alpine"},
+				Command: []string{"cat"},
+			},
+		},
+		Labels: []stitch.Label{
+			{
+				Name: "a",
+				IDs: []string{
+					"0b8a2ed7d14d78a388375025223b05d072bbaec3",
+					"d1c9f501efd7a348e54388358c5fe29690fb147d",
+				},
+			},
+		},
+	})
 	assert.True(t, fired(trigg))
 
-	spec = `deployment.deploy(
-		new Service("a", [new Container("alpine")])
-	)`
-	testContainerTxn(t, conn, spec)
+	testContainerTxn(t, conn, stitch.Stitch{
+		Containers: []stitch.Container{
+			{
+				ID:    "018e4ee517d85640d9bf0adb4579d2ac9bd358af",
+				Image: stitch.Image{Name: "alpine"},
+			},
+		},
+		Labels: []stitch.Label{
+			{
+				Name: "a",
+				IDs: []string{
+					"018e4ee517d85640d9bf0adb4579d2ac9bd358af",
+				},
+			},
+		},
+	})
 	assert.True(t, fired(trigg))
 
-	spec = `var b = new Service("b", [new Container("alpine")]);
-	var c = new Service("c", [new Container("alpine")]);
-	deployment.deploy([
-		b,
-		c,
-		new Service("a", b.containers.concat(c.containers)),
-	])`
-	testContainerTxn(t, conn, spec)
+	stc = stitch.Stitch{
+		Containers: []stitch.Container{
+			{
+				ID:    "018e4ee517d85640d9bf0adb4579d2ac9bd358af",
+				Image: stitch.Image{Name: "alpine"},
+			},
+			{
+				ID:    "ac4693f0b7fc17aa0e885aa03dc8f7cd6017f496",
+				Image: stitch.Image{Name: "alpine"},
+			},
+		},
+		Labels: []stitch.Label{
+			{
+				Name: "b",
+				IDs: []string{
+					"018e4ee517d85640d9bf0adb4579d2ac9bd358af",
+				},
+			},
+			{
+				Name: "c",
+				IDs: []string{
+					"ac4693f0b7fc17aa0e885aa03dc8f7cd6017f496",
+				},
+			},
+			{
+				Name: "a",
+				IDs: []string{
+					"018e4ee517d85640d9bf0adb4579d2ac9bd358af",
+					"ac4693f0b7fc17aa0e885aa03dc8f7cd6017f496",
+				},
+			},
+		},
+	}
+	testContainerTxn(t, conn, stc)
 	assert.True(t, fired(trigg))
 
-	testContainerTxn(t, conn, spec)
+	testContainerTxn(t, conn, stc)
 	assert.False(t, fired(trigg))
 }
 
-func testContainerTxn(t *testing.T, conn db.Conn, spec string) {
-	compiled, err := stitch.FromJavascript(spec, stitch.DefaultImportGetter)
-	assert.Nil(t, err)
-
+func testContainerTxn(t *testing.T, conn db.Conn, stc stitch.Stitch) {
 	var containers []db.Container
 	conn.Txn(db.AllTables...).Run(func(view db.Database) error {
-		updatePolicy(view, compiled.String())
+		updatePolicy(view, stc.String())
 		containers = view.SelectFromContainer(nil)
 		return nil
 	})
 
-	for _, e := range queryContainers(compiled) {
+	for _, e := range queryContainers(stc) {
 		found := false
 		for i, c := range containers {
 			if e.StitchID == c.StitchID {
@@ -115,59 +246,92 @@ func TestConnectionTxn(t *testing.T) {
 	conn := db.New()
 	trigg := conn.Trigger(db.ConnectionTable).C
 
-	pre := `var a = new Service("a", [new Container("alpine")]);
-	var b = new Service("b", [new Container("alpine")]);
-	var c = new Service("c", [new Container("alpine")]);
-	deployment.deploy([a, b, c]);`
-
-	spec := ""
-	testConnectionTxn(t, conn, spec)
+	testConnectionTxn(t, conn, stitch.Stitch{})
 	assert.False(t, fired(trigg))
 
-	spec = pre + `a.connect(80, a);`
-	testConnectionTxn(t, conn, spec)
+	stc := stitch.Stitch{
+		Containers: []stitch.Container{
+			{
+				ID:    "018e4ee517d85640d9bf0adb4579d2ac9bd358af",
+				Image: stitch.Image{Name: "alpine"},
+			},
+			{
+				ID:    "ac4693f0b7fc17aa0e885aa03dc8f7cd6017f496",
+				Image: stitch.Image{Name: "alpine"},
+			},
+			{
+				ID:    "6c1423bb4006da48cd36aa664afec85f05575702",
+				Image: stitch.Image{Name: "alpine"},
+			},
+		},
+		Labels: []stitch.Label{
+			{
+				Name: "a",
+				IDs: []string{
+					"018e4ee517d85640d9bf0adb4579d2ac9bd358af",
+				},
+			},
+			{
+				Name: "b",
+				IDs: []string{
+					"ac4693f0b7fc17aa0e885aa03dc8f7cd6017f496",
+				},
+			},
+			{
+				Name: "c",
+				IDs: []string{
+					"6c1423bb4006da48cd36aa664afec85f05575702",
+				},
+			},
+		},
+		Connections: []stitch.Connection{
+			{From: "a", To: "a", MinPort: 80, MaxPort: 80},
+		},
+	}
+	testConnectionTxn(t, conn, stc)
 	assert.True(t, fired(trigg))
 
-	testConnectionTxn(t, conn, spec)
+	testConnectionTxn(t, conn, stc)
 	assert.False(t, fired(trigg))
 
-	spec = pre + `a.connect(90, a);`
-	testConnectionTxn(t, conn, spec)
+	stc.Connections = []stitch.Connection{
+		{From: "a", To: "a", MinPort: 90, MaxPort: 90},
+	}
+	testConnectionTxn(t, conn, stc)
 	assert.True(t, fired(trigg))
 
-	testConnectionTxn(t, conn, spec)
+	testConnectionTxn(t, conn, stc)
 	assert.False(t, fired(trigg))
 
-	spec = pre + `b.connect(90, a);
-	b.connect(90, c);
-	b.connect(100, b);
-	c.connect(101, a);`
-	testConnectionTxn(t, conn, spec)
+	stc.Connections = []stitch.Connection{
+		{From: "b", To: "a", MinPort: 90, MaxPort: 90},
+		{From: "b", To: "c", MinPort: 90, MaxPort: 90},
+		{From: "b", To: "a", MinPort: 100, MaxPort: 100},
+		{From: "c", To: "a", MinPort: 101, MaxPort: 101},
+	}
+	testConnectionTxn(t, conn, stc)
 	assert.True(t, fired(trigg))
 
-	testConnectionTxn(t, conn, spec)
+	testConnectionTxn(t, conn, stc)
 	assert.False(t, fired(trigg))
 
-	spec = pre
-	testConnectionTxn(t, conn, spec)
+	stc.Connections = nil
+	testConnectionTxn(t, conn, stc)
 	assert.True(t, fired(trigg))
 
-	testConnectionTxn(t, conn, spec)
+	testConnectionTxn(t, conn, stc)
 	assert.False(t, fired(trigg))
 }
 
-func testConnectionTxn(t *testing.T, conn db.Conn, spec string) {
-	compiled, err := stitch.FromJavascript(spec, stitch.DefaultImportGetter)
-	assert.Nil(t, err)
-
+func testConnectionTxn(t *testing.T, conn db.Conn, stc stitch.Stitch) {
 	var connections []db.Connection
 	conn.Txn(db.AllTables...).Run(func(view db.Database) error {
-		updatePolicy(view, compiled.String())
+		updatePolicy(view, stc.String())
 		connections = view.SelectFromConnection(nil)
 		return nil
 	})
 
-	exp := compiled.Connections
+	exp := stc.Connections
 	for _, e := range exp {
 		found := false
 		for i, c := range connections {
@@ -198,14 +362,10 @@ func fired(c chan struct{}) bool {
 
 func TestPlacementTxn(t *testing.T) {
 	conn := db.New()
-	checkPlacement := func(spec string, exp ...db.Placement) {
-		compiled, err := stitch.FromJavascript(spec,
-			stitch.DefaultImportGetter)
-		assert.Nil(t, err)
-
+	checkPlacement := func(stc stitch.Stitch, exp ...db.Placement) {
 		placements := map[db.Placement]struct{}{}
 		conn.Txn(db.AllTables...).Run(func(view db.Database) error {
-			updatePolicy(view, compiled.String())
+			updatePolicy(view, stc.String())
 			res := view.SelectFromPlacement(nil)
 
 			// Set the ID to 0 so that we can use reflect.DeepEqual.
@@ -224,14 +384,52 @@ func TestPlacementTxn(t *testing.T) {
 		}
 	}
 
-	pre := `var foo = new Service("foo", [new Container("foo")]);
-	var bar = new Service("bar", [new Container("bar")]);
-	var baz = new Service("baz", [new Container("bar")]);
-	deployment.deploy([foo, bar, baz]);`
+	stc := stitch.Stitch{
+		Containers: []stitch.Container{
+			{
+				ID:    "1a84f87eebbf7dc7edda83a38f34a49f2116240b",
+				Image: stitch.Image{Name: "foo"},
+			},
+			{
+				ID:    "1806739e57b7678db83f0a5c6c63b16325c54242",
+				Image: stitch.Image{Name: "bar"},
+			},
+			{
+				ID:    "af771c5f8cd87c550263b011541cbf6a14051976",
+				Image: stitch.Image{Name: "bar"},
+			},
+		},
+		Labels: []stitch.Label{
+			{
+				Name: "foo",
+				IDs: []string{
+					"1a84f87eebbf7dc7edda83a38f34a49f2116240b",
+				},
+			},
+			{
+				Name: "bar",
+				IDs: []string{
+					"1806739e57b7678db83f0a5c6c63b16325c54242",
+				},
+			},
+			{
+				Name: "baz",
+				IDs: []string{
+					"af771c5f8cd87c550263b011541cbf6a14051976",
+				},
+			},
+		},
+		Placements: []stitch.Placement{
+			{
+				TargetLabel: "bar",
+				Exclusive:   true,
+				OtherLabel:  "foo",
+			},
+		},
+	}
 
 	// Create an exclusive placement.
-	spec := pre + `bar.place(new LabelRule(true, foo));`
-	checkPlacement(spec,
+	checkPlacement(stc,
 		db.Placement{
 			TargetLabel: "bar",
 			Exclusive:   true,
@@ -240,8 +438,10 @@ func TestPlacementTxn(t *testing.T) {
 	)
 
 	// Change the placement from "exclusive" to "on".
-	spec = pre + `bar.place(new LabelRule(false, foo));`
-	checkPlacement(spec,
+	stc.Placements = []stitch.Placement{
+		{TargetLabel: "bar", Exclusive: false, OtherLabel: "foo"},
+	}
+	checkPlacement(stc,
 		db.Placement{
 			TargetLabel: "bar",
 			Exclusive:   false,
@@ -250,9 +450,11 @@ func TestPlacementTxn(t *testing.T) {
 	)
 
 	// Add another placement constraint.
-	spec = pre + `bar.place(new LabelRule(false, foo));
-	bar.place(new LabelRule(true, bar));`
-	checkPlacement(spec,
+	stc.Placements = []stitch.Placement{
+		{TargetLabel: "bar", Exclusive: false, OtherLabel: "foo"},
+		{TargetLabel: "bar", Exclusive: true, OtherLabel: "bar"},
+	}
+	checkPlacement(stc,
 		db.Placement{
 			TargetLabel: "bar",
 			Exclusive:   false,
@@ -266,8 +468,10 @@ func TestPlacementTxn(t *testing.T) {
 	)
 
 	// Machine placement
-	spec = pre + `foo.place(new MachineRule(false, {size: "m4.large"}));`
-	checkPlacement(spec,
+	stc.Placements = []stitch.Placement{
+		{TargetLabel: "foo", Exclusive: false, Size: "m4.large"},
+	}
+	checkPlacement(stc,
 		db.Placement{
 			TargetLabel: "foo",
 			Exclusive:   false,
@@ -275,10 +479,14 @@ func TestPlacementTxn(t *testing.T) {
 		},
 	)
 
+	// XXX: Port placement belongs in Stitch unit tests.
 	// Port placement
-	spec = pre + `publicInternet.connect(80, foo);
-	publicInternet.connect(81, foo);`
-	checkPlacement(spec,
+	stc.Placements = nil
+	stc.Connections = []stitch.Connection{
+		{From: stitch.PublicInternetLabel, To: "foo", MinPort: 80, MaxPort: 80},
+		{From: stitch.PublicInternetLabel, To: "foo", MinPort: 81, MaxPort: 81},
+	}
+	checkPlacement(stc,
 		db.Placement{
 			TargetLabel: "foo",
 			Exclusive:   true,
@@ -286,14 +494,13 @@ func TestPlacementTxn(t *testing.T) {
 		},
 	)
 
-	spec = pre + `publicInternet.connect(80, foo);
-	publicInternet.connect(80, bar);
-	(function() {
-		publicInternet.connect(81, bar);
-		publicInternet.connect(81, baz);
-	})()`
-
-	checkPlacement(spec,
+	stc.Connections = []stitch.Connection{
+		{From: stitch.PublicInternetLabel, To: "foo", MinPort: 80, MaxPort: 80},
+		{From: stitch.PublicInternetLabel, To: "bar", MinPort: 80, MaxPort: 80},
+		{From: stitch.PublicInternetLabel, To: "bar", MinPort: 81, MaxPort: 81},
+		{From: stitch.PublicInternetLabel, To: "baz", MinPort: 81, MaxPort: 81},
+	}
+	checkPlacement(stc,
 		db.Placement{
 			TargetLabel: "foo",
 			Exclusive:   true,
@@ -338,13 +545,10 @@ func TestPlacementTxn(t *testing.T) {
 	)
 }
 
-func checkImage(t *testing.T, conn db.Conn, spec string, exp ...db.Image) {
-	depl, err := stitch.FromJavascript(spec, stitch.DefaultImportGetter)
-	assert.NoError(t, err)
-
+func checkImage(t *testing.T, conn db.Conn, stc stitch.Stitch, exp ...db.Image) {
 	var images []db.Image
 	conn.Txn(db.AllTables...).Run(func(view db.Database) error {
-		updatePolicy(view, depl.String())
+		updatePolicy(view, stc.String())
 		images = view.SelectFromImage(nil)
 		return nil
 	})
@@ -364,38 +568,70 @@ func TestImageTxn(t *testing.T) {
 	t.Parallel()
 
 	// Regular image that isn't built by Quilt.
-	checkImage(t, db.New(),
-		`deployment.deploy(
-			new Service("foo", [
-				new Container("image")
-			])
-		);`,
-	)
+	checkImage(t, db.New(), stitch.Stitch{
+		Containers: []stitch.Container{
+			{
+				ID:    "475c40d6070969839ba0f88f7a9bd0cc7936aa30",
+				Image: stitch.Image{Name: "image"},
+			},
+		},
+		Labels: []stitch.Label{
+			{
+				Name: "foo",
+				IDs: []string{
+					"475c40d6070969839ba0f88f7a9bd0cc7936aa30",
+				},
+			},
+		},
+	})
 
 	conn := db.New()
-	checkImage(t, conn,
-		`deployment.deploy([
-			new Service("foo", [
-				new Container(
-					new Image("a", "1")
-				)
-			]),
-			new Service("foo", [
-				new Container(
-					new Image("a", "1")
-				)
-			]),
-			new Service("foo", [
-				new Container(
-					new Image("b", "1")
-				)
-			]),
-			new Service("foo", [
-				new Container(
-					new Image("c")
-				)
-			]),
-		]);`,
+	checkImage(t, conn, stitch.Stitch{
+		Containers: []stitch.Container{
+			{
+				ID:    "96189e4ea36c80171fd842ccc4c3438d06061991",
+				Image: stitch.Image{Name: "a", Dockerfile: "1"},
+			},
+			{
+				ID:    "c51d206a1414f1fadf5020e5db35feee91410f79",
+				Image: stitch.Image{Name: "a", Dockerfile: "1"},
+			},
+			{
+				ID:    "ede1e03efba48e66be3e51aabe03ec77d9f9def9",
+				Image: stitch.Image{Name: "b", Dockerfile: "1"},
+			},
+			{
+				ID:    "133c61c61ef4b49ea26717efe0f0468d455fd317",
+				Image: stitch.Image{Name: "c"},
+			},
+		},
+		Labels: []stitch.Label{
+			{
+				Name: "foo",
+				IDs: []string{
+					"96189e4ea36c80171fd842ccc4c3438d06061991",
+				},
+			},
+			{
+				Name: "foo2",
+				IDs: []string{
+					"c51d206a1414f1fadf5020e5db35feee91410f79",
+				},
+			},
+			{
+				Name: "foo3",
+				IDs: []string{
+					"ede1e03efba48e66be3e51aabe03ec77d9f9def9",
+				},
+			},
+			{
+				Name: "foo4",
+				IDs: []string{
+					"133c61c61ef4b49ea26717efe0f0468d455fd317",
+				},
+			},
+		},
+	},
 		db.Image{
 			Name:       "a",
 			Dockerfile: "1",
@@ -415,19 +651,31 @@ func TestImageTxn(t *testing.T) {
 		view.Commit(img)
 		return nil
 	})
-	checkImage(t, conn,
-		`deployment.deploy([
-			new Service("foo", [
-				new Container(
-					new Image("a", "1")
-				)
-			]),
-			new Service("foo", [
-				new Container(
-					new Image("b", "2")
-				)
-			]),
-		]);`,
+	checkImage(t, conn, stitch.Stitch{
+		Containers: []stitch.Container{
+			{
+				ID:    "96189e4ea36c80171fd842ccc4c3438d06061991",
+				Image: stitch.Image{Name: "a", Dockerfile: "1"},
+			},
+			{
+				ID:    "18c2c81fb48a2a481af58ba5ad6da0e2b244f060",
+				Image: stitch.Image{Name: "b", Dockerfile: "2"},
+			},
+		},
+		Labels: []stitch.Label{
+			{
+				Name: "foo",
+				IDs: []string{
+					"96189e4ea36c80171fd842ccc4c3438d06061991",
+				},
+			}, {
+				Name: "foo2",
+				IDs: []string{
+					"18c2c81fb48a2a481af58ba5ad6da0e2b244f060",
+				},
+			},
+		},
+	},
 		db.Image{
 			Name:       "a",
 			Dockerfile: "1",

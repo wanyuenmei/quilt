@@ -11,17 +11,20 @@ import (
 )
 
 func TestEngine(t *testing.T) {
-	pre := `var deployment = createDeployment({
-		namespace: "namespace",
-		adminACL: ["1.2.3.4/32"],
-	});
-	var baseMachine = new Machine({provider: "Amazon", size: "m4.large"});`
 	conn := db.New()
 
-	code := pre + `deployment.deploy(baseMachine.asMaster().replicate(2));
-		deployment.deploy(baseMachine.asWorker().replicate(3));`
-
-	updateStitch(t, conn, prog(t, code))
+	stc := stitch.Stitch{
+		Namespace: "namespace",
+		AdminACL:  []string{"1.2.3.4/32"},
+		Machines: []stitch.Machine{
+			{Provider: "Amazon", Size: "m4.large", Role: "Master", ID: "1"},
+			{Provider: "Amazon", Size: "m4.large", Role: "Master", ID: "2"},
+			{Provider: "Amazon", Size: "m4.large", Role: "Worker", ID: "3"},
+			{Provider: "Amazon", Size: "m4.large", Role: "Worker", ID: "4"},
+			{Provider: "Amazon", Size: "m4.large", Role: "Worker", ID: "5"},
+		},
+	}
+	updateStitch(t, conn, stc)
 	acl, err := selectACL(conn)
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(acl.Admin))
@@ -31,10 +34,18 @@ func TestEngine(t *testing.T) {
 	assert.Equal(t, 3, len(workers))
 
 	/* Verify master increase. */
-	code = pre + `deployment.deploy(baseMachine.asMaster().replicate(4));
-		deployment.deploy(baseMachine.asWorker().replicate(5));`
+	stc.Machines = append(stc.Machines,
+		stitch.Machine{Provider: "Amazon", Size: "m4.large",
+			Role: "Master", ID: "6"},
+		stitch.Machine{Provider: "Amazon", Size: "m4.large",
+			Role: "Master", ID: "7"},
+		stitch.Machine{Provider: "Amazon", Size: "m4.large",
+			Role: "Worker", ID: "8"},
+		stitch.Machine{Provider: "Amazon", Size: "m4.large",
+			Role: "Worker", ID: "9"},
+	)
 
-	updateStitch(t, conn, prog(t, code))
+	updateStitch(t, conn, stc)
 	masters, workers = selectMachines(conn)
 	assert.Equal(t, 4, len(masters))
 	assert.Equal(t, 5, len(workers))
@@ -66,9 +77,11 @@ func TestEngine(t *testing.T) {
 	})
 
 	/* Also verify that masters and workers decrease properly. */
-	code = pre + `deployment.deploy(baseMachine.asMaster());
-		deployment.deploy(baseMachine.asWorker());`
-	updateStitch(t, conn, prog(t, code))
+	stc.Machines = []stitch.Machine{
+		{Provider: "Amazon", Size: "m4.large", Role: "Master", ID: "1"},
+		{Provider: "Amazon", Size: "m4.large", Role: "Worker", ID: "3"},
+	}
+	updateStitch(t, conn, stc)
 
 	masters, workers = selectMachines(conn)
 
@@ -83,10 +96,8 @@ func TestEngine(t *testing.T) {
 	assert.Equal(t, "3", workers[0].PrivateIP)
 
 	/* Empty Namespace does nothing. */
-	code = pre + `deployment.namespace = "";
-		deployment.deploy(baseMachine.asMaster());
-		deployment.deploy(baseMachine.asWorker());`
-	updateStitch(t, conn, prog(t, code))
+	stc.Namespace = ""
+	updateStitch(t, conn, stc)
 	masters, workers = selectMachines(conn)
 
 	assert.Equal(t, 1, len(masters))
@@ -100,8 +111,11 @@ func TestEngine(t *testing.T) {
 	assert.Equal(t, "3", workers[0].PrivateIP)
 
 	/* Verify things go to zero. */
-	code = pre + `deployment.deploy(baseMachine.asWorker())`
-	updateStitch(t, conn, prog(t, code))
+	updateStitch(t, conn, stitch.Stitch{
+		Machines: []stitch.Machine{
+			{Provider: "Amazon", Size: "m4.large", Role: "Worker"},
+		},
+	})
 	masters, workers = selectMachines(conn)
 	assert.Zero(t, len(masters))
 	assert.Zero(t, len(workers))
@@ -120,33 +134,41 @@ func TestEngine(t *testing.T) {
 	}
 
 	/* Test mixed providers. */
-	code = `deployment.deploy([
-		new Machine({provider: "Amazon", size: "m4.large", role: "Master"}),
-		new Machine({provider: "Vagrant", size: "v.large", role: "Master"}),
-		new Machine({provider: "Amazon", size: "m4.large", role: "Worker"}),
-		new Machine({provider: "Google", size: "g.large", role: "Worker"})]);`
-	updateStitch(t, conn, prog(t, code))
+	updateStitch(t, conn, stitch.Stitch{
+		Machines: []stitch.Machine{
+			{Provider: "Amazon", Size: "m4.large", Role: "Master", ID: "1"},
+			{Provider: "Vagrant", Size: "v.large", Role: "Master", ID: "2"},
+			{Provider: "Amazon", Size: "m4.large", Role: "Worker", ID: "3"},
+			{Provider: "Google", Size: "g.large", Role: "Worker", ID: "4"},
+		},
+	})
 	masters, workers = selectMachines(conn)
 	assert.True(t, providersInSlice(masters,
 		db.ProviderSlice{db.Amazon, db.Vagrant}))
 	assert.True(t, providersInSlice(workers, db.ProviderSlice{db.Amazon, db.Google}))
 
 	/* Test that machines with different providers don't match. */
-	code = `deployment.deploy([
-		new Machine({provider: "Amazon", size: "m4.large", role: "Master"}),
-		new Machine({provider: "Amazon", size: "m4.large", role: "Worker"})]);`
-	updateStitch(t, conn, prog(t, code))
+	updateStitch(t, conn, stitch.Stitch{
+		Machines: []stitch.Machine{
+			{Provider: "Amazon", Size: "m4.large", Role: "Master", ID: "1"},
+			{Provider: "Amazon", Size: "m4.large", Role: "Worker", ID: "2"},
+		},
+	})
 	masters, _ = selectMachines(conn)
 	assert.True(t, providersInSlice(masters, db.ProviderSlice{db.Amazon}))
 }
 
 func TestSort(t *testing.T) {
-	pre := `var baseMachine = new Machine({provider: "Amazon", size: "m4.large"});`
 	conn := db.New()
 
-	updateStitch(t, conn, prog(t, pre+`
-	deployment.deploy(baseMachine.asMaster().replicate(3));
-	deployment.deploy(baseMachine.asWorker().replicate(1));`))
+	updateStitch(t, conn, stitch.Stitch{
+		Machines: []stitch.Machine{
+			{Provider: "Amazon", Size: "m4.large", Role: "Master"},
+			{Provider: "Amazon", Size: "m4.large", Role: "Master"},
+			{Provider: "Amazon", Size: "m4.large", Role: "Master"},
+			{Provider: "Amazon", Size: "m4.large", Role: "Worker"},
+		},
+	})
 	conn.Txn(db.AllTables...).Run(func(view db.Database) error {
 		machines := view.SelectFromMachine(func(m db.Machine) bool {
 			return m.Role == db.Master
@@ -168,9 +190,13 @@ func TestSort(t *testing.T) {
 		return nil
 	})
 
-	updateStitch(t, conn, prog(t, pre+`
-	deployment.deploy(baseMachine.asMaster().replicate(2));
-	deployment.deploy(baseMachine.asWorker().replicate(1));`))
+	updateStitch(t, conn, stitch.Stitch{
+		Machines: []stitch.Machine{
+			{Provider: "Amazon", Size: "m4.large", Role: "Master"},
+			{Provider: "Amazon", Size: "m4.large", Role: "Master"},
+			{Provider: "Amazon", Size: "m4.large", Role: "Worker"},
+		},
+	})
 	conn.Txn(db.AllTables...).Run(func(view db.Database) error {
 		machines := view.SelectFromMachine(func(m db.Machine) bool {
 			return m.Role == db.Master
@@ -188,16 +214,18 @@ func TestSort(t *testing.T) {
 func TestACLs(t *testing.T) {
 	conn := db.New()
 
-	code := `createDeployment({adminACL: ["1.2.3.4/32", "local"]})
-		.deploy([
-			new Machine({provider: "Amazon", role: "Master"}),
-			new Machine({provider: "Amazon", role: "Worker"})
-		]);`
+	stc := stitch.Stitch{
+		AdminACL: []string{"1.2.3.4/32", "local"},
+		Machines: []stitch.Machine{
+			{Provider: "Amazon", Role: "Master"},
+			{Provider: "Amazon", Role: "worker"},
+		},
+	}
 
 	myIP = func() (string, error) {
 		return "5.6.7.8", nil
 	}
-	updateStitch(t, conn, prog(t, code))
+	updateStitch(t, conn, stc)
 	acl, err := selectACL(conn)
 	assert.Nil(t, err)
 	assert.Equal(t, []string{"1.2.3.4/32", "5.6.7.8/32"}, acl.Admin)
@@ -205,20 +233,10 @@ func TestACLs(t *testing.T) {
 	myIP = func() (string, error) {
 		return "", errors.New("")
 	}
-	updateStitch(t, conn, prog(t, code))
+	updateStitch(t, conn, stc)
 	acl, err = selectACL(conn)
 	assert.Nil(t, err)
 	assert.Equal(t, []string{"1.2.3.4/32"}, acl.Admin)
-}
-
-func prog(t *testing.T, code string) stitch.Stitch {
-	result, err := stitch.FromJavascript(code, stitch.DefaultImportGetter)
-	if err != nil {
-		t.Error(err.Error())
-		return stitch.Stitch{}
-	}
-
-	return result
 }
 
 func selectMachines(conn db.Conn) (masters, workers []db.Machine) {

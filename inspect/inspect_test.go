@@ -4,11 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/quilt/quilt/stitch"
-	"github.com/quilt/quilt/util"
 )
 
 func TestSlug(t *testing.T) {
@@ -28,21 +26,6 @@ func TestSlug(t *testing.T) {
 		}
 	}
 }
-
-func initSpec(src string) (stitch.Stitch, error) {
-	return stitch.FromJavascript(src, stitch.ImportGetter{
-		Path: "../specs",
-	})
-}
-
-const testStitch = `var a = new Service("a", [new Container("ubuntu")]);
-	var b = new Service("b", [new Container("ubuntu")]);
-	var c = new Service("c", [new Container("ubuntu")]);
-
-	deployment.deploy([a, b, c]);
-
-	a.connect(22, b);
-	b.connect(22, c);`
 
 // The expected graphviz graph returned by inspect when run on `testStitch`.
 const expGraph = `strict digraph {
@@ -67,9 +50,45 @@ func isGraphEqual(a, b string) bool {
 func TestViz(t *testing.T) {
 	t.Parallel()
 
-	spec, err := initSpec(testStitch)
-	if err != nil {
-		panic(err)
+	spec := stitch.Stitch{
+		Containers: []stitch.Container{
+			{
+				ID:    "54be1283e837c6e40ac79709aca8cdb8ec5f31f5",
+				Image: stitch.Image{Name: "ubuntu"},
+			},
+			{
+				ID:    "3c1a5738512a43c3122608ab32dbf9f84a14e5f9",
+				Image: stitch.Image{Name: "ubuntu"},
+			},
+			{
+				ID:    "cb129f8a27df770b1dac70955c227a57bc5c4af6",
+				Image: stitch.Image{Name: "ubuntu"},
+			},
+		},
+		Labels: []stitch.Label{
+			{
+				Name: "a",
+				IDs: []string{
+					"54be1283e837c6e40ac79709aca8cdb8ec5f31f5",
+				},
+			},
+			{
+				Name: "b",
+				IDs: []string{
+					"3c1a5738512a43c3122608ab32dbf9f84a14e5f9",
+				},
+			},
+			{
+				Name: "c",
+				IDs: []string{
+					"cb129f8a27df770b1dac70955c227a57bc5c4af6",
+				},
+			},
+		},
+		Connections: []stitch.Connection{
+			{From: "a", To: "b", MinPort: 22, MaxPort: 22},
+			{From: "b", To: "c", MinPort: 22, MaxPort: 22},
+		},
 	}
 
 	graph, err := stitch.InitializeGraph(spec)
@@ -81,18 +100,6 @@ func TestViz(t *testing.T) {
 	if !isGraphEqual(gv, expGraph) {
 		t.Error(gv + "\n" + expGraph)
 	}
-}
-
-func TestMain(t *testing.T) {
-	util.AppFs = afero.NewMemMapFs()
-	util.WriteFile("test.js", []byte(testStitch), 0644)
-
-	exitCode := Main([]string{"test.js", "graphviz"})
-
-	assert.Zero(t, exitCode)
-	res, err := util.ReadFile("test.dot")
-	assert.Nil(t, err)
-	assert.True(t, isGraphEqual(expGraph, res))
 }
 
 func TestMainArgErr(t *testing.T) {
