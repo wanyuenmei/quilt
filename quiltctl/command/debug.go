@@ -75,7 +75,7 @@ var (
 		{images.Ovsdb, "docker logs " + images.Ovsdb},
 		{"syslog", "sudo cat /var/log/syslog"},
 		{"journalctl", "sudo journalctl -xe"},
-		{"uname", "uname"},
+		{"uname", "uname -a"},
 		{"dmesg", "dmesg"},
 		{"uptime", "uptime"},
 	}
