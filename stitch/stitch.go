@@ -181,7 +181,6 @@ func New(filename string, specStr string, getter ImportGetter) (Stitch, error) {
 	if err != nil {
 		return Stitch{}, err
 	}
-	spec.createPortRules()
 
 	if len(spec.Invariants) == 0 {
 		return spec, nil
@@ -234,33 +233,6 @@ func parseContext(vm *otto.Otto) (stc Stitch, err error) {
 	}
 	err = json.Unmarshal(ctxStr, &stc)
 	return stc, err
-}
-
-// createPortRules creates exclusive placement rules such that no two containers
-// listening on the same public port get placed on the same machine.
-func (stitch *Stitch) createPortRules() {
-	ports := make(map[int][]string)
-	for _, c := range stitch.Connections {
-		if c.From != PublicInternetLabel {
-			continue
-		}
-
-		min := c.MinPort
-		ports[min] = append(ports[min], c.To)
-	}
-
-	for _, labels := range ports {
-		for _, tgt := range labels {
-			for _, other := range labels {
-				stitch.Placements = append(stitch.Placements,
-					Placement{
-						Exclusive:   true,
-						TargetLabel: tgt,
-						OtherLabel:  other,
-					})
-			}
-		}
-	}
 }
 
 // String returns the Stitch in its deployment representation.

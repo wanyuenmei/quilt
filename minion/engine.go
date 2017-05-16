@@ -19,12 +19,43 @@ func updatePolicy(view db.Database, spec string) {
 
 	updateImages(view, compiled)
 	updateContainers(view, compiled)
-	updatePlacements(view, compiled)
 	updateConnections(view, compiled)
+	updatePlacements(view, compiled)
+}
+
+// `portPlacements` creates exclusive placement rules such that no two containers
+// listening on the same public port get placed on the same machine.
+func portPlacements(connections []db.Connection) (placements []db.Placement) {
+	ports := make(map[int][]string)
+	for _, c := range connections {
+		if c.From != stitch.PublicInternetLabel {
+			continue
+		}
+
+		// XXX: Public connections do not currently support ranges, so we can
+		// safely consider just the MinPort.
+		ports[c.MinPort] = append(ports[c.MinPort], c.To)
+	}
+
+	for _, labels := range ports {
+		for _, tgt := range labels {
+			for _, other := range labels {
+				placements = append(placements,
+					db.Placement{
+						Exclusive:   true,
+						TargetLabel: tgt,
+						OtherLabel:  other,
+					},
+				)
+			}
+		}
+	}
+
+	return placements
 }
 
 func updatePlacements(view db.Database, spec stitch.Stitch) {
-	var placements db.PlacementSlice
+	placements := db.PlacementSlice(portPlacements(view.SelectFromConnection(nil)))
 	for _, sp := range spec.Placements {
 		placements = append(placements, db.Placement{
 			TargetLabel: sp.TargetLabel,
