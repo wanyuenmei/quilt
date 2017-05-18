@@ -4,12 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"os"
 	"strings"
 	"testing"
 
-	log "github.com/Sirupsen/logrus"
-	logrusTestHook "github.com/Sirupsen/logrus/hooks/test"
 	"github.com/fatih/color"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -20,122 +17,6 @@ import (
 	"github.com/quilt/quilt/stitch"
 	"github.com/quilt/quilt/util"
 )
-
-type file struct {
-	path, contents string
-}
-
-type runTest struct {
-	files        []file
-	path         string
-	expExitCode  int
-	expDeployArg string
-	expEntries   []log.Entry
-}
-
-func TestRunSpec(t *testing.T) {
-	os.Setenv("QUILT_PATH", "/quilt_path")
-	stitch.DefaultImportGetter.Path = "/quilt_path"
-
-	exJavascript := `deployment.deploy(new Machine({}));`
-	exJSON := `{"Machines":[{"ID":"c997390e1f071c5288a26c5f02b09717a46d249f",` +
-		`"CPU":{},"RAM":{}}],"Namespace":"default-namespace"}`
-	tests := []runTest{
-		{
-			files: []file{
-				{
-					path:     "test.js",
-					contents: exJavascript,
-				},
-			},
-			path:         "test.js",
-			expExitCode:  0,
-			expDeployArg: exJSON,
-		},
-		{
-			path:        "dne.js",
-			expExitCode: 1,
-			expEntries: []log.Entry{
-				{
-					Message: "open /quilt_path/dne.js: " +
-						"file does not exist",
-					Level: log.ErrorLevel,
-				},
-			},
-		},
-		{
-			path:        "/dne.js",
-			expExitCode: 1,
-			expEntries: []log.Entry{
-				{
-					Message: "open /dne.js: file does not exist",
-					Level:   log.ErrorLevel,
-				},
-			},
-		},
-		{
-			files: []file{
-				{
-					path:     "/quilt_path/in_quilt_path.js",
-					contents: exJavascript,
-				},
-			},
-			path:         "in_quilt_path",
-			expDeployArg: exJSON,
-		},
-		// Ensure we print a stacktrace when available.
-		{
-			files: []file{
-				{
-					path:     "/quilt_path/A.js",
-					contents: `require("B").foo();`,
-				},
-				{
-					path: "/quilt_path/B.js",
-					contents: `module.exports.foo = function() {
-						throw new Error("bar");
-					}`,
-				},
-			},
-			path:        "/quilt_path/A.js",
-			expExitCode: 1,
-			expEntries: []log.Entry{
-				{
-					Message: "Error: bar\n" +
-						"    at /quilt_path/B.js:2:17\n" +
-						"    at /quilt_path/A.js:1:67\n",
-					Level: log.ErrorLevel,
-				},
-			},
-		},
-	}
-	for _, test := range tests {
-		util.AppFs = afero.NewMemMapFs()
-
-		mockGetter := new(clientMock.Getter)
-		c := &clientMock.Client{}
-		mockGetter.On("Client", mock.Anything).Return(c, nil)
-
-		logHook := logrusTestHook.NewGlobal()
-
-		for _, f := range test.files {
-			util.WriteFile(f.path, []byte(f.contents), 0644)
-		}
-		runCmd := NewRunCommand()
-		runCmd.clientGetter = mockGetter
-		runCmd.stitch = test.path
-		exitCode := runCmd.Run()
-
-		assert.Equal(t, test.expExitCode, exitCode)
-		assert.Equal(t, test.expDeployArg, c.DeployArg)
-
-		assert.Equal(t, len(test.expEntries), len(logHook.Entries))
-		for i, entry := range logHook.Entries {
-			assert.Equal(t, test.expEntries[i].Message, entry.Message)
-			assert.Equal(t, test.expEntries[i].Level, entry.Level)
-		}
-	}
-}
 
 type diffTest struct {
 	curr, new, exp string
@@ -305,6 +186,10 @@ func TestPromptsUser(t *testing.T) {
 	defer func() {
 		confirm = oldConfirm
 	}()
+
+	compile = func(path string) (stitch.Stitch, error) {
+		return stitch.Stitch{}, nil
+	}
 
 	util.AppFs = afero.NewMemMapFs()
 	for _, confirmResp := range []bool{true, false} {

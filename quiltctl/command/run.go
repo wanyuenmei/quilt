@@ -9,13 +9,11 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/fatih/color"
 	"github.com/pmezard/go-difflib/difflib"
-	"github.com/robertkrimen/otto"
 
 	"github.com/quilt/quilt/api/client"
 	"github.com/quilt/quilt/api/client/getter"
@@ -72,26 +70,13 @@ func (rCmd *Run) Parse(args []string) error {
 
 var errNoCluster = errors.New("no cluster")
 
+var compile = stitch.FromFile
+
 // Run starts the run for the provided Stitch.
 func (rCmd *Run) Run() int {
-	stitchPath := rCmd.stitch
-	compiled, err := stitch.FromFile(stitchPath, stitch.DefaultImportGetter)
-	if err != nil && os.IsNotExist(err) && !filepath.IsAbs(stitchPath) {
-		// Automatically add the ".js" file suffix if it's not provided.
-		if !strings.HasSuffix(stitchPath, ".js") {
-			stitchPath += ".js"
-		}
-		compiled, err = stitch.FromFile(
-			filepath.Join(stitch.GetQuiltPath(), stitchPath),
-			stitch.DefaultImportGetter)
-	}
+	compiled, err := compile(rCmd.stitch)
 	if err != nil {
-		// Print the stacktrace if it's an Otto error.
-		if ottoError, ok := err.(*otto.Error); ok {
-			log.Error(ottoError.String())
-		} else {
-			log.Error(err)
-		}
+		log.Error(err)
 		return 1
 	}
 	deployment := compiled.String()

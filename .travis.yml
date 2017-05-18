@@ -8,6 +8,9 @@ services:
 go:
     - 1.x
 
+before_install:
+    - nvm install 7.10.0
+
 install:
     - make get-build-tools
 

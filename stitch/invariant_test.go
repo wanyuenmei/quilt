@@ -4,100 +4,285 @@ import (
 	"testing"
 )
 
-func initSpec(src string) (Stitch, error) {
-	return FromJavascript(src, ImportGetter{
-		Path: "../specs",
-	})
-}
-
 func TestReach(t *testing.T) {
-	stc := `var a = new Service("a", [new Container("ubuntu")]);
-	var b = new Service("b", [new Container("ubuntu")]);
-	var c = new Service("c", [new Container("ubuntu")]);
-	a.connect(new Port(22), b);
-	b.connect(new Port(22), c);
-
-	deployment.deploy([a, b, c]);
-
-	deployment.assert(a.canReach(c), true);
-	deployment.assert(c.canReach(a), false);
-	deployment.assert(c.between(a, b), true);
-	deployment.assert(a.between(c, b), false);`
-	_, err := initSpec(stc)
+	stc := `{
+        "Containers": [
+                {
+                        "ID": "54be1283e837c6e40ac79709aca8cdb8ec5f31f5",
+                        "Image": {"Name": "ubuntu"}
+                },
+                {
+                        "ID": "3c1a5738512a43c3122608ab32dbf9f84a14e5f9",
+                        "Image": {"Name": "ubuntu"}
+                },
+                {
+                        "ID": "cb129f8a27df770b1dac70955c227a57bc5c4af6",
+                        "Image": {"Name": "ubuntu"}
+                }
+        ],
+        "Labels": [
+                {
+                        "Name": "a",
+                        "IDs": ["54be1283e837c6e40ac79709aca8cdb8ec5f31f5"]
+                },
+                {
+                        "Name": "b",
+                        "IDs": ["3c1a5738512a43c3122608ab32dbf9f84a14e5f9"]
+                },
+                {
+                        "Name": "c",
+                        "IDs": ["cb129f8a27df770b1dac70955c227a57bc5c4af6"]
+                }
+        ],
+        "Connections": [
+                {"From": "a", "To": "b", "MinPort": 22, "MaxPort": 22},
+                {"From": "b", "To": "c", "MinPort": 22, "MaxPort": 22}
+        ],
+        "Invariants": [
+                {
+                        "Form": "reach",
+                        "Target": true,
+                        "Nodes": ["a", "c"]
+                },
+                {
+                        "Form": "reach",
+                        "Target": false,
+                        "Nodes": ["c", "a"]
+                },
+                {
+                        "Form": "between",
+                        "Target": true,
+                        "Nodes": ["a", "c", "b"]
+                },
+                {
+                        "Form": "between",
+                        "Target": false,
+                        "Nodes": ["c", "a", "b"]
+                }
+        ]
+}`
+	_, err := FromJSON(stc)
 	if err != nil {
 		t.Error(err)
 	}
 }
 
 func TestReachPublic(t *testing.T) {
-	stc := `var a = new Service("a", [new Container("ubuntu")]);
-	var b = new Service("b", [new Container("ubuntu")]);
-	var c = new Service("c", [new Container("ubuntu")]);
-	a.connect(22, publicInternet);
-	publicInternet.connect(22, b);
-	b.connect(22, c);
-
-	deployment.deploy([a, b, c]);
-
-	deployment.assert(publicInternet.canReach(b), true);
-	deployment.assert(publicInternet.canReach(c), true);
-	deployment.assert(publicInternet.canReach(a), false);
-	deployment.assert(b.canReach(publicInternet), false);`
-	_, err := initSpec(stc)
+	stc := `{
+        "Containers": [
+                {
+                        "ID": "54be1283e837c6e40ac79709aca8cdb8ec5f31f5",
+                        "Image": {"Name": "ubuntu"}
+                },
+                {
+                        "ID": "3c1a5738512a43c3122608ab32dbf9f84a14e5f9",
+                        "Image": {"Name": "ubuntu"}
+                },
+                {
+                        "ID": "cb129f8a27df770b1dac70955c227a57bc5c4af6",
+                        "Image": {"Name": "ubuntu"}
+                }
+        ],
+        "Labels": [
+                {
+                        "Name": "a",
+                        "IDs": ["54be1283e837c6e40ac79709aca8cdb8ec5f31f5"]
+                },
+                {
+                        "Name": "b",
+                        "IDs": ["3c1a5738512a43c3122608ab32dbf9f84a14e5f9"]
+                },
+                {
+                        "Name": "c",
+                        "IDs": ["cb129f8a27df770b1dac70955c227a57bc5c4af6"]
+                }
+        ],
+        "Connections": [
+                {"From": "a", "To": "public", "MinPort": 22, "MaxPort": 22},
+                {"From": "b", "To": "c", "MinPort": 22, "MaxPort": 22},
+                {"From": "public", "To": "b", "MinPort": 22, "MaxPort": 22}
+        ],
+        "Invariants": [
+                {
+                        "Form": "reach",
+                        "Target": true,
+                        "Nodes": ["public", "b"]
+                },
+                {
+                        "Form": "reach",
+                        "Target": true,
+                        "Nodes": ["public", "c"]
+                },
+                {
+                        "Form": "reach",
+                        "Target": false,
+                        "Nodes": ["public", "a"]
+                },
+                {
+                        "Form": "reach",
+                        "Target": false,
+                        "Nodes": ["b", "public"]
+                }
+        ]
+	}`
+	_, err := FromJSON(stc)
 	if err != nil {
 		t.Error(err)
 	}
 }
 
 func TestNeighbor(t *testing.T) {
-	stc := `var a = new Service("a", [new Container("ubuntu")]);
-	var b = new Service("b", [new Container("ubuntu")]);
-	var c = new Service("c", [new Container("ubuntu")]);
-	a.connect(new Port(22), b);
-	b.connect(new Port(22), c);
-
-	deployment.deploy([a, b, c]);
-
-	deployment.assert(a.neighborOf(c), false);
-	deployment.assert(b.neighborOf(c), true);`
-	_, err := initSpec(stc)
+	stc := `{
+        "Containers": [
+                {
+                        "ID": "54be1283e837c6e40ac79709aca8cdb8ec5f31f5",
+                        "Image": {"Name": "ubuntu"}
+                },
+                {
+                        "ID": "3c1a5738512a43c3122608ab32dbf9f84a14e5f9",
+                        "Image": {"Name": "ubuntu"}
+                },
+                {
+                        "ID": "cb129f8a27df770b1dac70955c227a57bc5c4af6",
+                        "Image": {"Name": "ubuntu"}
+                }
+        ],
+        "Labels": [
+                {
+                        "Name": "a",
+                        "IDs": ["54be1283e837c6e40ac79709aca8cdb8ec5f31f5"]
+                },
+                {
+                        "Name": "b",
+                        "IDs": ["3c1a5738512a43c3122608ab32dbf9f84a14e5f9"]
+                },
+                {
+                        "Name": "c",
+                        "IDs": ["cb129f8a27df770b1dac70955c227a57bc5c4af6"]
+                }
+        ],
+        "Connections": [
+                {"From": "a", "To": "b", "MinPort": 22, "MaxPort": 22},
+                {"From": "b", "To": "c", "MinPort": 22, "MaxPort": 22}
+        ],
+        "Invariants": [
+                {
+                        "Form": "reachDirect",
+                        "Target": false,
+                        "Nodes": ["a", "c"]
+                },
+                {
+                        "Form": "reachDirect",
+                        "Target": true,
+                        "Nodes": ["b", "c"]
+                }
+        ]
+	}`
+	_, err := FromJSON(stc)
 	if err != nil {
 		t.Error(err)
 	}
 }
 
 func TestAnnotation(t *testing.T) {
-	stc := `var a = new Service("a", [new Container("ubuntu")]);
-	var b = new Service("b", [new Container("ubuntu")]);
-	var c = new Service("c", [new Container("ubuntu")]);
-	a.connect(new Port(22), b);
-	b.connect(new Port(22), c);
+	stc := `{
+        "Containers": [
+                {
+                        "ID": "54be1283e837c6e40ac79709aca8cdb8ec5f31f5",
+                        "Image": {"Name": "ubuntu"}
+                },
+                {
+                        "ID": "3c1a5738512a43c3122608ab32dbf9f84a14e5f9",
+                        "Image": {"Name": "ubuntu"}
+                },
+                {
+                        "ID": "cb129f8a27df770b1dac70955c227a57bc5c4af6",
+                        "Image": {"Name": "ubuntu"}
+                }
+        ],
+        "Labels": [
+                {
+                        "Name": "a",
+                        "IDs": ["54be1283e837c6e40ac79709aca8cdb8ec5f31f5"]
+                },
+                {
+                        "Name": "b",
+                        "IDs": ["3c1a5738512a43c3122608ab32dbf9f84a14e5f9"],
+                        "Annotations": ["ACL"]
+                },
+                {
+                        "Name": "c",
+                        "IDs": ["cb129f8a27df770b1dac70955c227a57bc5c4af6"]
+                }
+        ],
+        "Connections": [
+                {"From": "a", "To": "b", "MinPort": 22, "MaxPort": 22},
+                {"From": "b", "To": "c", "MinPort": 22, "MaxPort": 22}
+        ],
+        "Invariants": [
+                {
+                        "Form": "reachACL",
+                        "Target": false,
+                        "Nodes": ["a", "c"]
+                }
+        ]
+	}`
 
-	b.annotate("ACL");
-
-	deployment.deploy([a, b, c]);
-
-	deployment.assert(a.canReachACL(c), false);`
-
-	_, err := initSpec(stc)
+	_, err := FromJSON(stc)
 	if err != nil {
 		t.Error(err)
 	}
 }
 
 func TestFail(t *testing.T) {
-	stc := `var a = new Service("a", [new Container("ubuntu")]);
-	var b = new Service("b", [new Container("ubuntu")]);
-	var c = new Service("c", [new Container("ubuntu")]);
-	a.connect(new Port(22), b);
-	b.connect(new Port(22), c);
-
-	deployment.deploy([a, b, c]);
-
-	deployment.assert(a.canReach(c), true);
-	deployment.assert(c.canReach(a), true);`
+	stc := `{
+        "Containers": [
+                {
+                        "ID": "54be1283e837c6e40ac79709aca8cdb8ec5f31f5",
+                        "Image": {"Name": "ubuntu"}
+                },
+                {
+                        "ID": "3c1a5738512a43c3122608ab32dbf9f84a14e5f9",
+                        "Image": {"Name": "ubuntu"}
+                },
+                {
+                        "ID": "cb129f8a27df770b1dac70955c227a57bc5c4af6",
+                        "Image": {"Name": "ubuntu"}
+                }
+        ],
+        "Labels": [
+                {
+                        "Name": "a",
+                        "IDs": ["54be1283e837c6e40ac79709aca8cdb8ec5f31f5"]
+                },
+                {
+                        "Name": "b",
+                        "IDs": ["3c1a5738512a43c3122608ab32dbf9f84a14e5f9"]
+                },
+                {
+                        "Name": "c",
+                        "IDs": ["cb129f8a27df770b1dac70955c227a57bc5c4af6"]
+                }
+        ],
+        "Connections": [
+                {"From": "a", "To": "b", "MinPort": 22, "MaxPort": 22},
+                {"From": "b", "To": "c", "MinPort": 22, "MaxPort": 22}
+        ],
+        "Invariants": [
+                {
+                        "Form": "reach",
+                        "Target": true,
+                        "Nodes": ["a", "c"]
+                },
+                {
+                        "Form": "reach",
+                        "Target": true,
+                        "Nodes": ["c", "a"]
+                }
+        ]
+	}`
 	expectedFailure := `invariant failed: reach true "c" "a"`
-	if _, err := initSpec(stc); err == nil {
+	if _, err := FromJSON(stc); err == nil {
 		t.Errorf("got no error, expected %s", expectedFailure)
 	} else if err.Error() != expectedFailure {
 		t.Errorf("got error %s, expected %s", err, expectedFailure)
@@ -105,23 +290,72 @@ func TestFail(t *testing.T) {
 }
 
 func TestBetween(t *testing.T) {
-	stc := `var a = new Service("a", [new Container("ubuntu")]);
-	var b = new Service("b", [new Container("ubuntu")]);
-	var c = new Service("c", [new Container("ubuntu")]);
-	var d = new Service("d", [new Container("ubuntu")]);
-	var e = new Service("e", [new Container("ubuntu")]);
-
-	a.connect(new Port(22), b);
-	a.connect(new Port(22), c);
-	b.connect(new Port(22), d);
-	c.connect(new Port(22), d);
-	d.connect(new Port(22), e);
-
-	deployment.deploy([a, b, c, d, e]);
-
-	deployment.assert(a.canReach(e), true)
-	deployment.assert(e.between(a, d), true)`
-	_, err := initSpec(stc)
+	stc := `{
+        "Containers": [
+                {
+                        "ID": "54be1283e837c6e40ac79709aca8cdb8ec5f31f5",
+                        "Image": {"Name": "ubuntu"}
+                },
+                {
+                        "ID": "3c1a5738512a43c3122608ab32dbf9f84a14e5f9",
+                        "Image": {"Name": "ubuntu"}
+                },
+                {
+                        "ID": "cb129f8a27df770b1dac70955c227a57bc5c4af6",
+                        "Image": {"Name": "ubuntu"}
+                },
+                {
+                        "ID": "a0adbaafe75c74d1394e288855892f07f7463a0d",
+                        "Image": {"Name": "ubuntu"}
+                },
+                {
+                        "ID": "026453d646f6ffa2b834fcd84d58bfea2efac512",
+                        "Image": {"Name": "ubuntu"}
+                }
+        ],
+        "Labels": [
+                {
+                        "Name": "a",
+                        "IDs": ["54be1283e837c6e40ac79709aca8cdb8ec5f31f5"]
+                },
+                {
+                        "Name": "b",
+                        "IDs": ["3c1a5738512a43c3122608ab32dbf9f84a14e5f9"]
+                },
+                {
+                        "Name": "c",
+                        "IDs": ["cb129f8a27df770b1dac70955c227a57bc5c4af6"]
+                },
+                {
+                        "Name": "d",
+                        "IDs": ["a0adbaafe75c74d1394e288855892f07f7463a0d"]
+                },
+                {
+                        "Name": "e",
+                        "IDs": ["026453d646f6ffa2b834fcd84d58bfea2efac512"]
+                }
+        ],
+        "Connections": [
+                {"From": "a", "To": "b", "MinPort": 22, "MaxPort": 22},
+                {"From": "a", "To": "c", "MinPort": 22, "MaxPort": 22},
+                {"From": "b", "To": "d", "MinPort": 22, "MaxPort": 22},
+                {"From": "c", "To": "d", "MinPort": 22, "MaxPort": 22},
+                {"From": "d", "To": "e", "MinPort": 22, "MaxPort": 22}
+        ],
+        "Invariants": [
+                {
+                        "Form": "reach",
+                        "Target": true,
+                        "Nodes": ["a", "e"]
+                },
+                {
+                        "Form": "between",
+                        "Target": true,
+                        "Nodes": ["a", "e", "d"]
+                }
+        ]
+}`
+	_, err := FromJSON(stc)
 	if err != nil {
 		t.Error(err)
 	}
@@ -146,7 +380,7 @@ func TestNoConnect(t *testing.T) {
 (place (labelRule "exclusive" "a") "c" "d" "e")
 
 (invariant enough)`
-	_, err := initSpec(stc)
+	_, err := FromJSON(stc)
 	if err != nil {
 		t.Error(err)
 	}
@@ -166,7 +400,7 @@ func TestNested(t *testing.T) {
 
 (invariant reach true "a" "d")
 (invariant reach true "b" "c")`
-	_, err := initSpec(stc)
+	_, err := FromJSON(stc)
 	if err != nil {
 		t.Error(err)
 	}
@@ -199,7 +433,7 @@ func TestPlacementInvs(t *testing.T) {
 
 (invariant reach true "a" "e")
 (invariant enough)`
-	_, err := initSpec(stc)
+	_, err := FromJSON(stc)
 	if err != nil {
 		t.Error(err)
 	}

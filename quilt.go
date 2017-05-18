@@ -23,8 +23,7 @@ func main() {
 			"[-log-level=<level> | -l=<level>] [-H=<listen_address>] " +
 			"[log-file=<log_output_file>] " +
 			"[daemon | inspect <stitch> | run <stitch> | minion | " +
-			"stop <namespace> | get <import_path> | " +
-			"ps | ssh <id> [command] | " +
+			"stop <namespace> | ps | ssh <id> [command] | " +
 			"logs <container> | debug-logs <id...> | version]")
 		fmt.Println("\nWhen provided a stitch, quilt takes responsibility\n" +
 			"for deploying it as specified.  Alternatively, quilt may be\n" +

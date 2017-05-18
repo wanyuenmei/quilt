@@ -9,8 +9,6 @@ import (
 )
 
 func main() {
-	defer os.RemoveAll(tests.QuiltPath)
-
 	testsByName := map[string]func() error{
 		"TestReadme": tests.TestReadme,
 		"TestSpecs":  tests.TestSpecs,

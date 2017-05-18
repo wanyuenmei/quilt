@@ -2,6 +2,12 @@
 This guide explains how to install Quilt, and also serves as a
 brief, hands-on introduction to some Quilt basics.
 
+## Install Node.js
+Quilt specs are written in Node.js. Only Node version v7.10.0 has been tested.
+
+Installation instructions for various operating systems are available
+[here](https://nodejs.org/en/download/).
+
 ## Install Go
 Quilt supports Go version 1.5 or later.
 
@@ -26,17 +32,6 @@ Clone the repository into your Go workspace: `go get github.com/quilt/quilt`.
 This command also automatically installs Quilt. If the installation was
 successful, then the `quilt` command should execute successfully in your shell.
 
-## QUILT_PATH
-Your `QUILT_PATH` will be where Quilt looks for imported specs, and where
-specs you download with `quilt get` get placed.  By default, your `QUILT_PATH`
-is `~/.quilt`. You can set a custom `QUILT_PATH` when invoking `quilt`:
-
-```bash
-QUILT_PATH="~/.my_quilt_directory" quilt run my_quilt_spec.js
-```
-
-Or you can `export` a custom path into your environment.
-
 ## Configure A Cloud Provider
 
 Below we discuss how to setup Quilt for Amazon EC2. Google Compute Engine is
@@ -60,12 +55,18 @@ We suggest you read
 [`quilt/nginx/main.js`](https://github.com/quilt/nginx/blob/master/main.js)
 to understand the infrastructure defined by this Quilt.js spec.
 
-### Import Nginx Spec
-Before we can run the Nginx spec, we need to import it into our `QUILT_PATH`.
-To do that, execute the following command from your shell:
+### Acquire the Nginx Spec
+In order to run the Nginx spec, we'll have to download it first. We'll simply
+clone it:
 ```bash
-quilt get github.com/quilt/nginx
+git clone https://github.com/quilt/nginx
+cd nginx
 ```
+
+### Install Spec Dependencies
+The Nginx spec depends on the `@quilt/quilt` module. More complicated specs
+may have other dependencies that would get pulled in as well. To install all
+dependencies, run `npm install .`.
 
 ### Configure `quilt/nginx/main.js`
 #### Set Up Your SSH Authentication
@@ -77,9 +78,11 @@ public keys from GitHub, so they can be used to configure SSH authentication.
 If you can access GitHub repositories through SSH, then you can also SSH into a
 `githubKey`-configured Machine.
 
-If you would like to use `githubKey` authentication, open your spec in
-`$QUILT_PATH/github.com/quilt/nginx/main.js` and set the `sshKeys` appropriately.
+If you would like to use `githubKey` authentication, open `main.js`, import the
+`githubKeys` function from `@quilt/quilt`, and set the `sshKeys` appropriately.
 ```javascript
+const {createDeployment, Machine, githubKeys} = require('@quilt/quilt');
+...
 var baseMachine = new Machine({
     ...
     sshKeys: githubKeys("CHANGE_ME"),
@@ -89,7 +92,7 @@ var baseMachine = new Machine({
 
 ### Deploying `quilt/nginx/main.js`
 In one shell, start the Quilt daemon with `quilt daemon`. In another shell,
-execute `quilt run github.com/quilt/nginx/main.js`. Quilt will set up several
+execute `quilt run ./main.js`. Quilt will set up several
 Ubuntu VMs on your cloud provider as Workers, and these Workers will host Nginx
 Docker containers as specified in
 [`quilt/nginx/app.js`](https://github.com/quilt/nginx/blob/master/app.js)
@@ -152,11 +155,6 @@ If you'd like to destroy the infrastructure you just deployed, you can either
 modify the specification to remove all of the Machines, or use the command,
 `quilt stop`. Both options will cause Quilt to destroy all of the
 Machines in the deployment.
-
-## Next Steps: Downloading Other Specs
-You can download specs into your `QUILT_PATH` by executing
-`quilt get <IMPORT_PATH>`, where `<IMPORT_PATH>` is a path to a repository
-containing specs (e.g. `github.com/quilt/nginx`).
 
 ## Next Steps: Writing your own Quilt Spec
 

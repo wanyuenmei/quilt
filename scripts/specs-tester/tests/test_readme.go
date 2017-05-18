@@ -4,9 +4,11 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 
+	"github.com/quilt/quilt/stitch"
 	"github.com/quilt/quilt/util"
 )
 
@@ -68,6 +70,15 @@ func (parser readmeParser) blocks() (map[string]string, error) {
 	return parser.codeBlocks, nil
 }
 
+var dependencies = `{
+  "dependencies": {
+    "@quilt/quilt": "quilt/quilt",
+    "@quilt/nodejs": "quilt/nodejs",
+    "@quilt/mongo": "quilt/mongo",
+    "@quilt/haproxy": "quilt/haproxy"
+  }
+}`
+
 // TestReadme checks that the code snippets in the README compile.
 func TestReadme() error {
 	f, err := util.Open("./README.md")
@@ -97,16 +108,20 @@ func TestReadme() error {
 		return fmt.Errorf("failed to parse README: %s", err.Error())
 	}
 
+	os.Mkdir(workDir, 0755)
+	defer os.RemoveAll(workDir)
+	os.Chdir(workDir)
+	util.WriteFile(filepath.Join(workDir, "package.json"), []byte(dependencies), 0644)
+	if err := run("npm", "install", "."); err != nil {
+		return err
+	}
+
 	for _, block := range blocks {
-		if err = checkSpec(block); err != nil {
+		specPath := filepath.Join(workDir, "readme_block.js")
+		util.WriteFile(specPath, []byte(block), 0644)
+		if _, err := stitch.FromFile(specPath); err != nil {
 			return err
 		}
 	}
 	return nil
-}
-
-func checkSpec(content string) error {
-	specPath := filepath.Join("/tmp", "readme_block.js")
-	util.WriteFile(specPath, []byte(content), 0644)
-	return testSpec(specPath)
 }

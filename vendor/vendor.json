@@ -652,12 +652,6 @@
 			"revisionTime": "2016-01-10T10:55:54Z"
 		},
 		{
-			"checksumSHA1": "UH75lsKCrVFdCZvJchkAPo2QXjw=",
-			"path": "github.com/robertkrimen/otto",
-			"revision": "7d9cbc2befca39869eb0e5bcb0f44c0692c2f8ff",
-			"revisionTime": "2016-07-28T22:04:12Z"
-		},
-		{
 			"checksumSHA1": "qgziiO3/QDVJMKw2nGrUbC8QldY=",
 			"path": "github.com/robertkrimen/otto/ast",
 			"revision": "7d9cbc2befca39869eb0e5bcb0f44c0692c2f8ff",

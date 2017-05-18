@@ -1,5 +1,29 @@
+const crypto = require('crypto');
+const request = require('sync-request');
+const stringify = require('json-stable-stringify');
+const _ = require('underscore');
+
+const githubCache = {};
+function githubKeys(user) {
+    if (user in githubCache) {
+        return githubCache[user];
+    }
+
+    const response = request('GET', `https://github.com/${user}.keys`);
+    if (response.statusCode >= 300) {
+        // Handle any errors.
+        throw `HTTP request for ${user}'s github keys failed with error ` +
+            `${response.statusCode}`;
+    }
+
+    const keys = response.getBody('utf8').trim().split('\n');
+    githubCache[user] = keys;
+
+    return keys;
+}
+
 // The default deployment object. createDeployment overwrites this.
-var deployment = new Deployment({});
+global._quiltDeployment = new Deployment({});
 
 // The label used by the QRI to denote connections with public internet.
 var publicInternetLabel = "public";
@@ -9,8 +33,8 @@ var uniqueIDCounter = 0;
 
 // Overwrite the deployment object with a new one.
 function createDeployment(deploymentOpts) {
-    deployment = new Deployment(deploymentOpts);
-    return deployment;
+    global._quiltDeployment = new Deployment(deploymentOpts);
+    return global._quiltDeployment;
 }
 
 function Deployment(deploymentOpts) {
@@ -45,7 +69,7 @@ function uniqueID() {
 function key(obj) {
     var keyObj = obj.clone();
     keyObj._refID = "";
-    return JSON.stringify(keyObj, omitSSHKey);
+    return stringify(keyObj, { replacer: omitSSHKey });
 }
 
 // setQuiltIDs deterministically sets the id field of objects based on
@@ -73,6 +97,12 @@ function setQuiltIDs(objs) {
         var k = key(obj);
         obj.id = hash(k + refIDs[k].indexOf(obj._refID));
     });
+}
+
+function hash(str) {
+    const shaSum = crypto.createHash('sha1');
+    shaSum.update(str);
+    return shaSum.digest('hex');
 }
 
 // Convert the deployment to the QRI deployment format.
@@ -571,3 +601,34 @@ function Port(p) {
 }
 
 var PortRange = Range;
+
+function getDeployment() {
+    return global._quiltDeployment;
+}
+
+// Reset global unique counters. Used only for unit testing.
+function resetGlobals() {
+    uniqueIDCounter = 0;
+    labelNameCount = {};
+}
+
+module.exports = {
+    Assertion,
+    Connection,
+    Container,
+    Deployment,
+    Image,
+    LabelRule,
+    Machine,
+    MachineRule,
+    Port,
+    PortRange,
+    Range,
+    Service,
+    createDeployment,
+    getDeployment,
+    githubKeys,
+    publicInternet,
+    enough,
+    resetGlobals,
+};
