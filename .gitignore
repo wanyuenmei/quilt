@@ -26,6 +26,9 @@ _testmain.go
 quilt
 quilt.exe
 
+quilt_linux.tar.gz
+quilt_mac.tar.gz
+
 *.cov
 *.cov.html
 *.coverprofile

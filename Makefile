@@ -43,6 +43,10 @@ linux:
 darwin:
 	cd -P . && CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build .
 
+release:
+	make linux && tar -zcvf quilt_linux.tar.gz quilt
+	make darwin && tar -zcvf quilt_mac.tar.gz quilt
+
 COV_SKIP= /api/client/mocks \
 	  /api/pb \
 	  /cluster/provider/mocks \

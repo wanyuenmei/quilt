@@ -16,7 +16,7 @@ install:
 
 script:
     - govendor test -i +local
-    - make -j 2 lint format-check coverage check-specs docker-build-quilt
+    - make -j 2 lint format-check coverage check-specs docker-build-quilt release
 
 after_success:
     - bash <(curl -s https://codecov.io/bash)
@@ -32,3 +32,14 @@ after_success:
 notifications:
   slack:
     secure: jap4ODSrC9Nrd61tU3vSB9z8GBUUQmVcQzHWzIUHtQ2orGE8NqlrgdL17Bang26mm083vjFuaHb82OeJXeeMnH+8WFBY8ju19KJI/4Lgnou+Q0eOZ6bmHY9fjIgLTm+HiOrMaeDiDtLUPQIm1O4aNQ1GjT410LeQ0QkFZSPRJN+kxYDvLW8GQi3kG12BvIWPWFJY/r5B6JvSWQPzsJXvFTFAfu5B9enhwzy/s7W9tT+ddpnuCyz2+O2ADpGfLwtyH50jLlmIyrq3QKT6vYy2COq5GZ3yM2noaQRYRbl/5LIPdsAh99wjJF4X9oNXCl4EmxK7sWPKZc7Yk/AIGVHhlOlkkYhYzbajw3OPLo/02RDJv4IPCpFKfePOYLNpvcH4F+ae4ZQ1NmU0ksH9q04fTUH6xtwRU74WIiaelWMoH4qegUR4GJHbIEbCcT1HwN36ZkAeIFtY8HHT9+3wag1nnWG3l3uRIudcvjYFp7flGhaqW/t+VFbxaKRbahRPHV9K71XajdxR2GoQOggaE6k7/TeGBkHDR/3zX0sA30+meHxrb8Zo3py+Lsb8CQ5ULE/TWyGQyLN8RN/ynj+qtvI6nVIgKzkD+pgluerEIu5KhA0WslHY1Z0cQgI8mmoU4SY5Tzim/kwyljmBVFAIafyDibc5OjVSRpGca1vtBc18ZrY=
+
+deploy:
+  provider: releases
+  api_key:
+    secure: oxk/b8fBRTDgXiJOmrvgaD/XlOxyU0shmvUTgYcgbnjjxTTN5avfDVT7cuHc47DNcqMhqHPKXJszKpJUkB2IXdGgcz51YzO7vVCK5XgRWdsUVIg55rgOqznALEu3ybt/GBf/DBLjJraaUwx5Un5/htxVZwj8rzu3MUUvnyt8f0yyVaGAegIapbGWdNj352vp2Kp189IC+0AtKHLZ8tRLoqMojsEofVsX5XidxLcc3sdO6wOz5TG1++uPJ4D1FFREKOsKMwBw7AJu/qqAWBAjGKywXJ2K9NceXtH3QGUwCLrFAxYXx7ybtphjPi+JGfdUu6WSNwqBhY6v3s+PB6cA3hZpJh3UIOFmqSXcA5Dh30EVVA5IAL+olzgXji4093PYAAokHw+T3h6ZQMVRfthGEvs6YdhURrDaNQbS3MKPm2Isxw3yA23LqhZ7Br68zQNp2XHv5G0sisUBUGdnyvDerjjf/hTsHwpNCS+NLNFuu4G8cUaDrEDb6yDLYNklAQgxwnWbJiJmaR856JznHw0PVJPP3zHTi4Scd/83HJF4L13rRPTh2csDG1kYPjf/pqcjIylxINZTcq5ux4TSs3fe75xWcaUbXB2TFR/YQyOlxway/e/PuOfvZpZOv3p92tXvebZF46WZ/zKcbm37gG718Rozygs1GeiAeeQnxS+cGLY=
+  file:
+      - quilt_mac.tar.gz
+      - quilt_linux.tar.gz
+  skip_cleanup: true
+  on:
+    tags: true
