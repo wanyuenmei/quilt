@@ -37,9 +37,6 @@ clean:
 	rm -f *.cov.coverprofile cluster/*.cov.coverprofile minion/*.cov.coverprofile
 	rm -f *.cov.html cluster/*.cov.html minion/*.cov.html
 
-windows:
-	cd -P . && GOOS=windows GOARCH=386 go build .
-
 linux:
 	cd -P . && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build .
 
