@@ -43,4 +43,4 @@ deploy:
       - quilt_linux
   skip_cleanup: true
   on:
-    tags: true
+    condition: '( $TRAVIS_PULL_REQUEST == "false" && $TRAVIS_BRANCH == "master" ) || $TRAVIS_TAG != ""'
