@@ -39,8 +39,8 @@ deploy:
   api_key:
     secure: oxk/b8fBRTDgXiJOmrvgaD/XlOxyU0shmvUTgYcgbnjjxTTN5avfDVT7cuHc47DNcqMhqHPKXJszKpJUkB2IXdGgcz51YzO7vVCK5XgRWdsUVIg55rgOqznALEu3ybt/GBf/DBLjJraaUwx5Un5/htxVZwj8rzu3MUUvnyt8f0yyVaGAegIapbGWdNj352vp2Kp189IC+0AtKHLZ8tRLoqMojsEofVsX5XidxLcc3sdO6wOz5TG1++uPJ4D1FFREKOsKMwBw7AJu/qqAWBAjGKywXJ2K9NceXtH3QGUwCLrFAxYXx7ybtphjPi+JGfdUu6WSNwqBhY6v3s+PB6cA3hZpJh3UIOFmqSXcA5Dh30EVVA5IAL+olzgXji4093PYAAokHw+T3h6ZQMVRfthGEvs6YdhURrDaNQbS3MKPm2Isxw3yA23LqhZ7Br68zQNp2XHv5G0sisUBUGdnyvDerjjf/hTsHwpNCS+NLNFuu4G8cUaDrEDb6yDLYNklAQgxwnWbJiJmaR856JznHw0PVJPP3zHTi4Scd/83HJF4L13rRPTh2csDG1kYPjf/pqcjIylxINZTcq5ux4TSs3fe75xWcaUbXB2TFR/YQyOlxway/e/PuOfvZpZOv3p92tXvebZF46WZ/zKcbm37gG718Rozygs1GeiAeeQnxS+cGLY=
   file:
-      - quilt_mac.tar.gz
-      - quilt_linux.tar.gz
+      - quilt_darwin
+      - quilt_linux
   skip_cleanup: true
   on:
     tags: true

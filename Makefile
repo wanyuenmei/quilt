@@ -38,14 +38,12 @@ clean:
 	rm -f *.cov.html cluster/*.cov.html minion/*.cov.html
 
 linux:
-	cd -P . && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build .
+	cd -P . && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o quilt_linux .
 
 darwin:
-	cd -P . && CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build .
+	cd -P . && CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o quilt_darwin .
 
-release:
-	make linux && tar -zcvf quilt_linux.tar.gz quilt
-	make darwin && tar -zcvf quilt_mac.tar.gz quilt
+release: linux darwin
 
 COV_SKIP= /api/client/mocks \
 	  /api/pb \

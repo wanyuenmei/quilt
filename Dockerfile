@@ -2,5 +2,5 @@ From quilt/ovs
 Maintainer Ethan J. Jackson
 
 Copy ./buildinfo /buildinfo
-Copy ./quilt /usr/local/bin/quilt
+Copy ./quilt_linux /usr/local/bin/quilt
 ENTRYPOINT []
