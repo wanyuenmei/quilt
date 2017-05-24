@@ -18,16 +18,16 @@ deployment.deploy(new Machine({
 1. Create a Google Cloud Platform Project
 
 All instances are booted under a Cloud Platform project. To setup a project for
-use with Quilt, go to the [console page](console.cloud.google.com), then click
-the project dropdown at the top of page, and hit the plus icon. Pick a name,
-and create your project.
+use with Quilt, go to the [console page](http://console.cloud.google.com), then
+click the project dropdown at the top of page, and hit the plus icon. Pick a
+name, and create your project.
 
 2. Enable the Compute API
 
 Select your newly created project from the project selector at the top of the
-[console page](console.cloud.google.com), and then select `API Manager ->
-Library` from the navbar on the left. Search for and enable the `Google Compute
-Engine API`.
+[console page](http://console.cloud.google.com), and then select `API Manager
+-> Library` from the navbar on the left. Search for and enable the `Google
+Compute Engine API`.
 
 3. Save the Credentials File
 
