@@ -45,6 +45,7 @@ deploy:
   file:
       - quilt_darwin
       - quilt_linux
+  overwrite: true
   skip_cleanup: true
   on:
     tags: true
