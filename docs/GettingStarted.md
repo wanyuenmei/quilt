@@ -17,11 +17,11 @@ Find Go using your package manager or on the [Golang website](https://golang.org
 We recommend reading the overview to Go workplaces [here](https://golang.org/doc/code.html).
 
 Before installing Quilt, you'll need to set up your GOPATH. Assuming the root of
-your Go workspace will be `~/gowork`, execute the following `export` commands in
-your terminal to set up your GOPATH.
+your Go workspace will be `$HOME/gowork`, execute the following `export` commands in
+your terminal to set up your `GOPATH`.
 ```bash
-export GOPATH=~/gowork
-export PATH=$PATH:$GOPATH/bin
+export GOPATH="$HOME/gowork"
+export PATH="$PATH:$GOPATH/bin"
 ```
 It would be a good idea to add these commands to your `.bashrc` so that they do
 not have to be run again.
