@@ -1,6 +1,12 @@
 Quilt Change Log
 ================
 
+Release 0.0.1
+-------------
+
+Release 0.0.1 is an experimental release targeted at students in the CS61B
+class at UC Berkeley.
+
 Release 0.0.0
 -------------
 
