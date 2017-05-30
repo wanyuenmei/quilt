@@ -11,7 +11,6 @@ import (
 	"github.com/quilt/quilt/cluster/machine"
 	"github.com/quilt/quilt/db"
 	"github.com/quilt/quilt/join"
-	"github.com/quilt/quilt/stitch"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -132,13 +131,6 @@ func (p *fakeProvider) UpdateFloatingIPs(machines []machine.Machine) error {
 	}
 
 	return nil
-}
-
-func (p *fakeProvider) Connect(namespace string) error { return nil }
-
-func (p *fakeProvider) ChooseSize(ram stitch.Range, cpu stitch.Range,
-	maxPrice float64) string {
-	return ""
 }
 
 func newTestCluster(namespace string) *cluster {
