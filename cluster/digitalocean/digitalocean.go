@@ -84,7 +84,7 @@ func (clst Cluster) List() (machines []machine.Machine, err error) {
 	for {
 		ips, resp, err := clst.client.ListFloatingIPs(floatingIPListOpt)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("list floating IPs: %s", err)
 		}
 
 		for _, ip := range ips {
@@ -105,7 +105,7 @@ func (clst Cluster) List() (machines []machine.Machine, err error) {
 	for {
 		droplets, resp, err := clst.client.ListDroplets(dropletListOpt)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("list droplets: %s", err)
 		}
 
 		for _, d := range droplets {
@@ -115,12 +115,12 @@ func (clst Cluster) List() (machines []machine.Machine, err error) {
 
 			pubIP, err := d.PublicIPv4()
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("get public IP: %s", err)
 			}
 
 			privIP, err := d.PrivateIPv4()
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("get private IP: %s", err)
 			}
 
 			machine := machine.Machine{
