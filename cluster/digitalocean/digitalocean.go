@@ -140,12 +140,7 @@ func (clst Cluster) List() (machines []machine.Machine, err error) {
 			break
 		}
 
-		page, err := resp.Links.CurrentPage()
-		if err != nil {
-			return nil, err
-		}
-
-		dropletListOpt.Page = page + 1
+		dropletListOpt.Page++
 	}
 	return machines, nil
 }

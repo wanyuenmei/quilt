@@ -184,20 +184,6 @@ func TestList(t *testing.T) {
 	machines, err = doClust.List()
 	assert.Nil(t, machines)
 	assert.EqualError(t, err, "get public IP: no networks have been defined")
-
-	respBad := &godo.Response{
-		Links: &godo.Links{
-			Pages: &godo.Pages{
-				Prev: "badurl",
-				Last: "2",
-			},
-		},
-	}
-	mc.On("ListFloatingIPs", mock.Anything).Return(nil, &godo.Response{}, nil).Once()
-	mc.On("ListDroplets", mock.Anything).Return([]godo.Droplet{}, respBad, nil).Once()
-	machines, err = doClust.List()
-	assert.Nil(t, machines)
-	assert.EqualError(t, err, "parse badurl: invalid URI for request")
 }
 
 func TestBoot(t *testing.T) {
