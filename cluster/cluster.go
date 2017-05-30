@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -35,6 +36,10 @@ var allProviders = []db.Provider{db.Amazon, db.DigitalOcean, db.Google, db.Vagra
 type instance struct {
 	provider db.Provider
 	region   string
+}
+
+func (inst instance) String() string {
+	return fmt.Sprintf("%s-%s", inst.provider, inst.region)
 }
 
 type cluster struct {
@@ -429,10 +434,10 @@ func syncDB(cms []machine.Machine, dbms []db.Machine) syncDBResult {
 
 func (clst cluster) get() ([]machine.Machine, error) {
 	var cloudMachines []machine.Machine
-	for _, p := range clst.providers {
+	for inst, p := range clst.providers {
 		providerMachines, err := p.List()
 		if err != nil {
-			return []machine.Machine{}, err
+			return []machine.Machine{}, fmt.Errorf("list %s: %s", inst, err)
 		}
 		cloudMachines = append(cloudMachines, providerMachines...)
 	}

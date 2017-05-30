@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"errors"
 	"reflect"
 	"strconv"
 	"testing"
@@ -48,6 +49,8 @@ type fakeProvider struct {
 	stopRequests []string
 	updateIPs    []ipRequest
 	aclRequests  []acl.ACL
+
+	listError error
 }
 
 func fakeValidRegions(p db.Provider) []string {
@@ -80,6 +83,10 @@ func (p *fakeProvider) clearLogs() {
 }
 
 func (p *fakeProvider) List() ([]machine.Machine, error) {
+	if p.listError != nil {
+		return nil, p.listError
+	}
+
 	var machines []machine.Machine
 	for _, machine := range p.machines {
 		machines = append(machines, machine)
@@ -789,6 +796,17 @@ func TestMultiRegionDeploy(t *testing.T) {
 	assert.Empty(t, joinResult.boot)
 	assert.Empty(t, joinResult.stop)
 	assert.Len(t, joinResult.pairs, len(dbMachines))
+}
+
+func TestGetError(t *testing.T) {
+	_, err := cluster{
+		providers: map[instance]provider{
+			{db.Amazon, "us-west-1"}: &fakeProvider{
+				listError: errors.New("err"),
+			},
+		},
+	}.get()
+	assert.EqualError(t, err, "list Amazon-us-west-1: err")
 }
 
 func setNamespace(conn db.Conn, ns string) {
