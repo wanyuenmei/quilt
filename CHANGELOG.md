@@ -1,10 +1,10 @@
 Quilt Change Log
 ================
 
-Release 0.0.2
+Release 0.1.0
 -------------
 
-Release 0.0.2 most notably modifies `quilt run` to evaluate Quilt specs using
+Release 0.1.0 most notably modifies `quilt run` to evaluate Quilt specs using
 Node.js, rather than within a Javascript implementation written in Go. This
 enables users to make use of many great Node features, such as package management,
 versioning, unit testing, a rich ecosystem of modules, and `use
