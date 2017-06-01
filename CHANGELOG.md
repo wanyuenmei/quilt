@@ -1,6 +1,12 @@
 Quilt Change Log
 ================
 
+Up Next
+-------------
+
+- Package the OVS kernel module for the latest DigitalOcean image to speed up
+boot times.
+
 Release 0.1.0
 -------------
 
