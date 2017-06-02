@@ -20,7 +20,7 @@ func TestStopNamespaceDefault(t *testing.T) {
 
 	c.ClusterReturn = []db.Cluster{
 		{
-			Spec: `{"namespace": "testSpace"}`,
+			Blueprint: `{"namespace": "testSpace"}`,
 		},
 	}
 
@@ -58,7 +58,7 @@ func TestStopContainers(t *testing.T) {
 
 	c.ClusterReturn = []db.Cluster{
 		{
-			Spec: `{"namespace": "testSpace", "machines": ` +
+			Blueprint: `{"namespace": "testSpace", "machines": ` +
 				`[{"provider": "Amazon"}, {"provider": "Google"}]}`,
 		},
 	}
@@ -84,7 +84,7 @@ func TestStopContainers(t *testing.T) {
 func assertDeployed(t *testing.T, exp stitch.Stitch, deployed string) {
 	actual, err := stitch.FromJSON(deployed)
 	assert.NoError(t, err)
-	assert.Equal(t, exp, actual, "incorrect stop spec deployed")
+	assert.Equal(t, exp, actual, "incorrect stop blueprint deployed")
 }
 
 func TestStopFlags(t *testing.T) {

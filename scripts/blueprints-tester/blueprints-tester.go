@@ -6,13 +6,13 @@ import (
 	"path"
 	"runtime"
 
-	"github.com/quilt/quilt/scripts/specs-tester/tests"
+	"github.com/quilt/quilt/scripts/blueprints-tester/tests"
 )
 
 func main() {
 	testsByName := map[string]func() error{
-		"TestReadme": tests.TestReadme,
-		"TestSpecs":  tests.TestSpecs,
+		"TestReadme":     tests.TestReadme,
+		"TestBlueprints": tests.TestBlueprints,
 	}
 
 	failed := false

@@ -25,7 +25,7 @@ func TestSetMinionConfig(t *testing.T) {
 
 	cfg := pb.MinionConfig{
 		PrivateIP:      "priv",
-		Spec:           "spec",
+		Blueprint:      "blueprint",
 		Provider:       "provider",
 		Size:           "size",
 		Region:         "region",
@@ -34,7 +34,7 @@ func TestSetMinionConfig(t *testing.T) {
 	}
 	expMinion := db.Minion{
 		Self:           true,
-		Spec:           "spec",
+		Blueprint:      "blueprint",
 		PrivateIP:      "priv",
 		Provider:       "provider",
 		Role:           db.Master,
@@ -50,8 +50,8 @@ func TestSetMinionConfig(t *testing.T) {
 	})
 
 	// Update a field.
-	cfg.Spec = "new"
-	expMinion.Spec = "new"
+	cfg.Blueprint = "new"
+	expMinion.Blueprint = "new"
 	cfg.EtcdMembers = []string{"etcd3"}
 	_, err = s.SetMinionConfig(nil, &cfg)
 	assert.NoError(t, err)
@@ -109,7 +109,7 @@ func TestGetMinionConfig(t *testing.T) {
 	s.Conn.Txn(db.AllTables...).Run(func(view db.Database) error {
 		m := view.InsertMinion()
 		m.Self = true
-		m.Spec = "selfspec"
+		m.Blueprint = "selfblueprint"
 		m.Role = db.Master
 		m.PrivateIP = "selfpriv"
 		m.Provider = "selfprovider"
@@ -124,7 +124,7 @@ func TestGetMinionConfig(t *testing.T) {
 	s.Conn.Txn(db.AllTables...).Run(func(view db.Database) error {
 		m := view.InsertMinion()
 		m.Self = false
-		m.Spec = "spec"
+		m.Blueprint = "blueprint"
 		m.Role = db.Master
 		m.PrivateIP = "priv"
 		m.Provider = "provider"
@@ -139,7 +139,7 @@ func TestGetMinionConfig(t *testing.T) {
 	assert.Equal(t, pb.MinionConfig{
 		Role:           pb.MinionConfig_MASTER,
 		PrivateIP:      "selfpriv",
-		Spec:           "selfspec",
+		Blueprint:      "selfblueprint",
 		Provider:       "selfprovider",
 		Size:           "selfsize",
 		Region:         "selfregion",
@@ -158,7 +158,7 @@ func TestGetMinionConfig(t *testing.T) {
 	assert.Equal(t, pb.MinionConfig{
 		Role:           pb.MinionConfig_MASTER,
 		PrivateIP:      "selfpriv",
-		Spec:           "selfspec",
+		Blueprint:      "selfblueprint",
 		Provider:       "selfprovider",
 		Size:           "selfsize",
 		Region:         "selfregion",

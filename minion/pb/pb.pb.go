@@ -63,7 +63,7 @@ type MinionConfig struct {
 	ID             string            `protobuf:"bytes,1,opt,name=ID,json=iD" json:"ID,omitempty"`
 	Role           MinionConfig_Role `protobuf:"varint,2,opt,name=role,enum=MinionConfig_Role" json:"role,omitempty"`
 	PrivateIP      string            `protobuf:"bytes,3,opt,name=PrivateIP,json=privateIP" json:"PrivateIP,omitempty"`
-	Spec           string            `protobuf:"bytes,4,opt,name=Spec,json=spec" json:"Spec,omitempty"`
+	Blueprint      string            `protobuf:"bytes,4,opt,name=Blueprint,json=blueprint" json:"Blueprint,omitempty"`
 	Provider       string            `protobuf:"bytes,5,opt,name=Provider,json=provider" json:"Provider,omitempty"`
 	Size           string            `protobuf:"bytes,6,opt,name=Size,json=size" json:"Size,omitempty"`
 	Region         string            `protobuf:"bytes,7,opt,name=Region,json=region" json:"Region,omitempty"`
@@ -98,9 +98,9 @@ func (m *MinionConfig) GetPrivateIP() string {
 	return ""
 }
 
-func (m *MinionConfig) GetSpec() string {
+func (m *MinionConfig) GetBlueprint() string {
 	if m != nil {
-		return m.Spec
+		return m.Blueprint
 	}
 	return ""
 }

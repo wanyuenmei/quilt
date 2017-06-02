@@ -55,8 +55,8 @@ COV_SKIP= /api/client/mocks \
 	  /quiltctl/testutils \
 	  /scripts \
 	  /scripts/format \
-	  /scripts/specs-tester \
-	  /scripts/specs-tester/tests \
+	  /scripts/blueprints-tester \
+	  /scripts/blueprints-tester/tests \
 	  /minion/pb \
 	  /minion/supervisor/images \
 	  /version
@@ -91,11 +91,11 @@ format-check:
 	    exit 1 ; \
 	fi
 
-build-specs-tester: scripts/specs-tester/*
-	cd scripts/specs-tester && go build .
+build-blueprints-tester: scripts/blueprints-tester/*
+	cd scripts/blueprints-tester && go build .
 
-check-specs: build-specs-tester
-	scripts/specs-tester/specs-tester
+check-blueprints: build-blueprints-tester
+	scripts/blueprints-tester/blueprints-tester
 
 lint: format
 	cd -P . && govendor vet +local

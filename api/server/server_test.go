@@ -130,18 +130,18 @@ func TestDeploy(t *testing.T) {
 
 	assert.NoError(t, err)
 
-	var spec string
+	var blueprint string
 	conn.Txn(db.AllTables...).Run(func(view db.Database) error {
 		clst, err := view.GetCluster()
 		assert.NoError(t, err)
-		spec = clst.Spec
+		blueprint = clst.Blueprint
 		return nil
 	})
 
 	exp, err := stitch.FromJSON(createMachineDeployment)
 	assert.NoError(t, err)
 
-	actual, err := stitch.FromJSON(spec)
+	actual, err := stitch.FromJSON(blueprint)
 	assert.NoError(t, err)
 
 	assert.Equal(t, exp, actual)
@@ -169,18 +169,18 @@ func TestVagrantDeployment(t *testing.T) {
 
 	assert.Error(t, err, vagrantErrMsg)
 
-	var spec string
+	var blueprint string
 	conn.Txn(db.AllTables...).Run(func(view db.Database) error {
 		clst, err := view.GetCluster()
 		assert.NoError(t, err)
-		spec = clst.Spec
+		blueprint = clst.Blueprint
 		return nil
 	})
 
 	exp, err := stitch.FromJSON(vagrantDeployment)
 	assert.NoError(t, err)
 
-	actual, err := stitch.FromJSON(spec)
+	actual, err := stitch.FromJSON(blueprint)
 	assert.NoError(t, err)
 
 	assert.Equal(t, exp, actual)

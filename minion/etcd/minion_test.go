@@ -89,7 +89,7 @@ func TestReadDiff(t *testing.T) {
 
 	sharedEtcd := randMinion()
 	sharedDbm := sharedEtcd
-	sharedDbm.Spec = "Spec"
+	sharedDbm.Blueprint = "Blueprint"
 	sharedDbm.ID = 3
 
 	etcd := []db.Minion{randMinion()}
@@ -133,7 +133,7 @@ func randMinion() db.Minion {
 
 func dbMinion() db.Minion {
 	dbm := randMinion()
-	dbm.Spec = randStr()
+	dbm.Blueprint = randStr()
 	dbm.ID = rand.Int()
 	return dbm
 }

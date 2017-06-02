@@ -11,9 +11,9 @@ import (
 
 func TestSlug(t *testing.T) {
 	test := map[string]string{
-		"slug.spec":       "slug",
-		"a/b/c/slug.spec": "a/b/c/slug",
-		"foo":             "err",
+		"slug.blueprint":       "slug",
+		"a/b/c/slug.blueprint": "a/b/c/slug",
+		"foo": "err",
 	}
 
 	for inp, expect := range test {
@@ -50,7 +50,7 @@ func isGraphEqual(a, b string) bool {
 func TestViz(t *testing.T) {
 	t.Parallel()
 
-	spec := stitch.Stitch{
+	blueprint := stitch.Stitch{
 		Containers: []stitch.Container{
 			{
 				ID:    "54be1283e837c6e40ac79709aca8cdb8ec5f31f5",
@@ -91,7 +91,7 @@ func TestViz(t *testing.T) {
 		},
 	}
 
-	graph, err := stitch.InitializeGraph(spec)
+	graph, err := stitch.InitializeGraph(blueprint)
 	if err != nil {
 		panic(err)
 	}

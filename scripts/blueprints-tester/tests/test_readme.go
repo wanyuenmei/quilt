@@ -117,9 +117,9 @@ func TestReadme() error {
 	}
 
 	for _, block := range blocks {
-		specPath := filepath.Join(workDir, "readme_block.js")
-		util.WriteFile(specPath, []byte(block), 0644)
-		if _, err := stitch.FromFile(specPath); err != nil {
+		blueprintPath := filepath.Join(workDir, "readme_block.js")
+		util.WriteFile(blueprintPath, []byte(block), 0644)
+		if _, err := stitch.FromFile(blueprintPath); err != nil {
 			return err
 		}
 	}

@@ -60,7 +60,7 @@ func (rCmd *Run) InstallFlags(flags *flag.FlagSet) {
 func (rCmd *Run) Parse(args []string) error {
 	if rCmd.stitch == "" {
 		if len(args) == 0 {
-			return errors.New("no spec specified")
+			return errors.New("no blueprint specified")
 		}
 		rCmd.stitch = args[0]
 	}
@@ -137,7 +137,7 @@ func getCurrentDeployment(c client.Client) (stitch.Stitch, error) {
 	case 0:
 		return stitch.Stitch{}, errNoCluster
 	case 1:
-		return stitch.FromJSON(clusters[0].Spec)
+		return stitch.FromJSON(clusters[0].Blueprint)
 	default:
 		panic("unreached")
 	}

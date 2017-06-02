@@ -10,7 +10,7 @@ type Cluster struct {
 	ID int
 
 	Namespace string // Cloud Provider Namespace
-	Spec      string `rowStringer:"omit"`
+	Blueprint string `rowStringer:"omit"`
 }
 
 // InsertCluster creates a new Cluster and interts it into 'db'.

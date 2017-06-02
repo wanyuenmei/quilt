@@ -69,7 +69,7 @@ func Init(conn db.Conn) {
 
 // RunOnce should be called regularly to allow the foreman to update minion cfg.
 func RunOnce(conn db.Conn) {
-	var spec string
+	var blueprint string
 	var machines []db.Machine
 	conn.Txn(db.ClusterTable,
 		db.MachineTable).Run(func(view db.Database) error {
@@ -79,7 +79,7 @@ func RunOnce(conn db.Conn) {
 		})
 
 		clst, _ := view.GetCluster()
-		spec = clst.Spec
+		blueprint = clst.Blueprint
 
 		return nil
 	})
@@ -114,7 +114,7 @@ func RunOnce(conn db.Conn) {
 		newConfig := pb.MinionConfig{
 			FloatingIP:     m.machine.FloatingIP,
 			PrivateIP:      m.machine.PrivateIP,
-			Spec:           spec,
+			Blueprint:      blueprint,
 			Provider:       string(m.machine.Provider),
 			Size:           m.machine.Size,
 			Region:         m.machine.Region,

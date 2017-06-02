@@ -25,7 +25,8 @@ func getSlug(configPath string) (string, error) {
 	return slug, nil
 }
 
-func viz(configPath string, spec stitch.Stitch, graph stitch.Graph, outputFormat string) {
+func viz(configPath string, blueprint stitch.Stitch, graph stitch.Graph,
+	outputFormat string) {
 	slug, err := getSlug(configPath)
 	if err != nil {
 		panic(err)

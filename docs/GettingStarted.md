@@ -64,7 +64,7 @@ git clone https://github.com/quilt/nginx
 cd nginx
 ```
 
-### Install Spec Dependencies
+### Install Blueprint Dependencies
 The Nginx blueprint depends on the `@quilt/quilt` module. More complicated
 blueprints
 may have other dependencies that would get pulled in as well. To install all

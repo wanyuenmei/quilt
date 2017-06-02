@@ -47,7 +47,7 @@ func (s server) GetMinionConfig(cts context.Context,
 	m := s.MinionSelf()
 	cfg.Role = db.RoleToPB(m.Role)
 	cfg.PrivateIP = m.PrivateIP
-	cfg.Spec = m.Spec
+	cfg.Blueprint = m.Blueprint
 	cfg.Provider = m.Provider
 	cfg.Size = m.Size
 	cfg.Region = m.Region
@@ -70,7 +70,7 @@ func (s server) SetMinionConfig(ctx context.Context,
 
 		minion := view.MinionSelf()
 		minion.PrivateIP = msg.PrivateIP
-		minion.Spec = msg.Spec
+		minion.Blueprint = msg.Blueprint
 		minion.Provider = msg.Provider
 		minion.Size = msg.Size
 		minion.Region = msg.Region

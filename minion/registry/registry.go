@@ -12,10 +12,10 @@ import (
 
 /*
 The registry submodule builds custom Dockerfiles. When a custom Dockerfile is
-deployed in a spec (e.g.`new Container(new Image("name", "dk"))`), a couple
+deployed in a blueprint (e.g.`new Container(new Image("name", "dk"))`), a couple
 things happen:
 1) On the leader, the engine reads the custom images from the Containers in the
-spec, and writes them to the Image table.
+blueprint, and writes them to the Image table.
 2) The registry submodule builds the images in the Image table, and updates
 their image ID with the ID of the built image.
 3) The scheduler schedules containers for which the image has been built.

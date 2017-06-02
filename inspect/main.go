@@ -11,8 +11,8 @@ import (
 func Usage() {
 	fmt.Fprintln(
 		os.Stderr,
-		`quilt inspect is a tool that helps visualize Stitch specifications.
-Usage: quilt inspect <path to spec file> <pdf|ascii|graphviz>
+		`quilt inspect is a tool that helps visualize Stitch blueprints.
+Usage: quilt inspect <path to blueprint file> <pdf|ascii|graphviz>
 Dependencies
  - easy-graph (install Graph::Easy from cpan)
  - graphviz (install from your favorite package manager)`,
@@ -29,13 +29,13 @@ func Main(opts []string) int {
 
 	configPath := opts[0]
 
-	spec, err := stitch.FromFile(configPath)
+	blueprint, err := stitch.FromFile(configPath)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
 
-	graph, err := stitch.InitializeGraph(spec)
+	graph, err := stitch.InitializeGraph(blueprint)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
@@ -43,7 +43,7 @@ func Main(opts []string) int {
 
 	switch opts[1] {
 	case "pdf", "ascii", "graphviz":
-		viz(configPath, spec, graph, opts[1])
+		viz(configPath, blueprint, graph, opts[1])
 	default:
 		Usage()
 		return 1

@@ -201,7 +201,7 @@ func TestPromptsUser(t *testing.T) {
 		c := &clientMock.Client{
 			ClusterReturn: []db.Cluster{
 				{
-					Spec: `{"old":"spec"}`,
+					Blueprint: `{"old":"blueprint"}`,
 				},
 			},
 		}
@@ -219,12 +219,12 @@ func TestPromptsUser(t *testing.T) {
 func TestRunFlags(t *testing.T) {
 	t.Parallel()
 
-	expStitch := "spec"
+	expStitch := "blueprint"
 	checkRunParsing(t, []string{"-stitch", expStitch}, Run{stitch: expStitch}, nil)
 	checkRunParsing(t, []string{expStitch}, Run{stitch: expStitch}, nil)
 	checkRunParsing(t, []string{"-f", expStitch},
 		Run{force: true, stitch: expStitch}, nil)
-	checkRunParsing(t, []string{}, Run{}, errors.New("no spec specified"))
+	checkRunParsing(t, []string{}, Run{}, errors.New("no blueprint specified"))
 }
 
 func checkRunParsing(t *testing.T, args []string, expFlags Run, expErr error) {

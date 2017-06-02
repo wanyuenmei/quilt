@@ -10,10 +10,10 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
-func updatePolicy(view db.Database, spec string) {
-	compiled, err := stitch.FromJSON(spec)
+func updatePolicy(view db.Database, blueprint string) {
+	compiled, err := stitch.FromJSON(blueprint)
 	if err != nil {
-		log.WithError(err).Warn("Invalid spec.")
+		log.WithError(err).Warn("Invalid blueprint.")
 		return
 	}
 
@@ -54,9 +54,9 @@ func portPlacements(connections []db.Connection) (placements []db.Placement) {
 	return placements
 }
 
-func updatePlacements(view db.Database, spec stitch.Stitch) {
+func updatePlacements(view db.Database, blueprint stitch.Stitch) {
 	placements := db.PlacementSlice(portPlacements(view.SelectFromConnection(nil)))
-	for _, sp := range spec.Placements {
+	for _, sp := range blueprint.Placements {
 		placements = append(placements, db.Placement{
 			TargetLabel: sp.TargetLabel,
 			Exclusive:   sp.Exclusive,
@@ -90,8 +90,8 @@ func updatePlacements(view db.Database, spec stitch.Stitch) {
 	}
 }
 
-func updateConnections(view db.Database, spec stitch.Stitch) {
-	scs, vcs := stitch.ConnectionSlice(spec.Connections),
+func updateConnections(view db.Database, blueprint stitch.Stitch) {
+	scs, vcs := stitch.ConnectionSlice(blueprint.Connections),
 		view.SelectFromConnection(nil)
 
 	dbcKey := func(val interface{}) interface{} {
@@ -126,9 +126,9 @@ func updateConnections(view db.Database, spec stitch.Stitch) {
 	}
 }
 
-func queryContainers(spec stitch.Stitch) []db.Container {
+func queryContainers(blueprint stitch.Stitch) []db.Container {
 	containers := map[string]*db.Container{}
-	for _, c := range spec.Containers {
+	for _, c := range blueprint.Containers {
 		containers[c.ID] = &db.Container{
 			StitchID:          c.ID,
 			Command:           c.Command,
@@ -140,7 +140,7 @@ func queryContainers(spec stitch.Stitch) []db.Container {
 		}
 	}
 
-	for _, label := range spec.Labels {
+	for _, label := range blueprint.Labels {
 		for _, id := range label.IDs {
 			containers[id].Labels = append(containers[id].Labels, label.Name)
 		}
@@ -154,12 +154,12 @@ func queryContainers(spec stitch.Stitch) []db.Container {
 	return ret
 }
 
-func updateContainers(view db.Database, spec stitch.Stitch) {
+func updateContainers(view db.Database, blueprint stitch.Stitch) {
 	key := func(val interface{}) interface{} {
 		return val.(db.Container).StitchID
 	}
 
-	pairs, news, dbcs := join.HashJoin(db.ContainerSlice(queryContainers(spec)),
+	pairs, news, dbcs := join.HashJoin(db.ContainerSlice(queryContainers(blueprint)),
 		db.ContainerSlice(view.SelectFromContainer(nil)), key, key)
 
 	for _, dbc := range dbcs {
@@ -190,7 +190,7 @@ func updateContainers(view db.Database, spec stitch.Stitch) {
 	}
 }
 
-func updateImages(view db.Database, spec stitch.Stitch) {
+func updateImages(view db.Database, blueprint stitch.Stitch) {
 	dbImageKey := func(intf interface{}) interface{} {
 		return stitch.Image{
 			Name:       intf.(db.Image).Name,
@@ -198,9 +198,9 @@ func updateImages(view db.Database, spec stitch.Stitch) {
 		}
 	}
 
-	specImages := stitchImageSlice(queryImages(spec))
+	blueprintImages := stitchImageSlice(queryImages(blueprint))
 	dbImages := db.ImageSlice(view.SelectFromImage(nil))
-	_, toAdd, toRemove := join.HashJoin(specImages, dbImages, nil, dbImageKey)
+	_, toAdd, toRemove := join.HashJoin(blueprintImages, dbImages, nil, dbImageKey)
 
 	for _, intf := range toAdd {
 		im := view.InsertImage()
@@ -214,9 +214,9 @@ func updateImages(view db.Database, spec stitch.Stitch) {
 	}
 }
 
-func queryImages(spec stitch.Stitch) (images []stitch.Image) {
+func queryImages(blueprint stitch.Stitch) (images []stitch.Image) {
 	addedImages := map[stitch.Image]struct{}{}
-	for _, c := range spec.Containers {
+	for _, c := range blueprint.Containers {
 		_, addedImage := addedImages[c.Image]
 		if c.Image.Dockerfile == "" || addedImage {
 			continue

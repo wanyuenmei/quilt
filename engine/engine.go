@@ -27,7 +27,7 @@ func updateTxn(view db.Database) error {
 		return err
 	}
 
-	stitch, err := stitch.FromJSON(cluster.Spec)
+	stitch, err := stitch.FromJSON(cluster.Blueprint)
 	if err != nil {
 		return err
 	}
@@ -40,16 +40,16 @@ func updateTxn(view db.Database) error {
 	return nil
 }
 
-func aclTxn(view db.Database, specHandle stitch.Stitch) {
+func aclTxn(view db.Database, blueprintHandle stitch.Stitch) {
 	aclRow, err := view.GetACL()
 	if err != nil {
 		aclRow = view.InsertACL()
 	}
 
-	aclRow.Admin = resolveACLs(specHandle.AdminACL)
+	aclRow.Admin = resolveACLs(blueprintHandle.AdminACL)
 
 	var applicationPorts []db.PortRange
-	for _, conn := range specHandle.Connections {
+	for _, conn := range blueprintHandle.Connections {
 		if conn.From == stitch.PublicInternetLabel {
 			applicationPorts = append(applicationPorts, db.PortRange{
 				MinPort: conn.MinPort,

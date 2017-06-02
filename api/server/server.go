@@ -112,7 +112,7 @@ func (s server) Deploy(cts context.Context, deployReq *pb.DeployRequest) (
 			cluster = view.InsertCluster()
 		}
 
-		cluster.Spec = stitch.String()
+		cluster.Blueprint = stitch.String()
 		view.Commit(cluster)
 		return nil
 	})

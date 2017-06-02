@@ -122,15 +122,15 @@ func syncChain(ipt IPTables, table, chain string, target []string) error {
 		join.StringSlice(curr), join.StringSlice(target), ruleKey, ruleKey)
 
 	for _, r := range rulesToDel {
-		ruleSpec := strings.Split(r.(string), " ")
-		if err := ipt.Delete(table, chain, ruleSpec...); err != nil {
+		ruleBlueprint := strings.Split(r.(string), " ")
+		if err := ipt.Delete(table, chain, ruleBlueprint...); err != nil {
 			return fmt.Errorf("iptables delete: %s", err)
 		}
 	}
 
 	for _, r := range rulesToAdd {
-		ruleSpec := strings.Split(r.(string), " ")
-		if err := ipt.Append(table, chain, ruleSpec...); err != nil {
+		ruleBlueprint := strings.Split(r.(string), " ")
+		if err := ipt.Append(table, chain, ruleBlueprint...); err != nil {
 			return fmt.Errorf("iptables append: %s", err)
 		}
 	}
@@ -233,31 +233,32 @@ func postroutingRules(publicInterface string, containers []db.Container,
 }
 
 type rule struct {
-	table    string
-	chain    string
-	ruleSpec []string
+	table         string
+	chain         string
+	ruleBlueprint []string
 }
 
 func setDefaultRules(ipt IPTables) error {
 	rules := []rule{
 		{
-			table:    "filter",
-			chain:    "FORWARD",
-			ruleSpec: []string{"-j", "ACCEPT"},
+			table:         "filter",
+			chain:         "FORWARD",
+			ruleBlueprint: []string{"-j", "ACCEPT"},
 		},
 		{
-			table:    "nat",
-			chain:    "INPUT",
-			ruleSpec: []string{"-j", "ACCEPT"},
+			table:         "nat",
+			chain:         "INPUT",
+			ruleBlueprint: []string{"-j", "ACCEPT"},
 		},
 		{
-			table:    "nat",
-			chain:    "OUTPUT",
-			ruleSpec: []string{"-j", "ACCEPT"},
+			table:         "nat",
+			chain:         "OUTPUT",
+			ruleBlueprint: []string{"-j", "ACCEPT"},
 		},
 	}
 	for _, r := range rules {
-		if err := ipt.AppendUnique(r.table, r.chain, r.ruleSpec...); err != nil {
+		err := ipt.AppendUnique(r.table, r.chain, r.ruleBlueprint...)
+		if err != nil {
 			return fmt.Errorf("iptables append: %s", err)
 		}
 	}

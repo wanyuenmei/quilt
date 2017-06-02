@@ -6,7 +6,7 @@ type Minion struct {
 	ID int `json:"-"`
 
 	Self           bool   `json:"-"`
-	Spec           string `json:"-" rowStringer:"omit"`
+	Blueprint      string `json:"-" rowStringer:"omit"`
 	AuthorizedKeys string `json:"-" rowStringer:"omit"`
 
 	// Below fields are included in the JSON encoding.

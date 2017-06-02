@@ -65,7 +65,7 @@ func Run(role db.Role) {
 		txn.Run(func(view db.Database) error {
 			minion := view.MinionSelf()
 			if view.EtcdLeader() {
-				updatePolicy(view, minion.Spec)
+				updatePolicy(view, minion.Blueprint)
 			}
 			return nil
 		})

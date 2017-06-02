@@ -88,7 +88,7 @@ func diffMinion(dbMinions, storeMinions []db.Minion) (del, add []db.Minion) {
 	key := func(iface interface{}) interface{} {
 		m := iface.(db.Minion)
 		m.ID = 0
-		m.Spec = ""
+		m.Blueprint = ""
 		m.Self = false
 		m.AuthorizedKeys = ""
 		return m

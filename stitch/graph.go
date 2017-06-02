@@ -27,7 +27,7 @@ type Graph struct {
 }
 
 // InitializeGraph queries the Stitch to fill in the Graph structure.
-func InitializeGraph(spec Stitch) (Graph, error) {
+func InitializeGraph(blueprint Stitch) (Graph, error) {
 	g := Graph{
 		Nodes: map[string]Node{},
 		// One global availability set by default.
@@ -36,28 +36,28 @@ func InitializeGraph(spec Stitch) (Graph, error) {
 		Machines:     []Machine{},
 	}
 
-	for _, label := range spec.Labels {
+	for _, label := range blueprint.Labels {
 		for _, cid := range label.IDs {
 			g.addNode(cid, label.Name, label.Annotations)
 		}
 	}
 	g.addNode(PublicInternetLabel, PublicInternetLabel, []string{})
 
-	for _, conn := range spec.Connections {
+	for _, conn := range blueprint.Connections {
 		err := g.addConnection(conn.From, conn.To)
 		if err != nil {
 			return Graph{}, err
 		}
 	}
 
-	for _, pl := range spec.Placements {
+	for _, pl := range blueprint.Placements {
 		err := g.addPlacementRule(pl)
 		if err != nil {
 			return Graph{}, err
 		}
 	}
 
-	for _, m := range spec.Machines {
+	for _, m := range blueprint.Machines {
 		g.Machines = append(g.Machines, m)
 	}
 

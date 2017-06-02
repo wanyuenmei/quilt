@@ -11,10 +11,10 @@ import (
 	"github.com/quilt/quilt/stitch"
 )
 
-// workDir is the directory specs are placed during testing.
-const workDir = "/tmp/quilt-spec-test"
+// workDir is the directory blueprints are placed during testing.
+const workDir = "/tmp/quilt-blueprint-test"
 
-func tryRunSpec(s spec) error {
+func tryRunBlueprint(s blueprint) error {
 	os.Mkdir(workDir, 0755)
 	defer os.RemoveAll(workDir)
 	os.Chdir(workDir)
@@ -41,13 +41,13 @@ func run(name string, args ...string) error {
 	return nil
 }
 
-type spec struct {
+type blueprint struct {
 	repo, path string
 }
 
-// TestSpecs checks that the listed Quilt specs compile.
-func TestSpecs() error {
-	specs := []spec{
+// TestBlueprints checks that the listed Quilt blueprints compile.
+func TestBlueprints() error {
+	blueprints := []blueprint{
 		{"https://github.com/quilt/tester", "./tests/100-logs/logs.js"},
 		{"https://github.com/quilt/tester",
 			"./tests/61-duplicate-cluster/duplicate-cluster.js"},
@@ -86,9 +86,9 @@ func TestSpecs() error {
 		{"https://github.com/quilt/infrastructure", "./floating-ip.js"},
 	}
 
-	for _, s := range specs {
+	for _, s := range blueprints {
 		log.Infof("Testing %s in %s", s.path, s.repo)
-		if err := tryRunSpec(s); err != nil {
+		if err := tryRunBlueprint(s); err != nil {
 			return err
 		}
 	}

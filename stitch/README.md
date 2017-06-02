@@ -31,8 +31,8 @@ If the Dockerfile is saved as a file, it can simply be `read` in:
 new Container(new Image("my-image-name", read("./Dockerfile")))
 ```
 
-If a user runs a spec that uses a custom image, then runs another spec that
-changes the contents of that image's Dockerfile, the image is re-built and
+If a user runs a blueprint that uses a custom image, then runs another blueprint
+that changes the contents of that image's Dockerfile, the image is re-built and
 all containers referencing that Dockerfile are restarted with the new image.
 
 If multiple containers specify the same Dockerfile, the same image is reused for

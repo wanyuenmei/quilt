@@ -266,7 +266,7 @@ func updateStitch(t *testing.T, conn db.Conn, stitch stitch.Stitch) {
 		if err != nil {
 			cluster = view.InsertCluster()
 		}
-		cluster.Spec = stitch.String()
+		cluster.Blueprint = stitch.String()
 		view.Commit(cluster)
 		return nil
 	})
