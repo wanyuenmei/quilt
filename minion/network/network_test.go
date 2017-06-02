@@ -10,20 +10,6 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-type lportslice []ovsdb.LPort
-
-func (lps lportslice) Len() int {
-	return len(lps)
-}
-
-func (lps lportslice) Less(i, j int) bool {
-	return lps[i].Name < lps[j].Name
-}
-
-func (lps lportslice) Swap(i, j int) {
-	lps[i], lps[j] = lps[j], lps[i]
-}
-
 func TestRunMaster(t *testing.T) {
 	conn := db.New()
 

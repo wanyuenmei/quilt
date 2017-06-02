@@ -14,7 +14,6 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
-const labelMac = "0a:00:00:00:00:00"
 const lSwitch = "quilt"
 
 // Run blocks implementing the network services.
