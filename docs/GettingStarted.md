@@ -3,7 +3,8 @@ This guide explains how to install Quilt, and also serves as a
 brief, hands-on introduction to some Quilt basics.
 
 ## Install Node.js
-Quilt specs are written in Node.js. Only Node version v7.10.0 has been tested.
+Quilt blueprints are written in Node.js. Only Node version v7.10.0 has been
+tested.
 
 Installation instructions for various operating systems are available
 [here](https://nodejs.org/en/download/).
@@ -53,10 +54,10 @@ aws_secret_access_key = <YOUR_SECRET_KEY>
 ## Your First Quilt-managed Infrastructure
 We suggest you read
 [`quilt/nginx/main.js`](https://github.com/quilt/nginx/blob/master/main.js)
-to understand the infrastructure defined by this Quilt.js spec.
+to understand the infrastructure defined by this Quilt.js blueprint.
 
-### Acquire the Nginx Spec
-In order to run the Nginx spec, we'll have to download it first. We'll simply
+### Acquire the Nginx Blueprint
+In order to run the Nginx blueprint, we'll have to download it first. We'll simply
 clone it:
 ```bash
 git clone https://github.com/quilt/nginx
@@ -64,7 +65,8 @@ cd nginx
 ```
 
 ### Install Spec Dependencies
-The Nginx spec depends on the `@quilt/quilt` module. More complicated specs
+The Nginx blueprint depends on the `@quilt/quilt` module. More complicated
+blueprints
 may have other dependencies that would get pulled in as well. To install all
 dependencies, run `npm install .`.
 
@@ -128,7 +130,7 @@ a2ac27cfd313        quay.io/coreos/etcd:v3.0.2   "/usr/local/bin/etcd "   11 min
 deb4f98db8eb        quilt/quilt:latest           "quilt minion"           11 minutes ago      Up 11 minutes                           minion
 ```
 
-Any docker containers defined in a Stitch specification are placed on one of
+Any docker containers defined in a blueprint are placed on one of
 your Worker VMs.  In addition to these user-defined containers, Quilt also
 places several support containers on each VM. Among these support containers is
 `minion`, which locally manages Docker and allows Quilt VMs to talk to each
@@ -152,15 +154,16 @@ Quilt cluster.
 ### Cleaning up
 
 If you'd like to destroy the infrastructure you just deployed, you can either
-modify the specification to remove all of the Machines, or use the command,
+modify the blueprint to remove all of the Machines, or use the command,
 `quilt stop`. Both options will cause Quilt to destroy all of the
 Machines in the deployment.
 
-## Next Steps: Writing your own Quilt Spec
+## Next Steps: Writing your own Quilt Blueprint
 
 This guide illustrated how to use Quilt to run an application that already had a
-spec written.  Next, you can try writing your own Quilt specs for new applications
-that don't yet have specs written; to do that, check out the
-[guide to writing Quilt specs](https://github.com/quilt/quilt/blob/master/docs/spec-writers-guide.md).
+blueprint written.  Next, you can try writing your own Quilt blueprints for new
+applications
+that don't yet have blueprints written; to do that, check out the
+[guide to writing Quilt blueprints](https://github.com/quilt/quilt/blob/master/docs/BlueprintWritersGuide.md).
 
 

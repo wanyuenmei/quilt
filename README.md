@@ -92,7 +92,7 @@ namespace.deploy(mongo);
 namespace.deploy(haproxy);
 ```
 
-This spec can be found in
+This blueprint can be found in
 [`github.com/quilt/mean/example.js`](https://github.com/quilt/mean/blob/master/example.js)
 and used to deploy your app. Check out [this
 guide](https://github.com/quilt/mean/blob/master/README.md)

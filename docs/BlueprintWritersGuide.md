@@ -1,9 +1,9 @@
-# Quilt Spec Writers Guide
+ Quilt Blueprint Writers Guide
 
-This guide describes how to write the Quilt spec for a new application, using
-the lobste.rs application as an example.  lobste.rs is an open source project
-that implements a reddit-like web page, where users can post content and vote up
-or down other content.
+This guide describes how to write the Quilt blueprint for a new application,
+using the lobste.rs application as an example.  lobste.rs is an open source
+project that implements a reddit-like web page, where users can post content
+and vote up or down other content.
 
 ### Decomposing the application into containers
 
@@ -113,16 +113,17 @@ with each other, which is what we'll set up with Quilt.  We'll also use Quilt to
 descrbie the machines to launch for the containers to run on.
 
 To run the containers for your application with Quilt, you'll need to write a
-Quilt spec.  Quilt specs are written in Javascript, and the Quilt Javascript API
+Quilt blueprint.  Quilt blueprints are written in Javascript, and the Quilt
+Javascript API
 is described [here](https://github.com/quilt/quilt/tree/master/stitch).  In this
-guide, we'll walk through how to write a Quilt spec for lobste.rs, but the Quilt
-API has more functionality than we could describe here.  See the [API
+guide, we'll walk through how to write a Quilt blueprint for lobste.rs, but the
+Quilt API has more functionality than we could describe here.  See the [API
 guide](https://github.com/quilt/quilt/tree/master/stitch) for more usage
 information.
 
-##### Writing the Quilt spec for MySQL
+##### Writing the Quilt blueprint for MySQL
 
-First, let's write the Quilt spec to get the MySQL container up and running.  We
+First, let's write the Quilt blueprint to get the MySQL container up and running.  We
 need to create a container based on the mysql image:
 
     var sqlContainer = new Container("mysql:5.6.32");
@@ -145,7 +146,7 @@ using a name and a list of containers:
     
 The SQL service is now initialized.  
 
-##### Writing the Quilt spec for lobste.rs
+##### Writing the Quilt blueprint for lobste.rs
 
 Next, we can similarly initialize the lobsters service.  The lobsters service is
 a little trickier to initialize because it requires an environment variable
@@ -200,11 +201,11 @@ deploy the two services on that infrastructure:
 
     deployment.deploy(sqlService); deployment.deploy(lobstersService);
     
-We're done!  Running the spec is now trivial.  With a quilt daemon running, run
-your new spec (which, in this case, is called lobsters.js):
+We're done!  Running the blueprint is now trivial.  With a quilt daemon running, run
+your new blueprint (which, in this case, is called lobsters.js):
 
     quilt run lobsters.js
     
 Now users of lobsters, for example, can deploy it without needing to worry about
 the details of how different services are connected with each other.  All they
-need to do is to `quilt run` the existing spec.
+need to do is to `quilt run` the existing blueprint.

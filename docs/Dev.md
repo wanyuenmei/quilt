@@ -32,13 +32,13 @@ in the database. For instance, to query for `Connection`s in the
 
 ## Quilt Global
 
-The first thing that happens when Quilt starts is that your config file is parsed
+The first thing that happens when Quilt starts is that your blueprint is parsed
 by `stitch`. `stitch` then puts the connection and container specifications into a
 sensible format and forwards them to the `engine`.
 
 The `engine` is responsible for keeping the `db` updated so it always reflects
 the desired state of the system. It does so by computing a diff of the config
-spec and the current state stored in the database. After identifying the
+ and the current state stored in the database. After identifying the
 differences, `engine` determines the least disruptive way to update the
 database to the correct state, and then performs these updates. Notice that the
 `engine` only updates the database, not the actual remote system - `cluster`
@@ -55,7 +55,7 @@ man between your locally run Quilt Global, and the `minion` on the VMs. Namely,
 the `foreman` configures the `minion`, notifies it of its (the `minion`'s)
 role, and passes it the policies from Quilt Global.
 
-All of these steps are done continuously so the config spec, database and
+All of these steps are done continuously so the blueprint, database and
 remote system always agree on the state of the system.
 
 ## Quilt Remote
