@@ -468,6 +468,12 @@ describe('Bindings', function () {
             expect(() => publicInternet.connect(new PortRange(80, 81), foo)).to
                 .throw('public internet cannot connect on port ranges');
         });
+        it('connect to non-service', function () {
+            expect(() => foo.connect(10, 10)).to
+                .throw(`Services can only connect to other services. ` +
+                    `Check that you're connecting to a service, and not ` +
+                    `to a Container or other object.`);
+        });
     });
     describe('Vet', function () {
         let foo;

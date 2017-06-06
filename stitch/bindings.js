@@ -301,6 +301,11 @@ Service.prototype.connect = function(range, to) {
     if (to === publicInternet) {
         return this.connectToPublic(range);
     }
+    if (!(to instanceof Service)) {
+        throw new Error("Services can only connect to other services. " +
+            "Check that you're connecting to a service, and not to a " +
+            "Container or other object.");
+    }
     this.connections.push(new Connection(range, to));
 };
 
