@@ -81,7 +81,7 @@ var dependencies = `{
 
 // TestReadme checks that the code snippets in the README compile.
 func TestReadme() error {
-	f, err := util.Open("./README.md")
+	f, err := util.Open("../../README.md")
 	if err != nil {
 		return fmt.Errorf("failed to open README: %s", err.Error())
 	}
