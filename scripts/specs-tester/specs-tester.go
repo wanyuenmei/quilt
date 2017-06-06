@@ -5,7 +5,6 @@ import (
 	"os"
 	"path"
 	"runtime"
-	"sort"
 
 	"github.com/quilt/quilt/scripts/specs-tester/tests"
 )
@@ -16,14 +15,8 @@ func main() {
 		"TestSpecs":  tests.TestSpecs,
 	}
 
-	var names []string
-	for name := range testsByName {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-
 	failed := false
-	for _, name := range names {
+	for name, test := range testsByName {
 		// Reset the working directory. Normally this is handled by
 		// the go testing framework, but we run these tests manually,
 		// because they require an internet connection, and we don't
@@ -32,7 +25,6 @@ func main() {
 		workingDir := path.Dir(filename)
 		os.Chdir(workingDir)
 
-		test := testsByName[name]
 		if result := test(); result != nil {
 			fmt.Printf("FAILED\t%s: %s\n", name, result.Error())
 			failed = true
