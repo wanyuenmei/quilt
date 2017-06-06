@@ -438,6 +438,10 @@ describe('Bindings', function () {
                 maxPort: 85,
             }]);
         });
+        it('connect to invalid port range', function () {
+            expect(() => foo.connect(true, bar)).to
+                .throw('Input argument must be a number or a Range');
+        });
         it('connect to publicInternet', function () {
             foo.connect(80, publicInternet);
             checkConnections([{

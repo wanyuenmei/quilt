@@ -404,9 +404,12 @@ function boxRange(x) {
         return new Range(0, 0);
     }
     if (typeof x === "number") {
-        x = new Range(x, x);
+        return new Range(x, x);
     }
-    return x;
+    if (!(x instanceof Range)) {
+        throw new Error("Input argument must be a number or a Range")
+    }
+    return x
 }
 
 function Machine(optionalArgs) {
