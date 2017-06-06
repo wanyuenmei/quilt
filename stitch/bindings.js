@@ -12,8 +12,9 @@ function githubKeys(user) {
     const response = request('GET', `https://github.com/${user}.keys`);
     if (response.statusCode >= 300) {
         // Handle any errors.
-        throw `HTTP request for ${user}'s github keys failed with error ` +
-            `${response.statusCode}`;
+        throw new Error(
+            `HTTP request for ${user}'s github keys failed with error ` +
+            `${response.statusCode}`);
     }
 
     const keys = response.getBody('utf8').trim().split('\n');
@@ -178,7 +179,8 @@ Deployment.prototype.vet = function() {
         service.connections.forEach(function(conn) {
             var to = conn.to.name;
             if (!labelMap[to]) {
-                throw service.name + " has a connection to undeployed service: " + to;
+                throw new Error(`${service.name} has a connection to ` +
+                    `undeployed service: ${to}`);
             }
         });
 
@@ -190,27 +192,28 @@ Deployment.prototype.vet = function() {
 
             var otherLabel = plcm.otherLabel;
             if (otherLabel !== undefined && !labelMap[otherLabel]) {
-                throw service.name + " has a placement in terms of an " +
-                    "undeployed service: " + otherLabel;
+                throw new Error(`${service.name} has a placement in terms ` +
+                    `of an undeployed service: ${otherLabel}`);
             }
         });
 
         if (hasFloatingIp && service.incomingPublic.length
             && service.containers.length > 1) {
-            throw service.name + " has a floating IP and multiple containers. " +
-              "This is not yet supported."
+            throw new Error(`${service.name} has a floating IP and ` +
+                `multiple containers. This is not yet supported.`);
         }
 
         service.containers.forEach(function(c) {
             var name = c.image.name;
             if (dockerfiles[name] != undefined && dockerfiles[name] != c.image.dockerfile) {
-                throw name + " has differing Dockerfiles";
+                throw new Error(`${name} has differing Dockerfiles`);
             }
             dockerfiles[name] = c.image.dockerfile;
 
             if (c.hostname !== undefined) {
                 if (hostnames[c.hostname]) {
-                    throw "hostname \"" + c.hostname + "\" used for multiple containers";
+                    throw new Error(`hostname "${c.hostname}" used for ` +
+                        `multiple containers`);
                 }
                 hostnames[c.hostname] = true;
             }
@@ -228,7 +231,8 @@ Deployment.prototype.deploy = function(toDeployList) {
     var that = this;
     toDeployList.forEach(function(toDeploy) {
         if (!toDeploy.deploy) {
-            throw "only objects that implement \"deploy(deployment)\" can be deployed";
+            throw new Error(`only objects that implement ` +
+                `"deploy(deployment)" can be deployed`);
         }
         toDeploy.deploy(that);
     });
@@ -316,7 +320,7 @@ var publicInternet = {
 Service.prototype.connectToPublic = function(range) {
     range = boxRange(range);
     if (range.min != range.max) {
-        throw "public internet cannot connect on port ranges";
+        throw new Error(`public internet cannot connect on port ranges`);
     }
     this.outgoingPublic.push(range);
 };
@@ -325,7 +329,7 @@ Service.prototype.connectToPublic = function(range) {
 Service.prototype.connectFromPublic = function(range) {
     range = boxRange(range);
     if (range.min != range.max) {
-        throw "public internet cannot connect on port ranges";
+        throw new Error(`public internet cannot connect on port ranges`);
     }
     this.incomingPublic.push(range);
 };
