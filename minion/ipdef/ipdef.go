@@ -7,7 +7,8 @@ import (
 )
 
 var (
-	// QuiltSubnet is the subnet under which quilt containers are given IP addresses.
+	// QuiltSubnet is the subnet under which Quilt containers and load balancers
+	// are given IP addresses.
 	QuiltSubnet = net.IPNet{
 		IP:   net.IPv4(10, 0, 0, 0),
 		Mask: net.CIDRMask(8, 32),
@@ -18,6 +19,15 @@ var (
 
 	// GatewayMac is the Mac address of the default gateway.
 	GatewayMac = IPToMac(GatewayIP)
+
+	// LoadBalancerIP is the IP address used to generate the MAC address of the
+	// load balancer router. It isn't directly used for routing, but we need to
+	// ensure that nothing else allocates this IP so that the MAC does not
+	// conflict.
+	LoadBalancerIP = net.IPv4(10, 0, 0, 1)
+
+	// LoadBalancerMac is the MAC address of the load balancer router.
+	LoadBalancerMac = IPToMac(LoadBalancerIP)
 
 	// QuiltBridge is the Open vSwitch bridge controlled by the Quilt minion.
 	QuiltBridge = "quilt-int"

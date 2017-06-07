@@ -6,6 +6,7 @@ Up Next
 
 - Package the OVS kernel module for the latest DigitalOcean image to speed up
 - Renamed specs to blueprints.
+- Load balancing.
 
 Release 0.1.0
 -------------

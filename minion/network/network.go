@@ -14,7 +14,12 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
-const lSwitch = "quilt"
+const (
+	lSwitch                = "quilt"
+	loadBalancerRouter     = "loadBalancerRouter"
+	loadBalancerSwitchPort = "loadBalancerSwitchPort"
+	loadBalancerRouterPort = "loadBalancerRouterPort"
+)
 
 // Run blocks implementing the network services.
 func Run(conn db.Conn) {
@@ -30,10 +35,11 @@ func Run(conn db.Conn) {
 	}
 }
 
-// The leader of the cluster is responsible for properly configuring OVN northd for
-// container networking.  This simply means creating a logical port for each container
-// and label.  The specialized OpenFlow rules Quilt requires are managed by the workers
-// individuallly.
+// The leader of the cluster is responsible for properly configuring OVN northd
+// for container networking and load balancing.  This means creating a logical
+// port for each container, creating ACLs, creating the load balancer router,
+// and creating load balancers.  The specialized OpenFlow rules Quilt requires
+// are managed by the workers individuallly.
 func runMaster(conn db.Conn) {
 	var labels []db.Label
 	var containers []db.Container
@@ -61,6 +67,8 @@ func runMaster(conn db.Conn) {
 	defer ovsdbClient.Disconnect()
 
 	updateLogicalSwitch(ovsdbClient, containers)
+	updateLoadBalancerRouter(ovsdbClient)
+	updateLoadBalancers(ovsdbClient, labels)
 	updateACLs(ovsdbClient, connections, labels)
 }
 
@@ -84,7 +92,16 @@ func updateLogicalSwitch(ovsdbClient ovsdb.Client, containers []db.Container) {
 		return
 	}
 
-	expPorts := []ovsdb.SwitchPort{}
+	expPorts := []ovsdb.SwitchPort{
+		{
+			Name: loadBalancerSwitchPort,
+			Type: "router",
+			Options: map[string]string{
+				"router-port": loadBalancerRouterPort,
+			},
+			// The addresses field is handled by `updateLoadBalancerARP`.
+		},
+	}
 	for _, dbc := range containers {
 		expPorts = append(expPorts, ovsdb.SwitchPort{
 			Name: dbc.IP,
@@ -118,6 +135,65 @@ func updateLogicalSwitch(ovsdbClient ovsdb.Client, containers []db.Container) {
 				"Failed to delete logical switch port: %s", lport.Name)
 		} else {
 			log.Infof("Delete logical switch port: %s", lport.Name)
+		}
+	}
+}
+
+func updateLoadBalancerRouter(ovsdbClient ovsdb.Client) {
+	routerExists, err := ovsdbClient.LogicalRouterExists(loadBalancerRouter)
+	if err != nil {
+		log.WithError(err).Error(
+			"Failed to check existence of load balancer router")
+		return
+	}
+
+	if !routerExists {
+		err := ovsdbClient.CreateLogicalRouter(loadBalancerRouter)
+		if err != nil {
+			log.WithError(err).Error("Failed to create load balancer router")
+			return
+		}
+	}
+
+	lports, err := ovsdbClient.ListRouterPorts()
+	if err != nil {
+		log.WithError(err).Error("Failed to list OVN router ports")
+		return
+	}
+
+	expPorts := []ovsdb.RouterPort{
+		{
+			Name:     loadBalancerRouterPort,
+			MAC:      ipdef.LoadBalancerMac,
+			Networks: []string{ipdef.QuiltSubnet.String()},
+		},
+	}
+
+	key := func(intf interface{}) interface{} {
+		return intf.(ovsdb.RouterPort).Name
+	}
+	_, toAdd, toDel := join.HashJoin(ovsdb.RouterPortSlice(expPorts),
+		ovsdb.RouterPortSlice(lports), key, key)
+
+	for _, intf := range toAdd {
+		lport := intf.(ovsdb.RouterPort)
+		err := ovsdbClient.CreateRouterPort(loadBalancerRouter, lport)
+		if err != nil {
+			log.WithError(err).WithField("lport", lport).
+				Warnf("Failed to create logical router port.")
+		} else {
+			log.Infof("New logical router port: %s", lport.Name)
+		}
+	}
+
+	for _, intf := range toDel {
+		lport := intf.(ovsdb.RouterPort)
+		err := ovsdbClient.DeleteRouterPort(loadBalancerRouter, lport)
+		if err != nil {
+			log.WithError(err).Warnf(
+				"Failed to delete logical router port: %s", lport.Name)
+		} else {
+			log.Infof("Delete logical router port: %s", lport.Name)
 		}
 	}
 }

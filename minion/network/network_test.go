@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/quilt/quilt/db"
+	"github.com/quilt/quilt/minion/ipdef"
 	"github.com/quilt/quilt/minion/ovsdb"
 	"github.com/quilt/quilt/minion/ovsdb/mocks"
 )
@@ -24,6 +25,14 @@ func TestUpdateLogicalSwitch(t *testing.T) {
 	updateLogicalSwitch(client, containers)
 	client.AssertNotCalled(t, "CreateSwitchPort")
 	client.AssertNotCalled(t, "DeleteSwitchPort")
+
+	client.On("CreateSwitchPort", lSwitch, ovsdb.SwitchPort{
+		Name: loadBalancerSwitchPort,
+		Type: "router",
+		Options: map[string]string{
+			"router-port": loadBalancerRouterPort,
+		},
+	}).Return(nil)
 
 	client.On("ListSwitchPorts").Return([]ovsdb.SwitchPort{{Name: "1.2.3.5"}}, nil)
 	client.On("DeleteSwitchPort", lSwitch, ovsdb.SwitchPort{
@@ -50,6 +59,7 @@ func TestCreateLogicalSwitch(t *testing.T) {
 
 	client := new(mocks.Client)
 	client.On("ListSwitchPorts").Return(nil, nil)
+	client.On("CreateSwitchPort", mock.Anything, mock.Anything).Return(nil)
 
 	client.On("LogicalSwitchExists", lSwitch).Return(false, assert.AnError).Once()
 	updateLogicalSwitch(client, nil)
@@ -68,4 +78,50 @@ func TestCreateLogicalSwitch(t *testing.T) {
 	client.On("LogicalSwitchExists", lSwitch).Return(false, nil).Once()
 	updateLogicalSwitch(client, nil)
 	client.AssertNotCalled(t, "ListSwitchPorts", lSwitch)
+}
+
+func TestCreateLogicalRouter(t *testing.T) {
+	t.Parallel()
+
+	client := new(mocks.Client)
+	client.On("ListRouterPorts").Return(nil, nil)
+	client.On("CreateRouterPort", mock.Anything, mock.Anything).Return(nil)
+
+	client.On("LogicalRouterExists", loadBalancerRouter).Return(
+		false, assert.AnError).Once()
+	updateLoadBalancerRouter(client)
+	client.AssertNotCalled(t, "CreateLogicalRouter", mock.Anything)
+
+	client.On("LogicalRouterExists", loadBalancerRouter).Return(true, nil).Once()
+	updateLoadBalancerRouter(client)
+	client.AssertNotCalled(t, "CreateLogicalRouter", mock.Anything)
+
+	client.On("CreateLogicalRouter", loadBalancerRouter).Return(nil).Once()
+	client.On("LogicalRouterExists", loadBalancerRouter).Return(false, nil).Once()
+	updateLoadBalancerRouter(client)
+	client.AssertCalled(t, "CreateLogicalRouter", loadBalancerRouter)
+
+	client.On("CreateLogicalRouter", loadBalancerRouter).Return(assert.AnError).Once()
+	client.On("LogicalRouterExists", loadBalancerRouter).Return(false, nil).Once()
+	updateLoadBalancerRouter(client)
+	client.AssertNotCalled(t, "ListRouterPorts", loadBalancerRouter)
+}
+
+func TestUpdateLoadBalancerRouter(t *testing.T) {
+	t.Parallel()
+
+	client := new(mocks.Client)
+
+	client.On("LogicalRouterExists", loadBalancerRouter).Return(true, nil)
+	client.On("ListRouterPorts").Return([]ovsdb.RouterPort{{Name: "toDelete"}}, nil)
+	client.On("DeleteRouterPort", loadBalancerRouter, ovsdb.RouterPort{
+		Name: "toDelete",
+	}).Return(nil).Once()
+	client.On("CreateRouterPort", loadBalancerRouter, ovsdb.RouterPort{
+		Name:     loadBalancerRouterPort,
+		MAC:      ipdef.LoadBalancerMac,
+		Networks: []string{ipdef.QuiltSubnet.String()},
+	}).Return(nil).Once()
+	updateLoadBalancerRouter(client)
+	client.AssertExpectations(t)
 }

@@ -3,10 +3,12 @@ package network
 import (
 	"fmt"
 	"net"
+	"reflect"
 	"sort"
 	"testing"
 
 	"github.com/quilt/quilt/db"
+	"github.com/quilt/quilt/join"
 	"github.com/quilt/quilt/minion/ipdef"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,7 +27,7 @@ func TestAllocateContainerIPs(t *testing.T) {
 		dbc.StitchID = "2"
 		view.Commit(dbc)
 
-		allocateContainerIPs(view)
+		allocateContainerIPs(view, map[string]struct{}{})
 		return nil
 	})
 
@@ -67,28 +69,37 @@ func TestUpdateLabelIPs(t *testing.T) {
 	})
 
 	conn.Txn(db.AllTables...).Run(func(view db.Database) error {
-		assert.NoError(t, updateLabelIPs(view))
+		assert.NoError(t, updateLabelIPs(view, map[string]struct{}{}))
 		return nil
 	})
 
-	var labels []db.Label
-	for _, label := range conn.SelectFromLabel(nil) {
-		label.ID = 0
-		labels = append(labels, label)
-	}
-	sort.Sort(db.LabelSlice(labels))
-
-	assert.Equal(t, []db.Label{
+	exp := []db.Label{
 		{
 			Label:        "blue",
-			IP:           "1.1.1.1",
 			ContainerIPs: []string{"1.1.1.1"},
 		}, {
 			Label:        "red",
-			IP:           "1.1.1.1",
 			ContainerIPs: []string{"1.1.1.1", "2.2.2.2"},
 		},
-	}, labels)
+	}
+
+	// Ensure that the label name and container IPs match, and that the generated
+	// IP is within the Quilt subnet.
+	key := func(expIntf interface{}, actualIntf interface{}) int {
+		exp := expIntf.(db.Label)
+		actual := actualIntf.(db.Label)
+
+		if exp.Label == actual.Label &&
+			reflect.DeepEqual(exp.ContainerIPs, actual.ContainerIPs) &&
+			ipdef.QuiltSubnet.Contains(net.ParseIP(actual.IP)) {
+			return 0
+		}
+		return -1
+	}
+
+	_, extraExp, extraActual := join.Join(exp, conn.SelectFromLabel(nil), key)
+	assert.Len(t, extraExp, 0)
+	assert.Len(t, extraActual, 0)
 }
 
 func TestAllocate(t *testing.T) {

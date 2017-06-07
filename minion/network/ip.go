@@ -20,36 +20,45 @@ func runUpdateIPs(conn db.Conn) {
 			continue
 		}
 
-		txn := conn.Txn(db.ContainerTable, db.LabelTable)
-		err := txn.Run(func(view db.Database) error {
-			err := allocateContainerIPs(view)
-			if err == nil {
-				err = updateLabelIPs(view)
-			}
-			return err
-		})
-
+		err := conn.Txn(db.ContainerTable, db.LabelTable).Run(updateIPsOnce)
 		if err != nil {
 			log.WithError(err).Warn("Failed to allocate IP addresses")
 		}
 	}
 }
 
-func allocateContainerIPs(view db.Database) error {
-	dbcs := view.SelectFromContainer(nil)
-
+func updateIPsOnce(view db.Database) error {
 	ipSet := map[string]struct{}{
-		ipdef.GatewayIP.String(): {},
+		ipdef.GatewayIP.String():      {},
+		ipdef.LoadBalancerIP.String(): {},
 
 		// While not strictly required, it would be odd to allocate 10.0.0.0.
 		ipdef.QuiltSubnet.IP.String(): {},
 	}
 
-	var unassigned []db.Container
-	for _, dbc := range dbcs {
+	for _, dbc := range view.SelectFromContainer(nil) {
 		if dbc.IP != "" {
 			ipSet[dbc.IP] = struct{}{}
-		} else {
+		}
+	}
+
+	for _, dbl := range view.SelectFromLabel(nil) {
+		if dbl.IP != "" {
+			ipSet[dbl.IP] = struct{}{}
+		}
+	}
+
+	err := allocateContainerIPs(view, ipSet)
+	if err == nil {
+		err = updateLabelIPs(view, ipSet)
+	}
+	return err
+}
+
+func allocateContainerIPs(view db.Database, ipSet map[string]struct{}) error {
+	var unassigned []db.Container
+	for _, dbc := range view.SelectFromContainer(nil) {
+		if dbc.IP == "" {
 			unassigned = append(unassigned, dbc)
 		}
 	}
@@ -67,7 +76,7 @@ func allocateContainerIPs(view db.Database) error {
 	return nil
 }
 
-func updateLabelIPs(view db.Database) error {
+func updateLabelIPs(view db.Database, ipSet map[string]struct{}) error {
 	dbcs := view.SelectFromContainer(func(dbc db.Container) bool {
 		return dbc.IP != ""
 	})
@@ -108,12 +117,13 @@ func updateLabelIPs(view db.Database) error {
 		dbl.Label = pair.R.(string)
 		dbl.ContainerIPs = containerIPs[dbl.Label]
 
-		// XXX: In effect, we're implementing a dumb load balancer where all
-		// traffic goes to the first container.  Something more sophisticated is
-		// coming (hopefully).
-		dbl.IP = ""
-		if len(dbl.ContainerIPs) > 0 {
-			dbl.IP = dbl.ContainerIPs[0]
+		if dbl.IP == "" {
+			ip, err := allocateIP(ipSet, ipdef.QuiltSubnet)
+			if err != nil {
+				return err
+			}
+
+			dbl.IP = ip
 		}
 		view.Commit(dbl)
 	}

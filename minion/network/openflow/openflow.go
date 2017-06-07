@@ -89,6 +89,11 @@ Table_1 {
 		output:veth{1..n}
 	}
 
+	// If the veth sends a packet to the load balancer router, forward it.
+	if reg0=1 && dl_dst=loadBalancerRouterMac {
+		output:reg2
+	}
+
 	// If the veth sends a packet to the gateway, forward it.
 	if reg0=1 && dl_dst=gwMac {
 		output:LOCAL
@@ -149,6 +154,8 @@ var staticFlows = []string{
 		"actions=output:LOCAL,output:NXM_NX_REG2[]",
 	"table=1,priority=900,reg0=0x2,dl_dst=ff:ff:ff:ff:ff:ff," +
 		"actions=output:NXM_NX_REG1[]",
+	fmt.Sprintf("table=1,priority=850,reg0=1,dl_dst=%s,actions=output:NXM_NX_REG2[]",
+		ipdef.LoadBalancerMac),
 	fmt.Sprintf("table=1,priority=800,reg0=1,dl_dst=%s,actions=LOCAL",
 		ipdef.GatewayMac),
 	fmt.Sprintf("table=1,priority=700,dl_dst=%s,actions=drop", ipdef.GatewayMac),
