@@ -21,7 +21,7 @@ type Client interface {
 	CreateLogicalSwitch(lswitch string) error
 	LogicalSwitchExists(lswitch string) (bool, error)
 	ListSwitchPorts() ([]SwitchPort, error)
-	CreateSwitchPort(lswitch, name, mac, ip string) error
+	CreateSwitchPort(lswitch string, lport SwitchPort) error
 	DeleteSwitchPort(lswitch string, lport SwitchPort) error
 
 	ListACLs() ([]ACL, error)
@@ -45,7 +45,9 @@ type client struct {
 type SwitchPort struct {
 	uuid      ovs.UUID
 	Name      string
+	Type      string
 	Addresses []string
+	Options   map[string]string
 }
 
 // SwitchPortSlice is a wrapper around []SwitchPort so it can be used in joins
@@ -138,25 +140,48 @@ func (ovsdb client) ListSwitchPorts() ([]SwitchPort, error) {
 
 	var result []SwitchPort
 	for _, row := range portReply[0].Rows {
-		result = append(result, SwitchPort{
-			uuid:      ovsUUIDFromRow(row),
-			Name:      row["name"].(string),
-			Addresses: ovsStringSetToSlice(row["addresses"]),
-		})
+		port, err := parseLogicalSwitchPort(row)
+		if err != nil {
+			return nil, fmt.Errorf("malformed switch port: %s", err)
+		}
+		result = append(result, port)
 	}
 	return result, nil
 }
 
-// CreateSwitchPort creates a new logical port in OVN.
-func (ovsdb client) CreateSwitchPort(lswitch, name, mac, ip string) error {
-	addrs := newOvsSet([]string{fmt.Sprintf("%s %s", mac, ip)})
+func parseLogicalSwitchPort(port row) (SwitchPort, error) {
+	options, err := ovsStringMapToMap(port["options"])
+	if err != nil {
+		return SwitchPort{}, fmt.Errorf("malformed options: %s", err)
+	}
+	return SwitchPort{
+		uuid:      ovsUUIDFromRow(port),
+		Name:      port["name"].(string),
+		Type:      port["type"].(string),
+		Addresses: ovsStringSetToSlice(port["addresses"]),
+		Options:   options,
+	}, nil
+}
 
-	port := map[string]interface{}{"name": name, "addresses": addrs}
+// CreateSwitchPort creates a new logical port in OVN.
+func (ovsdb client) CreateSwitchPort(lswitch string, lport SwitchPort) error {
+	portRow := map[string]interface{}{
+		"name": lport.Name,
+		"type": lport.Type,
+	}
+
+	if len(lport.Addresses) != 0 {
+		portRow["addresses"] = newOvsSet(lport.Addresses)
+	}
+
+	if lport.Options != nil {
+		portRow["options"] = newOvsMap(lport.Options)
+	}
 
 	insertOp := ovs.Operation{
 		Op:       "insert",
 		Table:    "Logical_Switch_Port",
-		Row:      port,
+		Row:      portRow,
 		UUIDName: "qlsportadd",
 	}
 
@@ -172,7 +197,7 @@ func (ovsdb client) CreateSwitchPort(lswitch, name, mac, ip string) error {
 	results, err := ovsdb.Transact("OVN_Northbound", insertOp, mutateOp)
 	if err != nil {
 		return fmt.Errorf("transaction error: creating switch port %s on %s: %s",
-			name, lswitch, err)
+			lport.Name, lswitch, err)
 	}
 
 	return errorCheck(results, 2)
@@ -423,6 +448,35 @@ func ovsStringSetToSlice(oSet interface{}) []string {
 	return ret
 }
 
+func ovsStringMapToMap(oMap interface{}) (map[string]string, error) {
+	var ret = make(map[string]string)
+	wrap, ok := oMap.([]interface{})
+	if !ok || len(wrap) == 0 || wrap[0] != "map" {
+		return nil, errors.New("ovs map outermost layer invalid")
+	}
+
+	brokenMap, ok := wrap[1].([]interface{})
+	if !ok {
+		return nil, errors.New("ovs map content invalid")
+	}
+	for _, kvPair := range brokenMap {
+		kvSlice, ok := kvPair.([]interface{})
+		if !ok {
+			return nil, errors.New("ovs map block must be a slice")
+		}
+		key, ok := kvSlice[0].(string)
+		if !ok {
+			return nil, errors.New("ovs map key must be string")
+		}
+		val, ok := kvSlice[1].(string)
+		if !ok {
+			return nil, errors.New("ovs map value must be string")
+		}
+		ret[key] = val
+	}
+	return ret, nil
+}
+
 func ovsUUIDFromRow(row row) ovs.UUID {
 	uuid := ovs.UUID{}
 	block, ok := row["_uuid"].([]interface{})
@@ -459,6 +513,14 @@ func (lps SwitchPortSlice) Len() int {
 
 func newOvsSet(slice interface{}) *ovs.OvsSet {
 	result, err := ovs.NewOvsSet(slice)
+	if err != nil {
+		panic(err)
+	}
+	return result
+}
+
+func newOvsMap(mp interface{}) *ovs.OvsMap {
+	result, err := ovs.NewOvsMap(mp)
 	if err != nil {
 		panic(err)
 	}

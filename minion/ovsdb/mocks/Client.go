@@ -50,13 +50,13 @@ func (_m *Client) CreateLogicalSwitch(lswitch string) error {
 	return r0
 }
 
-// CreateSwitchPort provides a mock function with given fields: lswitch, name, mac, ip
-func (_m *Client) CreateSwitchPort(lswitch string, name string, mac string, ip string) error {
-	ret := _m.Called(lswitch, name, mac, ip)
+// CreateSwitchPort provides a mock function with given fields: lswitch, lport
+func (_m *Client) CreateSwitchPort(lswitch string, lport ovsdb.SwitchPort) error {
+	ret := _m.Called(lswitch, lport)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string, string) error); ok {
-		r0 = rf(lswitch, name, mac, ip)
+	if rf, ok := ret.Get(0).(func(string, ovsdb.SwitchPort) error); ok {
+		r0 = rf(lswitch, lport)
 	} else {
 		r0 = ret.Error(0)
 	}

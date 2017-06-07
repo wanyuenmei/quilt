@@ -91,8 +91,13 @@ func runMaster(conn db.Conn) {
 
 	for _, dbcIface := range dbcs {
 		dbc := dbcIface.(db.Container)
-		err := ovsdbClient.CreateSwitchPort(lSwitch, dbc.IP,
-			ipdef.IPStrToMac(dbc.IP), dbc.IP)
+		lport := ovsdb.SwitchPort{
+			Name: dbc.IP,
+			// OVN represents network interfaces with the empty string.
+			Type:      "",
+			Addresses: []string{ipdef.IPStrToMac(dbc.IP) + " " + dbc.IP},
+		}
+		err := ovsdbClient.CreateSwitchPort(lSwitch, lport)
 		if err != nil {
 			log.WithError(err).Warnf(
 				"Failed to create logical switch port: %s", dbc.IP)

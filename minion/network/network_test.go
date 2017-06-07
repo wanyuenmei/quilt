@@ -58,8 +58,10 @@ func TestRunMaster(t *testing.T) {
 	client.On("ListSwitchPorts").Return([]ovsdb.SwitchPort{{Name: "1.2.3.5"}}, nil)
 	client.On("DeleteSwitchPort", lSwitch, ovsdb.SwitchPort{
 		Name: "1.2.3.5", Addresses: nil}).Return(anErr).Once()
-	client.On("CreateSwitchPort", lSwitch, "1.2.3.4",
-		"02:00:01:02:03:04", "1.2.3.4").Return(anErr).Once()
+	client.On("CreateSwitchPort", lSwitch, ovsdb.SwitchPort{
+		Name:      "1.2.3.4",
+		Addresses: []string{"02:00:01:02:03:04 1.2.3.4"},
+	}).Return(anErr).Once()
 	runMaster(conn)
 	client.AssertCalled(t, "Disconnect")
 	client.AssertCalled(t, "ListSwitchPorts")
@@ -71,8 +73,10 @@ func TestRunMaster(t *testing.T) {
 	client.On("ListSwitchPorts").Return([]ovsdb.SwitchPort{{Name: "1.2.3.5"}}, nil)
 	client.On("DeleteSwitchPort", lSwitch, ovsdb.SwitchPort{
 		Name: "1.2.3.5", Addresses: []string(nil)}).Return(nil)
-	client.On("CreateSwitchPort", lSwitch, "1.2.3.4",
-		"02:00:01:02:03:04", "1.2.3.4").Return(nil).Once()
+	client.On("CreateSwitchPort", lSwitch, ovsdb.SwitchPort{
+		Name:      "1.2.3.4",
+		Addresses: []string{"02:00:01:02:03:04 1.2.3.4"},
+	}).Return(nil).Once()
 	runMaster(conn)
 	client.AssertCalled(t, "Disconnect")
 	client.AssertCalled(t, "ListSwitchPorts")

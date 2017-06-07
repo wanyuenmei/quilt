@@ -81,7 +81,12 @@ func TestSwitchPorts(t *testing.T) {
 	r := map[string]interface{}{
 		"_uuid":     []interface{}{"a", "b"},
 		"name":      "name",
-		"addresses": ""}
+		"addresses": "mac ip",
+		"options": []interface{}{"map", []interface{}{
+			[]interface{}{"foo", "bar"},
+		}},
+		"type": "router",
+	}
 	api.On("Transact", "OVN_Northbound", []ovs.Operation{{
 		Op:    "select",
 		Table: "Logical_Switch_Port",
@@ -90,9 +95,35 @@ func TestSwitchPorts(t *testing.T) {
 		Rows: []map[string]interface{}{r}}}, nil).Once()
 
 	lports, err = odb.ListSwitchPorts()
-	assert.Len(t, lports, 1)
-	assert.Equal(t, "name", lports[0].Name)
 	assert.NoError(t, err)
+	assert.Equal(t, []SwitchPort{
+		{
+			uuid:      ovs.UUID{GoUUID: "b"},
+			Name:      "name",
+			Type:      "router",
+			Addresses: []string{"mac ip"},
+			Options:   map[string]string{"foo": "bar"},
+		},
+	}, lports)
+
+	r = map[string]interface{}{
+		"_uuid":     []interface{}{"a", "b"},
+		"name":      "",
+		"addresses": "",
+		"options":   "brokenMap",
+		"type":      "",
+	}
+	api.On("Transact", "OVN_Northbound", []ovs.Operation{{
+		Op:    "select",
+		Table: "Logical_Switch_Port",
+		Where: noCondition,
+	}}).Return([]ovs.OperationResult{{
+		Rows: []map[string]interface{}{r}}}, nil).Once()
+
+	_, err = odb.ListSwitchPorts()
+	assert.EqualError(t, err,
+		"malformed switch port: malformed options: "+
+			"ovs map outermost layer invalid")
 }
 
 func TestCreateSwitchPort(t *testing.T) {
@@ -101,11 +132,21 @@ func TestCreateSwitchPort(t *testing.T) {
 	api := new(mockTransact)
 	odb := Client(client{api})
 
-	addrs := newOvsSet([]string{"mac ip"})
+	port := SwitchPort{
+		Name:      "name",
+		Addresses: []string{"mac ip"},
+		Type:      "router",
+		Options:   map[string]string{"foo": "bar"},
+	}
 	ops := []ovs.Operation{{
-		Op:       "insert",
-		Table:    "Logical_Switch_Port",
-		Row:      map[string]interface{}{"name": "name", "addresses": addrs},
+		Op:    "insert",
+		Table: "Logical_Switch_Port",
+		Row: map[string]interface{}{
+			"name":      "name",
+			"addresses": newOvsSet([]string{"mac ip"}),
+			"type":      "router",
+			"options":   newOvsMap(map[string]string{"foo": "bar"}),
+		},
 		UUIDName: "qlsportadd",
 	}, {
 		Op:    "mutate",
@@ -115,14 +156,16 @@ func TestCreateSwitchPort(t *testing.T) {
 		},
 		Where: newCondition("name", "==", "lswitch")}}
 	api.On("Transact", "OVN_Northbound", ops).Return(nil, errors.New("err")).Once()
-	err := odb.CreateSwitchPort("lswitch", "name", "mac", "ip")
+	err := odb.CreateSwitchPort("lswitch", port)
 	assert.EqualError(t, err,
 		"transaction error: creating switch port name on lswitch: err")
 
 	api.On("Transact", "OVN_Northbound", ops).Return(
 		[]ovs.OperationResult{{}, {}}, nil)
-	err = odb.CreateSwitchPort("lswitch", "name", "mac", "ip")
+	err = odb.CreateSwitchPort("lswitch", port)
 	assert.NoError(t, err)
+
+	api.AssertExpectations(t)
 }
 
 func TestDeleteSwitchPort(t *testing.T) {
@@ -151,6 +194,8 @@ func TestDeleteSwitchPort(t *testing.T) {
 		[]ovs.OperationResult{{}, {}}, nil)
 	err = odb.DeleteSwitchPort("lswitch", lport)
 	assert.NoError(t, err)
+
+	api.AssertExpectations(t)
 }
 
 func TestListACLs(t *testing.T) {
