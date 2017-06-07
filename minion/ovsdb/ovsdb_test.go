@@ -46,7 +46,7 @@ func TestCreateLogicalSwitch(t *testing.T) {
 	assert.EqualError(t, err, "transaction error: creating switch foo: err")
 }
 
-func TestLogicalPorts(t *testing.T) {
+func TestSwitchPorts(t *testing.T) {
 	t.Parallel()
 
 	anErr := errors.New("err")
@@ -54,15 +54,15 @@ func TestLogicalPorts(t *testing.T) {
 	odb := Client(client{api})
 
 	api.On("Transact", mock.Anything, mock.Anything).Return(nil, anErr).Once()
-	_, err := odb.ListLogicalPorts()
-	assert.EqualError(t, err, "transaction error: listing lports: err")
+	_, err := odb.ListSwitchPorts()
+	assert.EqualError(t, err, "transaction error: listing switch ports: err")
 
 	api.On("Transact", "OVN_Northbound", []ovs.Operation{{
 		Op:    "select",
 		Table: "Logical_Switch_Port",
 		Where: noCondition,
 	}}).Return([]ovs.OperationResult{{Rows: nil}}, nil).Once()
-	lports, err := odb.ListLogicalPorts()
+	lports, err := odb.ListSwitchPorts()
 	assert.Zero(t, lports)
 	assert.NoError(t, err)
 
@@ -77,13 +77,13 @@ func TestLogicalPorts(t *testing.T) {
 	}}).Return([]ovs.OperationResult{{
 		Rows: []map[string]interface{}{r}}}, nil).Once()
 
-	lports, err = odb.ListLogicalPorts()
+	lports, err = odb.ListSwitchPorts()
 	assert.Len(t, lports, 1)
 	assert.Equal(t, "name", lports[0].Name)
 	assert.NoError(t, err)
 }
 
-func TestCreateLogicalPort(t *testing.T) {
+func TestCreateSwitchPort(t *testing.T) {
 	t.Parallel()
 
 	api := new(mockTransact)
@@ -94,32 +94,32 @@ func TestCreateLogicalPort(t *testing.T) {
 		Op:       "insert",
 		Table:    "Logical_Switch_Port",
 		Row:      map[string]interface{}{"name": "name", "addresses": addrs},
-		UUIDName: "qlportadd",
+		UUIDName: "qlsportadd",
 	}, {
 		Op:    "mutate",
 		Table: "Logical_Switch",
 		Mutations: []interface{}{
-			newMutation("ports", "insert", ovs.UUID{GoUUID: "qlportadd"}),
+			newMutation("ports", "insert", ovs.UUID{GoUUID: "qlsportadd"}),
 		},
 		Where: newCondition("name", "==", "lswitch")}}
 	api.On("Transact", "OVN_Northbound", ops).Return(nil, errors.New("err")).Once()
-	err := odb.CreateLogicalPort("lswitch", "name", "mac", "ip")
+	err := odb.CreateSwitchPort("lswitch", "name", "mac", "ip")
 	assert.EqualError(t, err,
-		"transaction error: creating lport name on lswitch: err")
+		"transaction error: creating switch port name on lswitch: err")
 
 	api.On("Transact", "OVN_Northbound", ops).Return(
 		[]ovs.OperationResult{{}, {}}, nil)
-	err = odb.CreateLogicalPort("lswitch", "name", "mac", "ip")
+	err = odb.CreateSwitchPort("lswitch", "name", "mac", "ip")
 	assert.NoError(t, err)
 }
 
-func TestDeleteLogicalPort(t *testing.T) {
+func TestDeleteSwitchPort(t *testing.T) {
 	t.Parallel()
 
 	api := new(mockTransact)
 	odb := Client(client{api})
 
-	lport := LPort{Name: "name", uuid: ovs.UUID{GoUUID: "uuid"}}
+	lport := SwitchPort{Name: "name", uuid: ovs.UUID{GoUUID: "uuid"}}
 	ops := []ovs.Operation{{
 		Op:    "delete",
 		Table: "Logical_Switch_Port",
@@ -131,13 +131,13 @@ func TestDeleteLogicalPort(t *testing.T) {
 			ovs.UUID{GoUUID: "uuid"})},
 		Where: newCondition("name", "==", "lswitch")}}
 	api.On("Transact", "OVN_Northbound", ops).Return(nil, errors.New("err")).Once()
-	err := odb.DeleteLogicalPort("lswitch", lport)
+	err := odb.DeleteSwitchPort("lswitch", lport)
 	assert.EqualError(t, err,
-		"transaction error: deleting lport name on lswitch: err")
+		"transaction error: deleting switch port name on lswitch: err")
 
 	api.On("Transact", "OVN_Northbound", ops).Return(
 		[]ovs.OperationResult{{}, {}}, nil)
-	err = odb.DeleteLogicalPort("lswitch", lport)
+	err = odb.DeleteSwitchPort("lswitch", lport)
 	assert.NoError(t, err)
 }
 
@@ -345,9 +345,9 @@ func TestErrorCheck(t *testing.T) {
 	assert.NoError(t, errorCheck([]ovs.OperationResult{{}}, 1))
 }
 
-func TestLPortSlice(t *testing.T) {
+func TestSwitchPortSlice(t *testing.T) {
 	t.Parallel()
-	slice := LPortSlice([]LPort{{Name: "name"}})
+	slice := SwitchPortSlice([]SwitchPort{{Name: "name"}})
 	assert.Equal(t, slice[0], slice.Get(0))
 	assert.Equal(t, 1, slice.Len())
 }

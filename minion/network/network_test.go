@@ -49,35 +49,35 @@ func TestRunMaster(t *testing.T) {
 	client.On("Disconnect").Return(nil)
 	client.On("ListAddressSets").Return(nil, anErr)
 	client.On("ListACLs").Return(nil, anErr)
-	client.On("ListLogicalPorts").Return(nil, anErr).Once()
+	client.On("ListSwitchPorts").Return(nil, anErr).Once()
 
 	runMaster(conn)
 	client.AssertCalled(t, "Disconnect")
 	client.AssertCalled(t, "CreateLogicalSwitch", mock.Anything)
 
-	client.On("ListLogicalPorts").Return([]ovsdb.LPort{{Name: "1.2.3.5"}}, nil)
-	client.On("DeleteLogicalPort", lSwitch, ovsdb.LPort{
+	client.On("ListSwitchPorts").Return([]ovsdb.SwitchPort{{Name: "1.2.3.5"}}, nil)
+	client.On("DeleteSwitchPort", lSwitch, ovsdb.SwitchPort{
 		Name: "1.2.3.5", Addresses: nil}).Return(anErr).Once()
-	client.On("CreateLogicalPort", lSwitch, "1.2.3.4",
+	client.On("CreateSwitchPort", lSwitch, "1.2.3.4",
 		"02:00:01:02:03:04", "1.2.3.4").Return(anErr).Once()
 	runMaster(conn)
 	client.AssertCalled(t, "Disconnect")
-	client.AssertCalled(t, "ListLogicalPorts")
+	client.AssertCalled(t, "ListSwitchPorts")
 	client.AssertCalled(t, "CreateLogicalSwitch", mock.Anything)
-	client.AssertCalled(t, "DeleteLogicalPort", mock.Anything, mock.Anything)
-	client.AssertCalled(t, "CreateLogicalPort", mock.Anything, mock.Anything,
+	client.AssertCalled(t, "DeleteSwitchPort", mock.Anything, mock.Anything)
+	client.AssertCalled(t, "CreateSwitchPort", mock.Anything, mock.Anything,
 		mock.Anything, mock.Anything)
 
-	client.On("ListLogicalPorts").Return([]ovsdb.LPort{{Name: "1.2.3.5"}}, nil)
-	client.On("DeleteLogicalPort", lSwitch, ovsdb.LPort{
+	client.On("ListSwitchPorts").Return([]ovsdb.SwitchPort{{Name: "1.2.3.5"}}, nil)
+	client.On("DeleteSwitchPort", lSwitch, ovsdb.SwitchPort{
 		Name: "1.2.3.5", Addresses: []string(nil)}).Return(nil)
-	client.On("CreateLogicalPort", lSwitch, "1.2.3.4",
+	client.On("CreateSwitchPort", lSwitch, "1.2.3.4",
 		"02:00:01:02:03:04", "1.2.3.4").Return(nil).Once()
 	runMaster(conn)
 	client.AssertCalled(t, "Disconnect")
-	client.AssertCalled(t, "ListLogicalPorts")
+	client.AssertCalled(t, "ListSwitchPorts")
 	client.AssertCalled(t, "CreateLogicalSwitch", mock.Anything)
-	client.AssertCalled(t, "DeleteLogicalPort", mock.Anything, mock.Anything)
-	client.AssertCalled(t, "CreateLogicalPort", mock.Anything, mock.Anything,
+	client.AssertCalled(t, "DeleteSwitchPort", mock.Anything, mock.Anything)
+	client.AssertCalled(t, "CreateSwitchPort", mock.Anything, mock.Anything,
 		mock.Anything, mock.Anything)
 }

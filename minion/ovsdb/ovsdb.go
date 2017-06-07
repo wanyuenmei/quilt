@@ -19,9 +19,9 @@ type transact interface {
 // Client is a connection to the ovsdb-server database.
 type Client interface {
 	CreateLogicalSwitch(lswitch string) error
-	ListLogicalPorts() ([]LPort, error)
-	CreateLogicalPort(lswitch, name, mac, ip string) error
-	DeleteLogicalPort(lswitch string, lport LPort) error
+	ListSwitchPorts() ([]SwitchPort, error)
+	CreateSwitchPort(lswitch, name, mac, ip string) error
+	DeleteSwitchPort(lswitch string, lport SwitchPort) error
 	ListACLs() ([]ACL, error)
 	CreateACL(lswitch, direction string, priority int, match, action string) error
 	DeleteACL(lswitch string, ovsdbACL ACL) error
@@ -36,15 +36,15 @@ type client struct {
 	transact
 }
 
-// LPort is a logical port in OVN.
-type LPort struct {
+// SwitchPort is a logical switch port in OVN.
+type SwitchPort struct {
 	uuid      ovs.UUID
 	Name      string
 	Addresses []string
 }
 
-// LPortSlice is a wrapper around []LPort so it can be used in joins
-type LPortSlice []LPort
+// SwitchPortSlice is a wrapper around []SwitchPort so it can be used in joins
+type SwitchPortSlice []SwitchPort
 
 // Interface is a linux device attached to OVS.
 type Interface struct {
@@ -119,20 +119,20 @@ func (ovsdb client) CreateLogicalSwitch(lswitch string) error {
 	return errorCheck(results, 1)
 }
 
-// ListLogicalPorts lists the logical ports in OVN.
-func (ovsdb client) ListLogicalPorts() ([]LPort, error) {
+// ListSwitchPorts lists the logical ports in OVN.
+func (ovsdb client) ListSwitchPorts() ([]SwitchPort, error) {
 	portReply, err := ovsdb.Transact("OVN_Northbound", ovs.Operation{
 		Op:    "select",
 		Table: "Logical_Switch_Port",
 		Where: noCondition,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("transaction error: listing lports: %s", err)
+		return nil, fmt.Errorf("transaction error: listing switch ports: %s", err)
 	}
 
-	var result []LPort
+	var result []SwitchPort
 	for _, row := range portReply[0].Rows {
-		result = append(result, LPort{
+		result = append(result, SwitchPort{
 			uuid:      ovsUUIDFromRow(row),
 			Name:      row["name"].(string),
 			Addresses: ovsStringSetToSlice(row["addresses"]),
@@ -141,8 +141,8 @@ func (ovsdb client) ListLogicalPorts() ([]LPort, error) {
 	return result, nil
 }
 
-// CreateLogicalPort creates a new logical port in OVN.
-func (ovsdb client) CreateLogicalPort(lswitch, name, mac, ip string) error {
+// CreateSwitchPort creates a new logical port in OVN.
+func (ovsdb client) CreateSwitchPort(lswitch, name, mac, ip string) error {
 	addrs := newOvsSet([]string{fmt.Sprintf("%s %s", mac, ip)})
 
 	port := map[string]interface{}{"name": name, "addresses": addrs}
@@ -151,29 +151,29 @@ func (ovsdb client) CreateLogicalPort(lswitch, name, mac, ip string) error {
 		Op:       "insert",
 		Table:    "Logical_Switch_Port",
 		Row:      port,
-		UUIDName: "qlportadd",
+		UUIDName: "qlsportadd",
 	}
 
 	mutateOp := ovs.Operation{
 		Op:    "mutate",
 		Table: "Logical_Switch",
 		Mutations: []interface{}{
-			newMutation("ports", "insert", ovs.UUID{GoUUID: "qlportadd"}),
+			newMutation("ports", "insert", ovs.UUID{GoUUID: "qlsportadd"}),
 		},
 		Where: newCondition("name", "==", lswitch),
 	}
 
 	results, err := ovsdb.Transact("OVN_Northbound", insertOp, mutateOp)
 	if err != nil {
-		return fmt.Errorf("transaction error: creating lport %s on %s: %s",
+		return fmt.Errorf("transaction error: creating switch port %s on %s: %s",
 			name, lswitch, err)
 	}
 
 	return errorCheck(results, 2)
 }
 
-// DeleteLogicalPort removes a logical port from OVN.
-func (ovsdb client) DeleteLogicalPort(lswitch string, lport LPort) error {
+// DeleteSwitchPort removes a logical port from OVN.
+func (ovsdb client) DeleteSwitchPort(lswitch string, lport SwitchPort) error {
 	deleteOp := ovs.Operation{
 		Op:    "delete",
 		Table: "Logical_Switch_Port",
@@ -189,7 +189,7 @@ func (ovsdb client) DeleteLogicalPort(lswitch string, lport LPort) error {
 
 	results, err := ovsdb.Transact("OVN_Northbound", deleteOp, mutateOp)
 	if err != nil {
-		return fmt.Errorf("transaction error: deleting lport %s on %s: %s",
+		return fmt.Errorf("transaction error: deleting switch port %s on %s: %s",
 			lport.Name, lswitch, err)
 	}
 	return errorCheck(results, 2)
@@ -442,12 +442,12 @@ func errorCheck(results []ovs.OperationResult, expectedResponses int) error {
 }
 
 // Get gets the element at the ith index
-func (lps LPortSlice) Get(i int) interface{} {
+func (lps SwitchPortSlice) Get(i int) interface{} {
 	return lps[i]
 }
 
 // Len returns the length of the slice
-func (lps LPortSlice) Len() int {
+func (lps SwitchPortSlice) Len() int {
 	return len(lps)
 }
 
