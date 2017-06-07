@@ -19,6 +19,7 @@ type transact interface {
 // Client is a connection to the ovsdb-server database.
 type Client interface {
 	CreateLogicalSwitch(lswitch string) error
+	LogicalSwitchExists(lswitch string) (bool, error)
 	ListSwitchPorts() ([]SwitchPort, error)
 	CreateSwitchPort(lswitch, name, mac, ip string) error
 	DeleteSwitchPort(lswitch string, lport SwitchPort) error
@@ -97,18 +98,6 @@ var Open = func() (Client, error) {
 
 // CreateLogicalSwitch creates a new logical switch in OVN.
 func (ovsdb client) CreateLogicalSwitch(lswitch string) error {
-	check, err := ovsdb.Transact("OVN_Northbound", ovs.Operation{
-		Op:    "select",
-		Table: "Logical_Switch",
-		Where: newCondition("name", "==", lswitch),
-	})
-	if err != nil {
-		return fmt.Errorf("transaction error: listing logical switches: %s", err)
-	}
-	if len(check[0].Rows) > 0 {
-		return fmt.Errorf("logical switch %s already exists", lswitch)
-	}
-
 	insertOp := ovs.Operation{
 		Op:    "insert",
 		Table: "Logical_Switch",
@@ -121,6 +110,19 @@ func (ovsdb client) CreateLogicalSwitch(lswitch string) error {
 			lswitch, err)
 	}
 	return errorCheck(results, 1)
+}
+
+func (ovsdb client) LogicalSwitchExists(lswitch string) (bool, error) {
+	matches, err := ovsdb.Transact("OVN_Northbound", ovs.Operation{
+		Op:    "select",
+		Table: "Logical_Switch",
+		Where: newCondition("name", "==", lswitch),
+	})
+	if err != nil {
+		return false, fmt.Errorf(
+			"transaction error: listing logical switch: %s", err)
+	}
+	return len(matches) > 0 && len(matches[0].Rows) > 0, nil
 }
 
 // ListSwitchPorts lists the logical ports in OVN.

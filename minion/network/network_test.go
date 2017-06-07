@@ -45,7 +45,7 @@ func TestRunMaster(t *testing.T) {
 		return client, nil
 	}
 
-	client.On("CreateLogicalSwitch", lSwitch).Return(nil)
+	client.On("LogicalSwitchExists", lSwitch).Return(true, nil).Once()
 	client.On("Disconnect").Return(nil)
 	client.On("ListAddressSets").Return(nil, anErr)
 	client.On("ListACLs").Return(nil, anErr)
@@ -53,8 +53,8 @@ func TestRunMaster(t *testing.T) {
 
 	runMaster(conn)
 	client.AssertCalled(t, "Disconnect")
-	client.AssertCalled(t, "CreateLogicalSwitch", mock.Anything)
 
+	client.On("LogicalSwitchExists", lSwitch).Return(true, nil).Once()
 	client.On("ListSwitchPorts").Return([]ovsdb.SwitchPort{{Name: "1.2.3.5"}}, nil)
 	client.On("DeleteSwitchPort", lSwitch, ovsdb.SwitchPort{
 		Name: "1.2.3.5", Addresses: nil}).Return(anErr).Once()
@@ -63,11 +63,11 @@ func TestRunMaster(t *testing.T) {
 	runMaster(conn)
 	client.AssertCalled(t, "Disconnect")
 	client.AssertCalled(t, "ListSwitchPorts")
-	client.AssertCalled(t, "CreateLogicalSwitch", mock.Anything)
 	client.AssertCalled(t, "DeleteSwitchPort", mock.Anything, mock.Anything)
 	client.AssertCalled(t, "CreateSwitchPort", mock.Anything, mock.Anything,
 		mock.Anything, mock.Anything)
 
+	client.On("LogicalSwitchExists", lSwitch).Return(true, nil).Once()
 	client.On("ListSwitchPorts").Return([]ovsdb.SwitchPort{{Name: "1.2.3.5"}}, nil)
 	client.On("DeleteSwitchPort", lSwitch, ovsdb.SwitchPort{
 		Name: "1.2.3.5", Addresses: []string(nil)}).Return(nil)
@@ -76,8 +76,28 @@ func TestRunMaster(t *testing.T) {
 	runMaster(conn)
 	client.AssertCalled(t, "Disconnect")
 	client.AssertCalled(t, "ListSwitchPorts")
-	client.AssertCalled(t, "CreateLogicalSwitch", mock.Anything)
 	client.AssertCalled(t, "DeleteSwitchPort", mock.Anything, mock.Anything)
 	client.AssertCalled(t, "CreateSwitchPort", mock.Anything, mock.Anything,
 		mock.Anything, mock.Anything)
+
+	conn.Txn(db.AllTables...).Run(func(view db.Database) error {
+		for _, l := range view.SelectFromLabel(nil) {
+			view.Remove(l)
+		}
+
+		for _, c := range view.SelectFromContainer(nil) {
+			view.Remove(c)
+		}
+
+		return nil
+	})
+
+	client.On("LogicalSwitchExists", lSwitch).Return(true, nil).Once()
+	runMaster(db.New())
+	client.AssertNotCalled(t, "CreateLogicalSwitch", mock.Anything)
+
+	client.On("CreateLogicalSwitch", lSwitch).Return(nil)
+	client.On("LogicalSwitchExists", lSwitch).Return(false, nil).Once()
+	runMaster(conn)
+	client.AssertCalled(t, "CreateLogicalSwitch", lSwitch)
 }

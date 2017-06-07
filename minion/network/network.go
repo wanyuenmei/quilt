@@ -60,7 +60,19 @@ func runMaster(conn db.Conn) {
 	}
 	defer ovsdbClient.Disconnect()
 
-	ovsdbClient.CreateLogicalSwitch(lSwitch)
+	switchExists, err := ovsdbClient.LogicalSwitchExists(lSwitch)
+	if err != nil {
+		log.WithError(err).Error("Failed to check existence of logical switch")
+		return
+	}
+
+	if !switchExists {
+		if err := ovsdbClient.CreateLogicalSwitch(lSwitch); err != nil {
+			log.WithError(err).Error("Failed to create logical switch")
+			return
+		}
+	}
+
 	lports, err := ovsdbClient.ListSwitchPorts()
 	if err != nil {
 		log.WithError(err).Error("Failed to list OVN switch ports.")

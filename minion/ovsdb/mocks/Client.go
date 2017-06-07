@@ -180,6 +180,27 @@ func (_m *Client) ListSwitchPorts() ([]ovsdb.SwitchPort, error) {
 	return r0, r1
 }
 
+// LogicalSwitchExists provides a mock function with given fields: lswitch
+func (_m *Client) LogicalSwitchExists(lswitch string) (bool, error) {
+	ret := _m.Called(lswitch)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(string) bool); ok {
+		r0 = rf(lswitch)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(lswitch)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // OpenFlowPorts provides a mock function with given fields:
 func (_m *Client) OpenFlowPorts() (map[string]int, error) {
 	ret := _m.Called()

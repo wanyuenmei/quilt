@@ -17,22 +17,6 @@ func TestCreateLogicalSwitch(t *testing.T) {
 	api := new(mockTransact)
 	odb := Client(client{api})
 
-	selectOp := []ovs.Operation{{
-		Op:    "select",
-		Table: "Logical_Switch",
-		Where: newCondition("name", "==", "foo")}}
-	api.On("Transact", "OVN_Northbound", selectOp).Return(nil, anErr).Once()
-	assert.EqualError(t, odb.CreateLogicalSwitch("foo"),
-		"transaction error: listing logical switches: err")
-
-	api.On("Transact", "OVN_Northbound", selectOp).Return([]ovs.OperationResult{{
-		Rows: []map[string]interface{}{nil}}}, nil).Once()
-	assert.EqualError(t, odb.CreateLogicalSwitch("foo"),
-		"logical switch foo already exists")
-
-	api.On("Transact", "OVN_Northbound", selectOp).Return(
-		[]ovs.OperationResult{{}}, nil)
-
 	op := []ovs.Operation{{
 		Op:    "insert",
 		Table: "Logical_Switch",
@@ -44,6 +28,34 @@ func TestCreateLogicalSwitch(t *testing.T) {
 	api.On("Transact", mock.Anything, mock.Anything).Return(nil, anErr)
 	err := odb.CreateLogicalSwitch("foo")
 	assert.EqualError(t, err, "transaction error: creating switch foo: err")
+}
+
+func TestLogicalSwitchExists(t *testing.T) {
+	t.Parallel()
+
+	anErr := errors.New("err")
+	api := new(mockTransact)
+	odb := Client(client{api})
+
+	selectOp := []ovs.Operation{{
+		Op:    "select",
+		Table: "Logical_Switch",
+		Where: newCondition("name", "==", "foo")}}
+	api.On("Transact", "OVN_Northbound", selectOp).Return(nil, anErr).Once()
+	_, err := odb.LogicalSwitchExists("foo")
+	assert.EqualError(t, err,
+		"transaction error: listing logical switch: err")
+
+	api.On("Transact", "OVN_Northbound", selectOp).Return([]ovs.OperationResult{{
+		Rows: []map[string]interface{}{nil}}}, nil).Once()
+	exists, err := odb.LogicalSwitchExists("foo")
+	assert.NoError(t, err)
+	assert.True(t, exists)
+
+	api.On("Transact", "OVN_Northbound", selectOp).Return(nil, nil).Once()
+	exists, err = odb.LogicalSwitchExists("foo")
+	assert.NoError(t, err)
+	assert.False(t, exists)
 }
 
 func TestSwitchPorts(t *testing.T) {
