@@ -26,6 +26,12 @@ type Client interface {
 	DeleteSwitchPort(lswitch string, lport SwitchPort) error
 	UpdateSwitchPortAddresses(name string, addresses []string) error
 
+	CreateLogicalRouter(lrouter string) error
+	LogicalRouterExists(lrouter string) (bool, error)
+	ListRouterPorts() ([]RouterPort, error)
+	CreateRouterPort(lrouter string, lport RouterPort) error
+	DeleteRouterPort(lrouter string, lport RouterPort) error
+
 	ListACLs() ([]ACL, error)
 	CreateACL(lswitch, direction string, priority int, match, action string) error
 	DeleteACL(lswitch string, ovsdbACL ACL) error
@@ -54,6 +60,17 @@ type SwitchPort struct {
 
 // SwitchPortSlice is a wrapper around []SwitchPort so it can be used in joins
 type SwitchPortSlice []SwitchPort
+
+// RouterPort is a logical router port in OVN.
+type RouterPort struct {
+	uuid     ovs.UUID
+	Name     string
+	MAC      string
+	Networks []string
+}
+
+// RouterPortSlice is a wrapper around []RouterPort so it can be used in joins
+type RouterPortSlice []RouterPort
 
 // Interface is a linux device attached to OVS.
 type Interface struct {
@@ -260,6 +277,117 @@ func (ovsdb client) DeleteSwitchPort(lswitch string, lport SwitchPort) error {
 	if err != nil {
 		return fmt.Errorf("transaction error: deleting switch port %s on %s: %s",
 			lport.Name, lswitch, err)
+	}
+	return errorCheck(results, 2)
+}
+
+func (ovsdb client) LogicalRouterExists(lrouter string) (bool, error) {
+	matches, err := ovsdb.Transact("OVN_Northbound", ovs.Operation{
+		Op:    "select",
+		Table: "Logical_Router",
+		Where: newCondition("name", "==", lrouter),
+	})
+	if err != nil {
+		return false, fmt.Errorf(
+			"transaction error: listing logical router: %s", err)
+	}
+	return len(matches) > 0 && len(matches[0].Rows) > 0, nil
+}
+
+// CreateLogicalRouter creates a new logical switch in OVN.
+func (ovsdb client) CreateLogicalRouter(lrouter string) error {
+	insertOp := ovs.Operation{
+		Op:    "insert",
+		Table: "Logical_Router",
+		Row:   map[string]interface{}{"name": lrouter},
+	}
+
+	results, err := ovsdb.Transact("OVN_Northbound", insertOp)
+	if err != nil {
+		return fmt.Errorf("transaction error: creating router %s: %s",
+			lrouter, err)
+	}
+	return errorCheck(results, 1)
+}
+
+// ListRouterPorts lists the logical router ports in OVN.
+func (ovsdb client) ListRouterPorts() ([]RouterPort, error) {
+	portReply, err := ovsdb.Transact("OVN_Northbound", ovs.Operation{
+		Op:    "select",
+		Table: "Logical_Router_Port",
+		Where: noCondition,
+	})
+	if err != nil {
+		return nil, fmt.Errorf(
+			"transaction error: listing logical router ports: %s", err)
+	}
+
+	var result []RouterPort
+	for _, row := range portReply[0].Rows {
+		result = append(result, RouterPort{
+			uuid:     ovsUUIDFromRow(row),
+			Name:     row["name"].(string),
+			Networks: ovsStringSetToSlice(row["networks"]),
+			MAC:      row["mac"].(string),
+		})
+	}
+	return result, nil
+}
+
+// CreateRouterPort creates a new logical port in OVN.
+func (ovsdb client) CreateRouterPort(lrouter string, port RouterPort) error {
+	ovsPort := map[string]interface{}{
+		"name":     port.Name,
+		"networks": newOvsSet(port.Networks),
+		"mac":      port.MAC,
+	}
+
+	insertOp := ovs.Operation{
+		Op:       "insert",
+		Table:    "Logical_Router_Port",
+		Row:      ovsPort,
+		UUIDName: "qlrportadd",
+	}
+
+	mutateOp := ovs.Operation{
+		Op:    "mutate",
+		Table: "Logical_Router",
+		Mutations: []interface{}{
+			newMutation("ports", "insert", ovs.UUID{GoUUID: "qlrportadd"}),
+		},
+		Where: newCondition("name", "==", lrouter),
+	}
+
+	results, err := ovsdb.Transact("OVN_Northbound", insertOp, mutateOp)
+	if err != nil {
+		return fmt.Errorf(
+			"transaction error: creating logical router port %s on %s: %s",
+			port.Name, lrouter, err)
+	}
+
+	return errorCheck(results, 2)
+}
+
+// DeleteRouterPort removes a logical port from OVN.
+func (ovsdb client) DeleteRouterPort(lrouter string, lport RouterPort) error {
+	deleteOp := ovs.Operation{
+		Op:    "delete",
+		Table: "Logical_Router_Port",
+		Where: newCondition("_uuid", "==", lport.uuid),
+	}
+
+	mutateOp := ovs.Operation{
+		Op:        "mutate",
+		Table:     "Logical_Router",
+		Mutations: []interface{}{newMutation("ports", "delete", lport.uuid)},
+		Where:     newCondition("name", "==", lrouter),
+	}
+
+	results, err := ovsdb.Transact("OVN_Northbound", deleteOp, mutateOp)
+	if err != nil {
+		return fmt.Errorf(
+			"transaction error: deleting logical router port %s on %s: %s",
+			lport.Name, lrouter, err)
 	}
 	return errorCheck(results, 2)
 }
@@ -546,6 +674,16 @@ func (lps SwitchPortSlice) Get(i int) interface{} {
 
 // Len returns the length of the slice
 func (lps SwitchPortSlice) Len() int {
+	return len(lps)
+}
+
+// Get gets the element at the ith index
+func (lps RouterPortSlice) Get(i int) interface{} {
+	return lps[i]
+}
+
+// Len returns the length of the slice
+func (lps RouterPortSlice) Len() int {
 	return len(lps)
 }
 

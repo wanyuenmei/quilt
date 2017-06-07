@@ -36,6 +36,20 @@ func (_m *Client) CreateAddressSet(name string, addresses []string) error {
 	return r0
 }
 
+// CreateLogicalRouter provides a mock function with given fields: lrouter
+func (_m *Client) CreateLogicalRouter(lrouter string) error {
+	ret := _m.Called(lrouter)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(lrouter)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // CreateLogicalSwitch provides a mock function with given fields: lswitch
 func (_m *Client) CreateLogicalSwitch(lswitch string) error {
 	ret := _m.Called(lswitch)
@@ -43,6 +57,20 @@ func (_m *Client) CreateLogicalSwitch(lswitch string) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(string) error); ok {
 		r0 = rf(lswitch)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// CreateRouterPort provides a mock function with given fields: lrouter, lport
+func (_m *Client) CreateRouterPort(lrouter string, lport ovsdb.RouterPort) error {
+	ret := _m.Called(lrouter, lport)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, ovsdb.RouterPort) error); ok {
+		r0 = rf(lrouter, lport)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -85,6 +113,20 @@ func (_m *Client) DeleteAddressSet(name string) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(string) error); ok {
 		r0 = rf(name)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// DeleteRouterPort provides a mock function with given fields: lrouter, lport
+func (_m *Client) DeleteRouterPort(lrouter string, lport ovsdb.RouterPort) error {
+	ret := _m.Called(lrouter, lport)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, ovsdb.RouterPort) error); ok {
+		r0 = rf(lrouter, lport)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -157,6 +199,29 @@ func (_m *Client) ListAddressSets() ([]ovsdb.AddressSet, error) {
 	return r0, r1
 }
 
+// ListRouterPorts provides a mock function with given fields:
+func (_m *Client) ListRouterPorts() ([]ovsdb.RouterPort, error) {
+	ret := _m.Called()
+
+	var r0 []ovsdb.RouterPort
+	if rf, ok := ret.Get(0).(func() []ovsdb.RouterPort); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]ovsdb.RouterPort)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ListSwitchPort provides a mock function with given fields: name
 func (_m *Client) ListSwitchPort(name string) (ovsdb.SwitchPort, error) {
 	ret := _m.Called(name)
@@ -194,6 +259,27 @@ func (_m *Client) ListSwitchPorts() ([]ovsdb.SwitchPort, error) {
 	var r1 error
 	if rf, ok := ret.Get(1).(func() error); ok {
 		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// LogicalRouterExists provides a mock function with given fields: lrouter
+func (_m *Client) LogicalRouterExists(lrouter string) (bool, error) {
+	ret := _m.Called(lrouter)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(string) bool); ok {
+		r0 = rf(lrouter)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(lrouter)
 	} else {
 		r1 = ret.Error(1)
 	}

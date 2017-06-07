@@ -262,6 +262,169 @@ func TestUpdateSwitchPortAddresses(t *testing.T) {
 	api.AssertExpectations(t)
 }
 
+func TestCreateLogicalRouter(t *testing.T) {
+	t.Parallel()
+
+	anErr := errors.New("err")
+	api := new(mockTransact)
+	odb := Client(client{api})
+
+	op := []ovs.Operation{{
+		Op:    "insert",
+		Table: "Logical_Router",
+		Row:   map[string]interface{}{"name": "foo"}}}
+	result := []ovs.OperationResult{{}}
+	api.On("Transact", "OVN_Northbound", op).Return(result, nil).Once()
+	assert.NoError(t, odb.CreateLogicalRouter("foo"))
+
+	api.On("Transact", mock.Anything, mock.Anything).Return(nil, anErr)
+	err := odb.CreateLogicalRouter("foo")
+	assert.EqualError(t, err, "transaction error: creating router foo: err")
+}
+
+func TestLogicalRouterExists(t *testing.T) {
+	t.Parallel()
+
+	anErr := errors.New("err")
+	api := new(mockTransact)
+	odb := Client(client{api})
+
+	selectOp := []ovs.Operation{{
+		Op:    "select",
+		Table: "Logical_Router",
+		Where: newCondition("name", "==", "foo")}}
+	api.On("Transact", "OVN_Northbound", selectOp).Return(nil, anErr).Once()
+	_, err := odb.LogicalRouterExists("foo")
+	assert.EqualError(t, err,
+		"transaction error: listing logical router: err")
+
+	api.On("Transact", "OVN_Northbound", selectOp).Return([]ovs.OperationResult{{
+		Rows: []map[string]interface{}{nil}}}, nil).Once()
+	exists, err := odb.LogicalRouterExists("foo")
+	assert.NoError(t, err)
+	assert.True(t, exists)
+
+	api.On("Transact", "OVN_Northbound", selectOp).Return(nil, nil).Once()
+	exists, err = odb.LogicalRouterExists("foo")
+	assert.NoError(t, err)
+	assert.False(t, exists)
+}
+
+func TestListRouterPorts(t *testing.T) {
+	t.Parallel()
+
+	anErr := errors.New("err")
+	api := new(mockTransact)
+	odb := Client(client{api})
+
+	api.On("Transact", mock.Anything, mock.Anything).Return(nil, anErr).Once()
+	_, err := odb.ListRouterPorts()
+	assert.EqualError(t, err, "transaction error: listing logical router ports: err")
+
+	api.On("Transact", "OVN_Northbound", []ovs.Operation{{
+		Op:    "select",
+		Table: "Logical_Router_Port",
+		Where: noCondition,
+	}}).Return([]ovs.OperationResult{{Rows: nil}}, nil).Once()
+	lports, err := odb.ListRouterPorts()
+	assert.Zero(t, lports)
+	assert.NoError(t, err)
+
+	r := map[string]interface{}{
+		"_uuid":    []interface{}{"a", "b"},
+		"name":     "name",
+		"mac":      "mac",
+		"networks": "0.0.0.0/0",
+	}
+	api.On("Transact", "OVN_Northbound", []ovs.Operation{{
+		Op:    "select",
+		Table: "Logical_Router_Port",
+		Where: noCondition,
+	}}).Return([]ovs.OperationResult{{
+		Rows: []map[string]interface{}{r}}}, nil).Once()
+
+	lports, err = odb.ListRouterPorts()
+	assert.NoError(t, err)
+	assert.Equal(t, []RouterPort{
+		{
+			uuid:     ovs.UUID{GoUUID: "b"},
+			Name:     "name",
+			MAC:      "mac",
+			Networks: []string{"0.0.0.0/0"},
+		},
+	}, lports)
+}
+
+func TestCreateRouterPort(t *testing.T) {
+	t.Parallel()
+
+	api := new(mockTransact)
+	odb := Client(client{api})
+
+	port := RouterPort{
+		Name:     "name",
+		MAC:      "mac",
+		Networks: []string{"network"},
+	}
+	ops := []ovs.Operation{{
+		Op:    "insert",
+		Table: "Logical_Router_Port",
+		Row: map[string]interface{}{
+			"name":     "name",
+			"networks": newOvsSet([]string{"network"}),
+			"mac":      "mac",
+		},
+		UUIDName: "qlrportadd",
+	}, {
+		Op:    "mutate",
+		Table: "Logical_Router",
+		Mutations: []interface{}{
+			newMutation("ports", "insert", ovs.UUID{GoUUID: "qlrportadd"}),
+		},
+		Where: newCondition("name", "==", "lrouter")}}
+	api.On("Transact", "OVN_Northbound", ops).Return(nil, errors.New("err")).Once()
+	err := odb.CreateRouterPort("lrouter", port)
+	assert.EqualError(t, err,
+		"transaction error: creating logical router port name on lrouter: err")
+
+	api.On("Transact", "OVN_Northbound", ops).Return(
+		[]ovs.OperationResult{{}, {}}, nil)
+	err = odb.CreateRouterPort("lrouter", port)
+	assert.NoError(t, err)
+
+	api.AssertExpectations(t)
+}
+
+func TestDeleteRouterPort(t *testing.T) {
+	t.Parallel()
+
+	api := new(mockTransact)
+	odb := Client(client{api})
+
+	lport := RouterPort{Name: "name", uuid: ovs.UUID{GoUUID: "uuid"}}
+	ops := []ovs.Operation{{
+		Op:    "delete",
+		Table: "Logical_Router_Port",
+		Where: newCondition("_uuid", "==", ovs.UUID{GoUUID: "uuid"}),
+	}, {
+		Op:    "mutate",
+		Table: "Logical_Router",
+		Mutations: []interface{}{newMutation("ports", "delete",
+			ovs.UUID{GoUUID: "uuid"})},
+		Where: newCondition("name", "==", "lrouter")}}
+	api.On("Transact", "OVN_Northbound", ops).Return(nil, errors.New("err")).Once()
+	err := odb.DeleteRouterPort("lrouter", lport)
+	assert.EqualError(t, err,
+		"transaction error: deleting logical router port name on lrouter: err")
+
+	api.On("Transact", "OVN_Northbound", ops).Return(
+		[]ovs.OperationResult{{}, {}}, nil)
+	err = odb.DeleteRouterPort("lrouter", lport)
+	assert.NoError(t, err)
+
+	api.AssertExpectations(t)
+}
+
 func TestListACLs(t *testing.T) {
 	t.Parallel()
 
