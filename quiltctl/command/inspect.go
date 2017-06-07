@@ -21,6 +21,16 @@ func (iCmd *Inspect) Parse(args []string) error {
 	return nil
 }
 
+// BeforeRun makes any necessary post-parsing transformations.
+func (iCmd *Inspect) BeforeRun() error {
+	return nil
+}
+
+// AfterRun performs any necessary post-run cleanup.
+func (iCmd *Inspect) AfterRun() error {
+	return nil
+}
+
 // Run inspects the provided Stitch.
 func (iCmd *Inspect) Run() int {
 	return inspect.Main(iCmd.args)

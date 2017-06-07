@@ -30,7 +30,21 @@ func Run(cmdName string, args []string) {
 		os.Exit(1)
 	}
 
-	os.Exit(cmd.Run())
+	if err := cmd.BeforeRun(); err != nil {
+		log.Error(err)
+		os.Exit(1)
+	}
+
+	exitCode := cmd.Run()
+	if err := cmd.AfterRun(); err != nil {
+		log.Error(err)
+		// The exit code returned by `Run` has precedence if both `Run` and
+		// `AfterRun` error.
+		if exitCode == 0 {
+			exitCode = 1
+		}
+	}
+	os.Exit(exitCode)
 }
 
 // HasSubcommand returns true if quiltctl has a subcommand for the given name.

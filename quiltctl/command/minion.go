@@ -47,6 +47,16 @@ func (mCmd *Minion) Parse(args []string) error {
 	return nil
 }
 
+// BeforeRun makes any necessary post-parsing transformations.
+func (mCmd *Minion) BeforeRun() error {
+	return nil
+}
+
+// AfterRun performs any necessary post-run cleanup.
+func (mCmd *Minion) AfterRun() error {
+	return nil
+}
+
 // Run starts the minion.
 func (mCmd *Minion) Run() int {
 	log.WithField("version", version.Version).Info("Starting Quilt minion")

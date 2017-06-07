@@ -13,3 +13,11 @@ type commonFlags struct {
 func (cf *commonFlags) InstallFlags(flags *flag.FlagSet) {
 	flags.StringVar(&cf.host, "H", api.DefaultSocket, "the host to connect to")
 }
+
+func (cf *commonFlags) BeforeRun() error {
+	return nil
+}
+
+func (cf *commonFlags) AfterRun() error {
+	return nil
+}
