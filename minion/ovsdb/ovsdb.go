@@ -22,13 +22,17 @@ type Client interface {
 	ListSwitchPorts() ([]SwitchPort, error)
 	CreateSwitchPort(lswitch, name, mac, ip string) error
 	DeleteSwitchPort(lswitch string, lport SwitchPort) error
+
 	ListACLs() ([]ACL, error)
 	CreateACL(lswitch, direction string, priority int, match, action string) error
 	DeleteACL(lswitch string, ovsdbACL ACL) error
+
 	ListAddressSets() ([]AddressSet, error)
 	CreateAddressSet(name string, addresses []string) error
 	DeleteAddressSet(name string) error
+
 	OpenFlowPorts() (map[string]int, error)
+
 	Disconnect()
 }
 
