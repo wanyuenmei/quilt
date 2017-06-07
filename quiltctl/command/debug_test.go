@@ -136,9 +136,8 @@ func TestDebug(t *testing.T) {
 		// Check that all logs are fetched.
 		{
 			cmd: Debug{
-				tar:         false,
-				all:         true,
-				commonFlags: &commonFlags{},
+				tar: false,
+				all: true,
 			},
 			machines: []db.Machine{
 				{
@@ -169,10 +168,9 @@ func TestDebug(t *testing.T) {
 		// Check that all logs are fetched with -machines and -containers.
 		{
 			cmd: Debug{
-				tar:         false,
-				machines:    true,
-				containers:  true,
-				commonFlags: &commonFlags{},
+				tar:        false,
+				machines:   true,
+				containers: true,
 			},
 			machines: []db.Machine{
 				{
@@ -196,9 +194,8 @@ func TestDebug(t *testing.T) {
 		// Check that just container logs are fetched.
 		{
 			cmd: Debug{
-				tar:         false,
-				containers:  true,
-				commonFlags: &commonFlags{},
+				tar:        false,
+				containers: true,
 			},
 			machines: []db.Machine{
 				{
@@ -221,9 +218,8 @@ func TestDebug(t *testing.T) {
 		// Check that just machine logs are fetched.
 		{
 			cmd: Debug{
-				tar:         false,
-				machines:    true,
-				commonFlags: &commonFlags{},
+				tar:      false,
+				machines: true,
 			},
 			machines: []db.Machine{
 				{
@@ -252,9 +248,8 @@ func TestDebug(t *testing.T) {
 		// Check that we can get logs by specific stitch ids
 		{
 			cmd: Debug{
-				tar:         false,
-				ids:         []string{"2", "4", "5"},
-				commonFlags: &commonFlags{},
+				tar: false,
+				ids: []string{"2", "4", "5"},
 			},
 			machines: []db.Machine{
 				{
@@ -280,9 +275,8 @@ func TestDebug(t *testing.T) {
 		// Check that we can get logs by specific stitch ids in arbitrary order
 		{
 			cmd: Debug{
-				tar:         false,
-				ids:         []string{"4", "2", "1"},
-				commonFlags: &commonFlags{},
+				tar: false,
+				ids: []string{"4", "2", "1"},
 			},
 			machines: []db.Machine{
 				{
@@ -308,9 +302,8 @@ func TestDebug(t *testing.T) {
 		// Check that we error on arbitrary stitch IDs.
 		{
 			cmd: Debug{
-				tar:         false,
-				ids:         []string{"4", "2"},
-				commonFlags: &commonFlags{},
+				tar: false,
+				ids: []string{"4", "2"},
 			},
 			machines: []db.Machine{
 				{
@@ -332,9 +325,8 @@ func TestDebug(t *testing.T) {
 		// Check that we error on non-existent stitch IDs.
 		{
 			cmd: Debug{
-				tar:         false,
-				ids:         []string{"6"},
-				commonFlags: &commonFlags{},
+				tar: false,
+				ids: []string{"6"},
 			},
 			machines: []db.Machine{
 				{
@@ -356,9 +348,8 @@ func TestDebug(t *testing.T) {
 		// Check that containers without a minion aren't reported.
 		{
 			cmd: Debug{
-				tar:         false,
-				containers:  true,
-				commonFlags: &commonFlags{},
+				tar:        false,
+				containers: true,
 			},
 			machines: []db.Machine{
 				{
@@ -384,9 +375,8 @@ func TestDebug(t *testing.T) {
 		// Check that machines without an IP aren't reported.
 		{
 			cmd: Debug{
-				tar:         false,
-				machines:    true,
-				commonFlags: &commonFlags{},
+				tar:      false,
+				machines: true,
 			},
 			machines: []db.Machine{
 				{
@@ -413,10 +403,9 @@ func TestDebug(t *testing.T) {
 		// Check that a supplied path is respected.
 		{
 			cmd: Debug{
-				tar:         false,
-				all:         true,
-				outPath:     "tmp_folder",
-				commonFlags: &commonFlags{},
+				tar:     false,
+				all:     true,
+				outPath: "tmp_folder",
 			},
 			machines: []db.Machine{
 				{
@@ -463,6 +452,9 @@ func TestDebug(t *testing.T) {
 		mockClientGetter := new(mocks.Getter)
 		mockClientGetter.On("Client", mock.Anything).Return(mockLocalClient, nil)
 		testCmd.clientGetter = mockClientGetter
+		testCmd.connectionHelper = &connectionHelper{
+			client: mockLocalClient,
+		}
 
 		assert.Equal(t, test.expReturn, testCmd.Run())
 		rootDir := debugFolder

@@ -29,20 +29,20 @@ type Ps struct {
 	noTruncate   bool
 	clientGetter client.Getter
 
-	*commonFlags
+	*connectionHelper
 }
 
 // NewPsCommand creates a new Ps command instance.
 func NewPsCommand() *Ps {
 	return &Ps{
-		commonFlags:  &commonFlags{},
-		clientGetter: getter.New(),
+		connectionHelper: &connectionHelper{},
+		clientGetter:     getter.New(),
 	}
 }
 
 // InstallFlags sets up parsing for command line flags
 func (pCmd *Ps) InstallFlags(flags *flag.FlagSet) {
-	pCmd.commonFlags.InstallFlags(flags)
+	pCmd.connectionHelper.InstallFlags(flags)
 	flags.BoolVar(&pCmd.noTruncate, "no-trunc", false, "do not truncate container"+
 		" command output")
 	flags.Usage = func() {
@@ -68,13 +68,7 @@ func (pCmd *Ps) Run() int {
 	return 0
 }
 
-func (pCmd *Ps) run() error {
-	localClient, err := pCmd.clientGetter.Client(pCmd.host)
-	if err != nil {
-		return fmt.Errorf("error connecting to quilt daemon: %s", err)
-	}
-	defer localClient.Close()
-
+func (pCmd *Ps) run() (err error) {
 	var connections []db.Connection
 	var containers []db.Container
 	var machines []db.Machine
@@ -84,11 +78,12 @@ func (pCmd *Ps) run() error {
 	machineErr := make(chan error)
 
 	go func() {
-		machines, err = localClient.QueryMachines()
+		machines, err = pCmd.client.QueryMachines()
 		machineErr <- err
 	}()
 
-	leaderClient, leadErr := pCmd.clientGetter.LeaderClient(localClient)
+	leaderClient, leadErr := pCmd.clientGetter.LeaderClient(
+		pCmd.client)
 	if leadErr == nil {
 		defer leaderClient.Close()
 

@@ -10,7 +10,6 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 
 	clientMock "github.com/quilt/quilt/api/client/mocks"
 	"github.com/quilt/quilt/db"
@@ -197,7 +196,6 @@ func TestPromptsUser(t *testing.T) {
 			return confirmResp, nil
 		}
 
-		mockGetter := new(clientMock.Getter)
 		c := &clientMock.Client{
 			ClusterReturn: []db.Cluster{
 				{
@@ -205,12 +203,12 @@ func TestPromptsUser(t *testing.T) {
 				},
 			},
 		}
-		mockGetter.On("Client", mock.Anything).Return(c, nil)
 
 		util.WriteFile("test.js", []byte(""), 0644)
-		runCmd := NewRunCommand()
-		runCmd.clientGetter = mockGetter
-		runCmd.stitch = "test.js"
+		runCmd := &Run{
+			connectionHelper: &connectionHelper{client: c},
+			stitch:           "test.js",
+		}
 		runCmd.Run()
 		assert.Equal(t, confirmResp, c.DeployArg != "")
 	}

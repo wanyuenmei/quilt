@@ -45,7 +45,7 @@ type Debug struct {
 	clientGetter client.Getter
 	sshGetter    ssh.Getter
 
-	*commonFlags
+	*connectionHelper
 }
 
 type logTarget struct {
@@ -104,9 +104,9 @@ var (
 // NewDebugCommand creates a new Debug command instance.
 func NewDebugCommand() *Debug {
 	return &Debug{
-		clientGetter: getter.New(),
-		sshGetter:    ssh.New,
-		commonFlags:  &commonFlags{},
+		clientGetter:     getter.New(),
+		sshGetter:        ssh.New,
+		connectionHelper: &connectionHelper{},
 	}
 }
 
@@ -145,7 +145,7 @@ quilt debug-logs -i ~/.ssh/quilt 09ed35808a0b
 
 // InstallFlags sets up parsing for command line flags.
 func (dCmd *Debug) InstallFlags(flags *flag.FlagSet) {
-	dCmd.commonFlags.InstallFlags(flags)
+	dCmd.connectionHelper.InstallFlags(flags)
 	flags.StringVar(&dCmd.privateKey, "i", "",
 		"the private key to use to connect to the host")
 	flags.StringVar(&dCmd.outPath, "o", "",
@@ -186,14 +186,7 @@ func (dCmd Debug) Run() int {
 		return 1
 	}
 
-	c, err := dCmd.clientGetter.Client(dCmd.host)
-	if err != nil {
-		log.Error(err)
-		return 1
-	}
-	defer c.Close()
-
-	machines, err := c.QueryMachines()
+	machines, err := dCmd.client.QueryMachines()
 	if err != nil {
 		log.Error(err)
 		return 1

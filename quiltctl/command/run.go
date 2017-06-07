@@ -16,7 +16,6 @@ import (
 	"github.com/pmezard/go-difflib/difflib"
 
 	"github.com/quilt/quilt/api/client"
-	"github.com/quilt/quilt/api/client/getter"
 	"github.com/quilt/quilt/stitch"
 )
 
@@ -25,22 +24,19 @@ type Run struct {
 	stitch string
 	force  bool
 
-	clientGetter client.Getter
-
-	*commonFlags
+	*connectionHelper
 }
 
 // NewRunCommand creates a new Run command instance.
 func NewRunCommand() *Run {
 	return &Run{
-		commonFlags:  &commonFlags{},
-		clientGetter: getter.New(),
+		connectionHelper: &connectionHelper{},
 	}
 }
 
 // InstallFlags sets up parsing for command line flags.
 func (rCmd *Run) InstallFlags(flags *flag.FlagSet) {
-	rCmd.commonFlags.InstallFlags(flags)
+	rCmd.connectionHelper.InstallFlags(flags)
 
 	flags.StringVar(&rCmd.stitch, "stitch", "", "the stitch to run")
 	flags.BoolVar(&rCmd.force, "f", false, "deploy without confirming changes")
@@ -82,14 +78,7 @@ func (rCmd *Run) Run() int {
 	}
 	deployment := compiled.String()
 
-	c, err := rCmd.clientGetter.Client(rCmd.host)
-	if err != nil {
-		log.Error(err)
-		return 1
-	}
-	defer c.Close()
-
-	curr, err := getCurrentDeployment(c)
+	curr, err := getCurrentDeployment(rCmd.client)
 	if err != nil && err != errNoCluster {
 		log.WithError(err).Error("Unable to get current deployment.")
 		return 1
@@ -119,7 +108,7 @@ func (rCmd *Run) Run() int {
 		}
 	}
 
-	err = c.Deploy(deployment)
+	err = rCmd.client.Deploy(deployment)
 	if err != nil {
 		log.WithError(err).Error("Error while starting run.")
 		return 1

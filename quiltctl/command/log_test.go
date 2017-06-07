@@ -110,7 +110,6 @@ func TestLog(t *testing.T) {
 		},
 	}
 	mockGetter := new(mocks.Getter)
-	mockGetter.On("Client", mock.Anything).Return(mockLocalClient, nil)
 	mockGetter.On("ContainerClient", mock.Anything, mock.Anything).Return(
 		&mocks.Client{
 			ContainerReturn: []db.Container{
@@ -133,7 +132,7 @@ func TestLog(t *testing.T) {
 		}
 		testCmd.privateKey = "key"
 		testCmd.clientGetter = mockGetter
-		testCmd.commonFlags = &commonFlags{}
+		testCmd.connectionHelper = &connectionHelper{client: mockLocalClient}
 
 		mockSSHClient.On("Run", false, test.expSSHCommand).Return(nil)
 		mockSSHClient.On("Close").Return(nil)
@@ -150,14 +149,13 @@ func TestLogAmbiguousID(t *testing.T) {
 		ContainerReturn: []db.Container{{StitchID: "foo"}},
 	}
 	mockClientGetter := new(mocks.Getter)
-	mockClientGetter.On("Client", mock.Anything).Return(mockClient, nil)
 	mockClientGetter.On("ContainerClient", mock.Anything, mock.Anything).
 		Return(mockClient, nil)
 
 	testCmd := Log{
-		commonFlags:  &commonFlags{},
-		clientGetter: mockClientGetter,
-		target:       "foo",
+		connectionHelper: &connectionHelper{client: mockClient},
+		clientGetter:     mockClientGetter,
+		target:           "foo",
 	}
 	assert.Equal(t, 1, testCmd.Run())
 }
@@ -168,14 +166,13 @@ func TestLogNoMatch(t *testing.T) {
 		ContainerReturn: []db.Container{{StitchID: "foo"}},
 	}
 	mockClientGetter := new(mocks.Getter)
-	mockClientGetter.On("Client", mock.Anything).Return(mockClient, nil)
 	mockClientGetter.On("ContainerClient", mock.Anything, mock.Anything).
 		Return(mockClient, nil)
 
 	testCmd := Log{
-		commonFlags:  &commonFlags{},
-		clientGetter: mockClientGetter,
-		target:       "bar",
+		connectionHelper: &connectionHelper{client: mockClient},
+		clientGetter:     mockClientGetter,
+		target:           "bar",
 	}
 	assert.Equal(t, 1, testCmd.Run())
 }
@@ -183,7 +180,6 @@ func TestLogNoMatch(t *testing.T) {
 func TestLogScheduledContainer(t *testing.T) {
 	mockClient := &mocks.Client{}
 	mockClientGetter := new(mocks.Getter)
-	mockClientGetter.On("Client", mock.Anything).Return(mockClient, nil)
 	mockClientGetter.On("ContainerClient", mock.Anything, mock.Anything).Return(
 		&mocks.Client{
 			ContainerReturn: []db.Container{{StitchID: "foo"}},
@@ -191,9 +187,9 @@ func TestLogScheduledContainer(t *testing.T) {
 		}, nil)
 
 	testCmd := Log{
-		commonFlags:  &commonFlags{},
-		clientGetter: mockClientGetter,
-		target:       "foo",
+		connectionHelper: &connectionHelper{client: mockClient},
+		clientGetter:     mockClientGetter,
+		target:           "foo",
 	}
 	assert.Equal(t, 1, testCmd.Run())
 }

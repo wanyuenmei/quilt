@@ -44,31 +44,21 @@ func TestPsErrors(t *testing.T) {
 
 	mockErr := errors.New("error")
 
-	// Error connecting to local client
-	mockGetter = new(clientMock.Getter)
-	mockGetter.On("Client", mock.Anything).Return(nil, mockErr)
-
-	cmd = &Ps{false, mockGetter, &commonFlags{}}
-	assert.EqualError(t, cmd.run(), "error connecting to quilt daemon: error")
-	mockGetter.AssertExpectations(t)
-
 	// Error querying machines
 	mockGetter = new(clientMock.Getter)
 	mockClient = &clientMock.Client{MachineErr: mockErr}
-	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
 	mockGetter.On("LeaderClient", mock.Anything).Return(nil, mockErr)
 
-	cmd = &Ps{false, mockGetter, &commonFlags{}}
+	cmd = &Ps{false, mockGetter, &connectionHelper{client: mockClient}}
 	assert.EqualError(t, cmd.run(), "unable to query machines: error")
 	mockGetter.AssertExpectations(t)
 
 	// Error connecting to leader
 	mockGetter = new(clientMock.Getter)
 	mockClient = new(clientMock.Client)
-	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
 	mockGetter.On("LeaderClient", mock.Anything).Return(nil, mockErr)
 
-	cmd = &Ps{false, mockGetter, &commonFlags{}}
+	cmd = &Ps{false, mockGetter, &connectionHelper{client: mockClient}}
 	assert.NoError(t, cmd.run())
 	mockGetter.AssertExpectations(t)
 
@@ -76,10 +66,9 @@ func TestPsErrors(t *testing.T) {
 	mockGetter = new(clientMock.Getter)
 	mockClient = new(clientMock.Client)
 	mockLeaderClient = &clientMock.Client{ContainerErr: mockErr}
-	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
 	mockGetter.On("LeaderClient", mock.Anything).Return(mockLeaderClient, nil)
 
-	cmd = &Ps{false, mockGetter, &commonFlags{}}
+	cmd = &Ps{false, mockGetter, &connectionHelper{client: mockClient}}
 	assert.EqualError(t, cmd.run(), "unable to query containers: error")
 	mockGetter.AssertExpectations(t)
 
@@ -87,10 +76,9 @@ func TestPsErrors(t *testing.T) {
 	mockGetter = new(clientMock.Getter)
 	mockClient = new(clientMock.Client)
 	mockLeaderClient = &clientMock.Client{ConnectionErr: mockErr}
-	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
 	mockGetter.On("LeaderClient", mock.Anything).Return(mockLeaderClient, nil)
 
-	cmd = &Ps{false, mockGetter, &commonFlags{}}
+	cmd = &Ps{false, mockGetter, &connectionHelper{client: mockClient}}
 	assert.EqualError(t, cmd.run(), "unable to query connections: error")
 	mockGetter.AssertExpectations(t)
 
@@ -109,7 +97,7 @@ func TestPsErrors(t *testing.T) {
 	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
 	mockGetter.On("LeaderClient", mock.Anything).Return(mockLeaderClient, nil)
 
-	cmd = &Ps{false, mockGetter, &commonFlags{}}
+	cmd = &Ps{false, mockGetter, &connectionHelper{client: mockClient}}
 	assert.Equal(t, 0, cmd.Run())
 	mockGetter.AssertExpectations(t)
 }
@@ -121,10 +109,9 @@ func TestPsSuccess(t *testing.T) {
 	mockClient := new(clientMock.Client)
 	mockLeaderClient := new(clientMock.Client)
 
-	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
 	mockGetter.On("LeaderClient", mock.Anything).Return(mockLeaderClient, nil)
 
-	cmd := &Ps{false, mockGetter, &commonFlags{}}
+	cmd := &Ps{false, mockGetter, &connectionHelper{client: mockClient}}
 	assert.Equal(t, 0, cmd.Run())
 	mockGetter.AssertExpectations(t)
 }
@@ -151,7 +138,7 @@ func TestQueryWorkersSuccess(t *testing.T) {
 	}
 	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
 
-	cmd := &Ps{false, mockGetter, &commonFlags{}}
+	cmd := &Ps{false, mockGetter, &connectionHelper{}}
 	result := cmd.queryWorkers(machines)
 	assert.Equal(t, containers, result)
 	mockGetter.AssertExpectations(t)
@@ -187,7 +174,7 @@ func TestQueryWorkersFailure(t *testing.T) {
 	mockGetter.On("Client", api.RemoteAddress("1.2.3.4")).Return(nil, mockErr)
 	mockGetter.On("Client", api.RemoteAddress("5.6.7.8")).Return(mockClient, nil)
 
-	cmd := &Ps{false, mockGetter, &commonFlags{}}
+	cmd := &Ps{false, mockGetter, &connectionHelper{}}
 	result := cmd.queryWorkers(machines)
 	assert.Equal(t, containers, result)
 	mockGetter.AssertExpectations(t)
@@ -201,7 +188,7 @@ func TestQueryWorkersFailure(t *testing.T) {
 	mockGetter.On("Client", api.RemoteAddress("1.2.3.4")).Return(failingClient, nil)
 	mockGetter.On("Client", api.RemoteAddress("5.6.7.8")).Return(mockClient, nil)
 
-	cmd = &Ps{false, mockGetter, &commonFlags{}}
+	cmd = &Ps{false, mockGetter, &connectionHelper{}}
 	result = cmd.queryWorkers(machines)
 	assert.Equal(t, containers, result)
 	mockGetter.AssertExpectations(t)

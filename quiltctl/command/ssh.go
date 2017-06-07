@@ -27,15 +27,15 @@ type SSH struct {
 	clientGetter client.Getter
 	sshGetter    ssh.Getter
 
-	*commonFlags
+	*connectionHelper
 }
 
 // NewSSHCommand creates a new SSH command instance.
 func NewSSHCommand() *SSH {
 	return &SSH{
-		clientGetter: getter.New(),
-		sshGetter:    ssh.New,
-		commonFlags:  &commonFlags{},
+		clientGetter:     getter.New(),
+		sshGetter:        ssh.New,
+		connectionHelper: &connectionHelper{},
 	}
 }
 
@@ -54,7 +54,7 @@ quilt ssh 8879fd2dbcee echo foo
 
 // InstallFlags sets up parsing for command line flags.
 func (sCmd *SSH) InstallFlags(flags *flag.FlagSet) {
-	sCmd.commonFlags.InstallFlags(flags)
+	sCmd.connectionHelper.InstallFlags(flags)
 	flags.StringVar(&sCmd.privateKey, "i", "",
 		"the private key to use to connect to the host")
 	flags.BoolVar(&sCmd.allocatePTY, "t", false,
@@ -85,15 +85,9 @@ func (sCmd SSH) Run() int {
 		return 1
 	}
 
-	c, err := sCmd.clientGetter.Client(sCmd.host)
-	if err != nil {
-		log.Error(err)
-		return 1
-	}
-	defer c.Close()
-
-	mach, machErr := getMachine(c, sCmd.target)
-	contHost, cont, contErr := getContainer(c, sCmd.clientGetter, sCmd.target)
+	mach, machErr := getMachine(sCmd.client, sCmd.target)
+	contHost, cont, contErr := getContainer(
+		sCmd.client, sCmd.clientGetter, sCmd.target)
 
 	resolvedMachine := machErr == nil
 	resolvedContainer := contErr == nil

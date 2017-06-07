@@ -6,8 +6,6 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 
-	"github.com/quilt/quilt/api/client"
-	"github.com/quilt/quilt/api/client/getter"
 	"github.com/quilt/quilt/stitch"
 )
 
@@ -16,22 +14,19 @@ type Stop struct {
 	namespace      string
 	onlyContainers bool
 
-	clientGetter client.Getter
-
-	*commonFlags
+	*connectionHelper
 }
 
 // NewStopCommand creates a new Stop command instance.
 func NewStopCommand() *Stop {
 	return &Stop{
-		clientGetter: getter.New(),
-		commonFlags:  &commonFlags{},
+		connectionHelper: &connectionHelper{},
 	}
 }
 
 // InstallFlags sets up parsing for command line flags.
 func (sCmd *Stop) InstallFlags(flags *flag.FlagSet) {
-	sCmd.commonFlags.InstallFlags(flags)
+	sCmd.connectionHelper.InstallFlags(flags)
 
 	flags.StringVar(&sCmd.namespace, "namespace", "",
 		"the namespace to stop")
@@ -62,18 +57,11 @@ func (sCmd *Stop) Parse(args []string) error {
 
 // Run stops the given namespace.
 func (sCmd *Stop) Run() int {
-	c, err := sCmd.clientGetter.Client(sCmd.host)
-	if err != nil {
-		log.Error(err)
-		return 1
-	}
-	defer c.Close()
-
 	newCluster := stitch.Stitch{
 		Namespace: sCmd.namespace,
 	}
 	if sCmd.namespace == "" || sCmd.onlyContainers {
-		currDepl, err := getCurrentDeployment(c)
+		currDepl, err := getCurrentDeployment(sCmd.client)
 		if err != nil {
 			log.WithError(err).
 				Error("Failed to get current cluster")
@@ -93,7 +81,7 @@ func (sCmd *Stop) Run() int {
 		}
 	}
 
-	if err = c.Deploy(newCluster.String()); err != nil {
+	if err := sCmd.client.Deploy(newCluster.String()); err != nil {
 		log.WithError(err).Error("Unable to stop namespace.")
 		return 1
 	}

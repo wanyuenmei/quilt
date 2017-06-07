@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 
 	clientMock "github.com/quilt/quilt/api/client/mocks"
 	"github.com/quilt/quilt/db"
@@ -14,10 +13,7 @@ import (
 func TestStopNamespaceDefault(t *testing.T) {
 	t.Parallel()
 
-	mockGetter := new(clientMock.Getter)
 	c := &clientMock.Client{}
-	mockGetter.On("Client", mock.Anything).Return(c, nil)
-
 	c.ClusterReturn = []db.Cluster{
 		{
 			Blueprint: `{"namespace": "testSpace"}`,
@@ -25,7 +21,7 @@ func TestStopNamespaceDefault(t *testing.T) {
 	}
 
 	stopCmd := NewStopCommand()
-	stopCmd.clientGetter = mockGetter
+	stopCmd.client = c
 	stopCmd.Run()
 	assertDeployed(t, stitch.Stitch{Namespace: "testSpace"}, c.DeployArg)
 
@@ -37,12 +33,10 @@ func TestStopNamespaceDefault(t *testing.T) {
 func TestStopNamespace(t *testing.T) {
 	t.Parallel()
 
-	mockGetter := new(clientMock.Getter)
 	c := &clientMock.Client{}
-	mockGetter.On("Client", mock.Anything).Return(c, nil)
 
 	stopCmd := NewStopCommand()
-	stopCmd.clientGetter = mockGetter
+	stopCmd.client = c
 	stopCmd.namespace = "namespace"
 	stopCmd.Run()
 
@@ -52,10 +46,7 @@ func TestStopNamespace(t *testing.T) {
 func TestStopContainers(t *testing.T) {
 	t.Parallel()
 
-	mockGetter := new(clientMock.Getter)
 	c := &clientMock.Client{}
-	mockGetter.On("Client", mock.Anything).Return(c, nil)
-
 	c.ClusterReturn = []db.Cluster{
 		{
 			Blueprint: `{"namespace": "testSpace", "machines": ` +
@@ -64,7 +55,7 @@ func TestStopContainers(t *testing.T) {
 	}
 
 	stopCmd := NewStopCommand()
-	stopCmd.clientGetter = mockGetter
+	stopCmd.client = c
 	stopCmd.onlyContainers = true
 	stopCmd.Run()
 

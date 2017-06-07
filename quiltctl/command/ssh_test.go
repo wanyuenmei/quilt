@@ -70,8 +70,14 @@ func TestSSHFlags(t *testing.T) {
 
 func TestSSHPTY(t *testing.T) {
 	isTerminal = func() bool { return false }
-	assert.Equal(t, 1, SSH{}.Run())
-	assert.Equal(t, 1, SSH{args: []string{"foo"}, allocatePTY: true}.Run())
+	assert.Equal(t, 1, SSH{
+		connectionHelper: &connectionHelper{client: &mocks.Client{}},
+	}.Run())
+	assert.Equal(t, 1, SSH{
+		connectionHelper: &connectionHelper{client: &mocks.Client{}},
+		args:             []string{"foo"},
+		allocatePTY:      true,
+	}.Run())
 }
 
 type getMachineTest struct {
@@ -163,9 +169,8 @@ func TestSSH(t *testing.T) {
 		// Machine with login shell.
 		{
 			cmd: SSH{
-				commonFlags: &commonFlags{},
-				privateKey:  "key",
-				target:      "tgt",
+				privateKey: "key",
+				target:     "tgt",
 			},
 			machines:    []db.Machine{{StitchID: "tgt", PublicIP: "host"}},
 			expHost:     "host",
@@ -174,10 +179,9 @@ func TestSSH(t *testing.T) {
 		// Machine with exec command.
 		{
 			cmd: SSH{
-				commonFlags: &commonFlags{},
-				privateKey:  "key",
-				target:      "tgt",
-				args:        []string{"foo", "bar"},
+				privateKey: "key",
+				target:     "tgt",
+				args:       []string{"foo", "bar"},
 			},
 			machines:   []db.Machine{{StitchID: "tgt", PublicIP: "host"}},
 			expHost:    "host",
@@ -186,9 +190,8 @@ func TestSSH(t *testing.T) {
 		// Container with login shell.
 		{
 			cmd: SSH{
-				commonFlags: &commonFlags{},
-				privateKey:  "key",
-				target:      "tgt",
+				privateKey: "key",
+				target:     "tgt",
 			},
 			containers: []db.Container{
 				{StitchID: "tgt", DockerID: "dockerID"},
@@ -200,10 +203,9 @@ func TestSSH(t *testing.T) {
 		// Container with exec.
 		{
 			cmd: SSH{
-				commonFlags: &commonFlags{},
-				privateKey:  "key",
-				target:      "tgt",
-				args:        []string{"foo", "bar"},
+				privateKey: "key",
+				target:     "tgt",
+				args:       []string{"foo", "bar"},
 			},
 			containers: []db.Container{
 				{StitchID: "tgt", DockerID: "dockerID"},
@@ -214,7 +216,6 @@ func TestSSH(t *testing.T) {
 		// Container with exec and PTY.
 		{
 			cmd: SSH{
-				commonFlags: &commonFlags{},
 				privateKey:  "key",
 				target:      "tgt",
 				args:        []string{"foo", "bar"},
@@ -254,10 +255,10 @@ func TestSSH(t *testing.T) {
 			HostReturn:      test.expHost,
 		}
 		mockClientGetter := new(mocks.Getter)
-		mockClientGetter.On("Client", mock.Anything).Return(mockLocalClient, nil)
 		mockClientGetter.On("ContainerClient", mock.Anything, mock.Anything).
 			Return(mockContainerClient, nil)
 		testCmd.clientGetter = mockClientGetter
+		testCmd.connectionHelper = &connectionHelper{client: mockLocalClient}
 
 		assert.Equal(t, 0, testCmd.Run())
 		mockSSHClient.AssertExpectations(t)
@@ -275,9 +276,9 @@ func TestAmbiguousID(t *testing.T) {
 		Return(mockClient, nil)
 
 	testCmd := SSH{
-		commonFlags:  &commonFlags{},
-		clientGetter: mockClientGetter,
-		target:       "foo",
+		connectionHelper: &connectionHelper{client: mockClient},
+		clientGetter:     mockClientGetter,
+		target:           "foo",
 	}
 	assert.Equal(t, 1, testCmd.Run())
 }
@@ -293,9 +294,9 @@ func TestNoMatch(t *testing.T) {
 		Return(mockClient, nil)
 
 	testCmd := SSH{
-		commonFlags:  &commonFlags{},
-		clientGetter: mockClientGetter,
-		target:       "bar",
+		connectionHelper: &connectionHelper{client: mockClient},
+		clientGetter:     mockClientGetter,
+		target:           "bar",
 	}
 	assert.Equal(t, 1, testCmd.Run())
 }
@@ -318,11 +319,11 @@ func TestSSHExitError(t *testing.T) {
 		Return(nil, errors.New("unused"))
 
 	testCmd := SSH{
-		commonFlags:  &commonFlags{},
-		sshGetter:    mockSSHGetter,
-		clientGetter: mockClientGetter,
-		target:       "tgt",
-		args:         []string{"unused"},
+		connectionHelper: &connectionHelper{client: mockLocalClient},
+		sshGetter:        mockSSHGetter,
+		clientGetter:     mockClientGetter,
+		target:           "tgt",
+		args:             []string{"unused"},
 	}
 	assert.Equal(t, 10, testCmd.Run())
 
@@ -335,11 +336,11 @@ func TestSSHExitError(t *testing.T) {
 	mockSSHClient.On("Run", mock.Anything, mock.Anything).Return(errors.New("error"))
 
 	testCmd = SSH{
-		commonFlags:  &commonFlags{},
-		sshGetter:    mockSSHGetter,
-		clientGetter: mockClientGetter,
-		target:       "tgt",
-		args:         []string{"unused"},
+		connectionHelper: &connectionHelper{client: mockLocalClient},
+		sshGetter:        mockSSHGetter,
+		clientGetter:     mockClientGetter,
+		target:           "tgt",
+		args:             []string{"unused"},
 	}
 	assert.Equal(t, 1, testCmd.Run())
 }
@@ -365,9 +366,9 @@ func TestSSHScheduledContainer(t *testing.T) {
 		}, nil)
 
 	testCmd := SSH{
-		commonFlags:  &commonFlags{},
-		clientGetter: mockClientGetter,
-		target:       "foo",
+		connectionHelper: &connectionHelper{client: mockClient},
+		clientGetter:     mockClientGetter,
+		target:           "foo",
 	}
 	assert.Equal(t, 1, testCmd.Run())
 }

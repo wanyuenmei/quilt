@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 
 	"github.com/quilt/quilt/api/client/mocks"
 )
@@ -27,28 +26,14 @@ func TestGetDaemonVersion(t *testing.T) {
 	mockLocalClient := &mocks.Client{
 		VersionReturn: "mockVersion",
 	}
-	mockGetter := new(mocks.Getter)
-	mockGetter.On("Client", mock.Anything).Return(mockLocalClient, nil)
+	vCmd := Version{
+		connectionHelper: &connectionHelper{client: mockLocalClient},
+	}
 
-	actual, err := Version{
-		clientGetter: mockGetter,
-		commonFlags:  &commonFlags{},
-	}.getDaemonVersion()
-	assert.NoError(t, err)
-	assert.Equal(t, "mockVersion", actual)
+	res := vCmd.Run()
+	assert.Zero(t, res)
 
 	mockLocalClient.VersionErr = assert.AnError
-	_, err = Version{
-		clientGetter: mockGetter,
-		commonFlags:  &commonFlags{},
-	}.getDaemonVersion()
-	assert.NotNil(t, err)
-
-	mockGetter = new(mocks.Getter)
-	mockGetter.On("Client", mock.Anything).Return(nil, assert.AnError)
-	_, err = Version{
-		clientGetter: mockGetter,
-		commonFlags:  &commonFlags{},
-	}.getDaemonVersion()
-	assert.NotNil(t, err)
+	res = vCmd.Run()
+	assert.NotZero(t, res)
 }
