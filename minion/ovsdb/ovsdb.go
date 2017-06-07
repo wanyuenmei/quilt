@@ -40,6 +40,10 @@ type Client interface {
 	CreateAddressSet(name string, addresses []string) error
 	DeleteAddressSet(name string) error
 
+	ListLoadBalancers() ([]LoadBalancer, error)
+	CreateLoadBalancer(lswitch string, name string, vips map[string]string) error
+	DeleteLoadBalancer(lswitch string, lb LoadBalancer) error
+
 	OpenFlowPorts() (map[string]int, error)
 
 	Disconnect()
@@ -96,6 +100,15 @@ type ACLCore struct {
 	Direction string
 	Match     string
 	Action    string
+}
+
+// LoadBalancer is a load balancer in OVN.
+type LoadBalancer struct {
+	uuid ovs.UUID
+	Name string
+
+	// VIPs maps IPs to a comma-separated list of IPs to load balance.
+	VIPs map[string]string
 }
 
 type row map[string]interface{}
@@ -587,6 +600,87 @@ func (ovsdb client) OpenFlowPorts() (map[string]int, error) {
 	}
 
 	return ifaceMap, nil
+}
+
+func (ovsdb client) CreateLoadBalancer(lswitch, name string,
+	vips map[string]string) error {
+	insertOp := ovs.Operation{
+		Op:    "insert",
+		Table: "Load_Balancer",
+		Row: map[string]interface{}{
+			"name": name,
+			"vips": newOvsMap(vips),
+		},
+		UUIDName: "qlbadd",
+	}
+
+	mut := newMutation("load_balancer", "insert", ovs.UUID{GoUUID: "qlbadd"})
+	mutateOp := ovs.Operation{
+		Op:        "mutate",
+		Table:     "Logical_Switch",
+		Mutations: []interface{}{mut},
+		Where:     newCondition("name", "==", lswitch),
+	}
+
+	results, err := ovsdb.Transact("OVN_Northbound", insertOp, mutateOp)
+	if err != nil {
+		return fmt.Errorf("transaction error: creating load balancer on %s: %s",
+			lswitch, err)
+	}
+	return errorCheck(results, 2)
+}
+
+// DeleteLoadBalancer removes a load balancer from OVN.
+func (ovsdb client) DeleteLoadBalancer(lswitch string, lb LoadBalancer) error {
+	deleteOp := ovs.Operation{
+		Op:    "delete",
+		Table: "Load_Balancer",
+		Where: newCondition("_uuid", "==", lb.uuid),
+	}
+
+	mutateOp := ovs.Operation{
+		Op:    "mutate",
+		Table: "Logical_Switch",
+		Mutations: []interface{}{
+			newMutation("load_balancer", "delete", lb.uuid),
+		},
+		Where: newCondition("name", "==", lswitch),
+	}
+
+	results, err := ovsdb.Transact("OVN_Northbound", deleteOp, mutateOp)
+	if err != nil {
+		return fmt.Errorf("transaction error: deleting load balancer on %s: %s",
+			lswitch, err)
+	}
+	return errorCheck(results, 2)
+}
+
+// ListLoadBalancers lists the load balancers in OVN.
+func (ovsdb client) ListLoadBalancers() ([]LoadBalancer, error) {
+	reply, err := ovsdb.Transact("OVN_Northbound", ovs.Operation{
+		Op:    "select",
+		Table: "Load_Balancer",
+		Where: noCondition,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("transaction error: listing load balancers: %s",
+			err)
+	}
+
+	var result []LoadBalancer
+	for _, row := range reply[0].Rows {
+		vips, err := ovsStringMapToMap(row["vips"])
+		if err != nil {
+			return nil, fmt.Errorf("malformed vips: %s", err)
+		}
+
+		result = append(result, LoadBalancer{
+			uuid: ovsUUIDFromRow(row),
+			Name: row["name"].(string),
+			VIPs: vips,
+		})
+	}
+	return result, nil
 }
 
 // This does not cover all cases, they should just be added as needed

@@ -614,6 +614,120 @@ func TestOpenFlowPorts(t *testing.T) {
 	assert.Equal(t, map[string]int{"name": 12}, mp)
 }
 
+func TestListLoadBalancers(t *testing.T) {
+	t.Parallel()
+
+	api := new(mockTransact)
+	odb := Client(client{api})
+
+	ops := []ovs.Operation{{
+		Op:    "select",
+		Table: "Load_Balancer",
+		Where: noCondition}}
+	api.On("Transact", "OVN_Northbound", ops).Return(nil, errors.New("err")).Once()
+	_, err := odb.ListLoadBalancers()
+	assert.EqualError(t, err, "transaction error: listing load balancers: err")
+
+	r := map[string]interface{}{
+		"_uuid": []interface{}{"a", "b"},
+		"name":  "name",
+		"vips": []interface{}{"map", []interface{}{
+			[]interface{}{"vip", "addrs"},
+		}},
+	}
+	api.On("Transact", "OVN_Northbound", ops).Return(
+		[]ovs.OperationResult{{Rows: []map[string]interface{}{r}}}, nil).Once()
+	res, err := odb.ListLoadBalancers()
+	assert.NoError(t, err)
+	assert.Equal(t, []LoadBalancer{
+		{
+			uuid: ovs.UUID{GoUUID: "b"},
+			Name: "name",
+			VIPs: map[string]string{"vip": "addrs"},
+		},
+	}, res)
+}
+
+func TestCreateLoadBalancer(t *testing.T) {
+	t.Parallel()
+
+	api := new(mockTransact)
+	odb := Client(client{api})
+
+	mut := newMutation("load_balancer", "insert", ovs.UUID{GoUUID: "qlbadd"})
+	ops := []ovs.Operation{
+		{
+			Op:    "insert",
+			Table: "Load_Balancer",
+			Row: map[string]interface{}{
+				"name": "name",
+				"vips": newOvsMap(map[string]string{"vip": "addrs"}),
+			},
+			UUIDName: "qlbadd",
+		},
+		{
+			Op:        "mutate",
+			Table:     "Logical_Switch",
+			Mutations: []interface{}{mut},
+			Where:     newCondition("name", "==", "lswitch"),
+		},
+	}
+	api.On("Transact", "OVN_Northbound", ops).Return(nil, errors.New("err")).Once()
+	err := odb.CreateLoadBalancer("lswitch", "name",
+		map[string]string{"vip": "addrs"})
+	assert.EqualError(t, err,
+		"transaction error: creating load balancer on lswitch: err")
+
+	api.On("Transact", "OVN_Northbound", ops).Return(
+		[]ovs.OperationResult{{}, {}}, nil)
+	err = odb.CreateLoadBalancer("lswitch", "name",
+		map[string]string{"vip": "addrs"})
+	assert.NoError(t, err)
+
+	api.AssertExpectations(t)
+}
+
+func TestDeleteLoadBalancer(t *testing.T) {
+	t.Parallel()
+
+	api := new(mockTransact)
+	odb := Client(client{api})
+
+	mut := newMutation("load_balancer", "delete", ovs.UUID{GoUUID: "foo"})
+	ops := []ovs.Operation{
+		{
+			Op:    "delete",
+			Table: "Load_Balancer",
+			Where: newCondition("_uuid", "==", ovs.UUID{GoUUID: "foo"}),
+		},
+		{
+			Op:        "mutate",
+			Table:     "Logical_Switch",
+			Mutations: []interface{}{mut},
+			Where:     newCondition("name", "==", "lswitch"),
+		},
+	}
+	api.On("Transact", "OVN_Northbound", ops).Return(nil, errors.New("err")).Once()
+	err := odb.DeleteLoadBalancer("lswitch",
+		LoadBalancer{
+			uuid: ovs.UUID{GoUUID: "foo"},
+		},
+	)
+	assert.EqualError(t, err,
+		"transaction error: deleting load balancer on lswitch: err")
+
+	api.On("Transact", "OVN_Northbound", ops).Return(
+		[]ovs.OperationResult{{}, {}}, nil)
+	err = odb.DeleteLoadBalancer("lswitch",
+		LoadBalancer{
+			uuid: ovs.UUID{GoUUID: "foo"},
+		},
+	)
+	assert.NoError(t, err)
+
+	api.AssertExpectations(t)
+}
+
 func TestOvsStringSetToSlice(t *testing.T) {
 	t.Parallel()
 	assert.Equal(t, []string{"b"}, ovsStringSetToSlice("b"))

@@ -36,6 +36,20 @@ func (_m *Client) CreateAddressSet(name string, addresses []string) error {
 	return r0
 }
 
+// CreateLoadBalancer provides a mock function with given fields: lswitch, name, vips
+func (_m *Client) CreateLoadBalancer(lswitch string, name string, vips map[string]string) error {
+	ret := _m.Called(lswitch, name, vips)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string, map[string]string) error); ok {
+		r0 = rf(lswitch, name, vips)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // CreateLogicalRouter provides a mock function with given fields: lrouter
 func (_m *Client) CreateLogicalRouter(lrouter string) error {
 	ret := _m.Called(lrouter)
@@ -120,6 +134,20 @@ func (_m *Client) DeleteAddressSet(name string) error {
 	return r0
 }
 
+// DeleteLoadBalancer provides a mock function with given fields: lswitch, lb
+func (_m *Client) DeleteLoadBalancer(lswitch string, lb ovsdb.LoadBalancer) error {
+	ret := _m.Called(lswitch, lb)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, ovsdb.LoadBalancer) error); ok {
+		r0 = rf(lswitch, lb)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // DeleteRouterPort provides a mock function with given fields: lrouter, lport
 func (_m *Client) DeleteRouterPort(lrouter string, lport ovsdb.RouterPort) error {
 	ret := _m.Called(lrouter, lport)
@@ -186,6 +214,29 @@ func (_m *Client) ListAddressSets() ([]ovsdb.AddressSet, error) {
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]ovsdb.AddressSet)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ListLoadBalancers provides a mock function with given fields:
+func (_m *Client) ListLoadBalancers() ([]ovsdb.LoadBalancer, error) {
+	ret := _m.Called()
+
+	var r0 []ovsdb.LoadBalancer
+	if rf, ok := ret.Get(0).(func() []ovsdb.LoadBalancer); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]ovsdb.LoadBalancer)
 		}
 	}
 
