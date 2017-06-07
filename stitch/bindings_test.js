@@ -2,7 +2,6 @@ const chai = require('chai');
 const chaiSubset = require('chai-subset');
 const {
     Assertion,
-    Connection,
     Container,
     Deployment,
     Image,
@@ -407,7 +406,79 @@ describe('Bindings', function () {
             expect(foo.children()).to.eql(['1.foo.q', '2.foo.q']);
         });
     });
+    describe('AllowFrom', function () {
+        let foo;
+        let bar;
+        beforeEach(function () {
+            foo = new Service('foo', []);
+            bar = new Service('bar', []);
+            deployment.deploy([foo, bar]);
+        });
+        const checkConnections = function (expected) {
+            const { connections } = deployment.toQuiltRepresentation();
+            expect(connections).to.have.lengthOf(expected.length)
+                .and.containSubset(expected);
+        };
+        it('port', function () {
+            bar.allowFrom(foo, new Port(80));
+            checkConnections([{
+                from: 'foo',
+                to: 'bar',
+                minPort: 80,
+                maxPort: 80,
+            }]);
+        });
+        it('port range', function () {
+            bar.allowFrom(foo, new PortRange(80, 85));
+            checkConnections([{
+                from: 'foo',
+                to: 'bar',
+                minPort: 80,
+                maxPort: 85,
+            }]);
+        });
+        it('connect to invalid port range', function () {
+            expect(() => foo.connect(true, bar)).to
+                .throw('Input argument must be a number or a Range');
+        });
+        it('allow connections to publicInternet', function () {
+            publicInternet.allowFrom(foo, 80);
+            checkConnections([{
+                from: 'foo',
+                to: 'public',
+                minPort: 80,
+                maxPort: 80,
+            }]);
+        });
+        it('allow connections from publicInternet', function () {
+            foo.allowFrom(publicInternet, 80);
+            checkConnections([{
+                from: 'public',
+                to: 'foo',
+                minPort: 80,
+                maxPort: 80,
+            }]);
+        });
+        it('connect to publicInternet port range', function () {
+            expect(() => publicInternet.allowFrom(foo, new PortRange(80, 81))).to
+                .throw('public internet can only connect to single ports and not to port ranges');
+        });
+        it('connect from publicInternet port range', function () {
+            expect(() => foo.allowFrom(publicInternet, new PortRange(80, 81))).to
+                .throw('public internet can only connect to single ports and not to port ranges');
+        });
+        it('allowFrom non-service', function () {
+            expect(() => foo.allowFrom(10, 10)).to
+                .throw(`Services can only connect to other services. ` +
+                    `Check that you're allowing connections from a service, and not ` +
+                    `from a Container or other object.`);
+        });
+    });
     describe('Connect', function () {
+        // This test runs all of the same tests as AllowFrom, but uses the
+        // deprecated connect() function rather than the newer allowFrom()
+        // function. We can remove this as soon as we remove support for
+        // connect().
         let foo;
         let bar;
         beforeEach(function () {
@@ -462,11 +533,11 @@ describe('Bindings', function () {
         });
         it('connect to publicInternet port range', function () {
             expect(() => foo.connect(new PortRange(80, 81), publicInternet)).to
-                .throw('public internet cannot connect on port ranges');
+                .throw('public internet can only connect to single ports and not to port ranges');
         });
         it('connect from publicInternet port range', function () {
             expect(() => publicInternet.connect(new PortRange(80, 81), foo)).to
-                .throw('public internet cannot connect on port ranges');
+                .throw('public internet can only connect to single ports and not to port ranges');
         });
         it('connect to non-service', function () {
             expect(() => foo.connect(10, 10)).to
@@ -483,8 +554,8 @@ describe('Bindings', function () {
             deployment.deploy([foo]);
         });
         it('connect to undeployed label', function () {
-            foo.connect(80, new Service('baz', []));
-            expect(deploy).to.throw('foo has a connection to undeployed service: baz');
+            foo.allowFrom(new Service('baz', []), 80);
+            expect(deploy).to.throw('foo allows connections from an undeployed service: baz');
         });
         it('placement in terms of undeployed label', function () {
             foo.place(new MachineRule(false, { provider: 'Amazon' }));

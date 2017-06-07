@@ -26,7 +26,10 @@ function githubKeys(user) {
 // The default deployment object. createDeployment overwrites this.
 global._quiltDeployment = new Deployment({});
 
-// The label used by the QRI to denote connections with public internet.
+// The name used to refer to the public internet in the JSON description
+// of the network connections (connections to other services are referenced by
+// the name of the service, but since the public internet is not a service,
+// we need a special label for it).
 var publicInternetLabel = "public";
 
 // Global unique ID counter.
@@ -48,7 +51,7 @@ function Deployment(deploymentOpts) {
     this.machines = [];
     this.containers = {};
     this.services = [];
-    this.connections = [];
+    this.allowedInboundConnections = [];
     this.placements = [];
     this.invariants = [];
 }
@@ -176,11 +179,11 @@ Deployment.prototype.vet = function() {
     var dockerfiles = {};
     var hostnames = {};
     this.services.forEach(function(service) {
-        service.connections.forEach(function(conn) {
-            var to = conn.to.name;
-            if (!labelMap[to]) {
-                throw new Error(`${service.name} has a connection to ` +
-                    `undeployed service: ${to}`);
+        service.allowedInboundConnections.forEach(function(conn) {
+            var from = conn.from.name;
+            if (!labelMap[from]) {
+                throw new Error(`${service.name} allows connections from ` +
+                    `an undeployed service: ${from}`);
             }
         });
 
@@ -248,7 +251,7 @@ function Service(name, containers) {
     this.annotations = [];
     this.placements = [];
 
-    this.connections = [];
+    this.allowedInboundConnections = [];
     this.outgoingPublic = [];
     this.incomingPublic = [];
 }
@@ -297,24 +300,43 @@ Service.prototype.deploy = function(deployment) {
 };
 
 Service.prototype.connect = function(range, to) {
-    range = boxRange(range);
-    if (to === publicInternet) {
-        return this.connectToPublic(range);
-    }
-    if (!(to instanceof Service)) {
+    console.warn("Warning: connect is deprecated; switch to using " +
+        "allowFrom. If you previously used a.connect(5, b), you should " +
+        "now use b.allowFrom(a, 5).");
+    if (!(to === publicInternet || to instanceof Service)) {
         throw new Error("Services can only connect to other services. " +
             "Check that you're connecting to a service, and not to a " +
             "Container or other object.");
     }
-    this.connections.push(new Connection(range, to));
+    to.allowFrom(this, range);
+}
+
+Service.prototype.allowFrom = function(sourceService, portRange) {
+    range = boxRange(portRange);
+    if (sourceService === publicInternet) {
+        return this.allowFromPublic(range);
+    }
+    if (!(sourceService instanceof Service)) {
+        throw new Error("Services can only connect to other services. " +
+            "Check that you're allowing connections from a service, and " +
+            "not from a Container or other object.");
+    }
+    this.allowedInboundConnections.push(
+        new Connection(sourceService, portRange));
 };
 
-// publicInternet is an object that looks like another service that can be
-// connected to or from. However, it is actually just syntactic sugar to hide
-// the connectToPublic and connectFromPublic functions.
+// publicInternet is an object that looks like another service that can
+// allow inbound connections. However, it is actually just syntactic sugar to hide
+// the allowOutboundPublic and allowFromPublic functions.
 var publicInternet = {
     connect: function(range, to) {
-        to.connectFromPublic(range);
+        console.warn("Warning: connect is deprecated; switch to using " +
+            "allowFrom. Instead of publicInternet.connect(port, service), " +
+            "use service.allowFrom(publicInternet, port).");
+        to.allowFromPublic(range);
+    },
+    allowFrom: function(sourceService, portRange) {
+        sourceService.allowOutboundPublic(portRange);
     },
     canReach: function(to) {
         return reachable(publicInternetLabel, to.name);
@@ -323,18 +345,32 @@ var publicInternet = {
 
 // Allow outbound traffic from the service to public internet.
 Service.prototype.connectToPublic = function(range) {
+    console.warn("Warning: connectToPublic is deprecated; switch to using " +
+        "allowOutboundPublic.");
+    this.allowOutboundPublic(range);
+}
+
+Service.prototype.allowOutboundPublic = function(range) {
     range = boxRange(range);
     if (range.min != range.max) {
-        throw new Error(`public internet cannot connect on port ranges`);
+        throw new Error(`public internet can only connect to single ports ` +
+            `and not to port ranges`);
     }
     this.outgoingPublic.push(range);
 };
 
 // Allow inbound traffic from public internet to the service.
 Service.prototype.connectFromPublic = function(range) {
+    console.warn("Warning: connectFromPublic is deprecated; switch to " +
+        "allowFromPublic");
+    this.allowFromPublic(range);
+}
+
+Service.prototype.allowFromPublic = function(range) {
     range = boxRange(range);
     if (range.min != range.max) {
-        throw new Error(`public internet cannot connect on port ranges`);
+        throw new Error(`public internet can only connect to single ports ` +
+            `and not to port ranges`);
     }
     this.incomingPublic.push(range);
 };
@@ -347,10 +383,10 @@ Service.prototype.getQuiltConnections = function() {
     var connections = [];
     var that = this;
 
-    this.connections.forEach(function(conn) {
+    this.allowedInboundConnections.forEach(function(conn) {
         connections.push({
-            from: that.name,
-            to: conn.to.name,
+            from: conn.from.name,
+            to: that.name,
             minPort: conn.minPort,
             maxPort: conn.maxPort
         });
@@ -597,10 +633,10 @@ function MachineRule(exclusive, optionalArgs) {
     }
 }
 
-function Connection(ports, to) {
+function Connection(from, ports) {
     this.minPort = ports.min;
     this.maxPort = ports.max;
-    this.to = to;
+    this.from = from;
 }
 
 function Range(min, max) {
@@ -626,7 +662,6 @@ function resetGlobals() {
 
 module.exports = {
     Assertion,
-    Connection,
     Container,
     Deployment,
     Image,
