@@ -21,8 +21,10 @@ type Client interface {
 	CreateLogicalSwitch(lswitch string) error
 	LogicalSwitchExists(lswitch string) (bool, error)
 	ListSwitchPorts() ([]SwitchPort, error)
+	ListSwitchPort(name string) (SwitchPort, error)
 	CreateSwitchPort(lswitch string, lport SwitchPort) error
 	DeleteSwitchPort(lswitch string, lport SwitchPort) error
+	UpdateSwitchPortAddresses(name string, addresses []string) error
 
 	ListACLs() ([]ACL, error)
 	CreateACL(lswitch, direction string, priority int, match, action string) error
@@ -127,6 +129,23 @@ func (ovsdb client) LogicalSwitchExists(lswitch string) (bool, error) {
 	return len(matches) > 0 && len(matches[0].Rows) > 0, nil
 }
 
+func (ovsdb client) UpdateSwitchPortAddresses(lportName string,
+	addresses []string) error {
+	results, err := ovsdb.Transact("OVN_Northbound", ovs.Operation{
+		Op:    "update",
+		Table: "Logical_Switch_Port",
+		Where: newCondition("name", "==", lportName),
+		Row: map[string]interface{}{
+			"addresses": newOvsSet(addresses),
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("transaction error: updating switch port %s: %s",
+			lportName, err)
+	}
+	return errorCheck(results, 1)
+}
+
 // ListSwitchPorts lists the logical ports in OVN.
 func (ovsdb client) ListSwitchPorts() ([]SwitchPort, error) {
 	portReply, err := ovsdb.Transact("OVN_Northbound", ovs.Operation{
@@ -147,6 +166,25 @@ func (ovsdb client) ListSwitchPorts() ([]SwitchPort, error) {
 		result = append(result, port)
 	}
 	return result, nil
+}
+
+// ListSwitchPort lists the logical port corresponding to the given name.
+func (ovsdb client) ListSwitchPort(name string) (SwitchPort, error) {
+	portReply, err := ovsdb.Transact("OVN_Northbound", ovs.Operation{
+		Op:    "select",
+		Table: "Logical_Switch_Port",
+		Where: newCondition("name", "==", name),
+	})
+	if err != nil {
+		return SwitchPort{}, fmt.Errorf(
+			"transaction error: listing switch ports: %s", err)
+	}
+
+	if len(portReply[0].Rows) == 0 {
+		return SwitchPort{}, errors.New("no matching port found")
+	}
+
+	return parseLogicalSwitchPort(portReply[0].Rows[0])
 }
 
 func parseLogicalSwitchPort(port row) (SwitchPort, error) {

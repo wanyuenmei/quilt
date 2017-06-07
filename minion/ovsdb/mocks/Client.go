@@ -157,6 +157,27 @@ func (_m *Client) ListAddressSets() ([]ovsdb.AddressSet, error) {
 	return r0, r1
 }
 
+// ListSwitchPort provides a mock function with given fields: name
+func (_m *Client) ListSwitchPort(name string) (ovsdb.SwitchPort, error) {
+	ret := _m.Called(name)
+
+	var r0 ovsdb.SwitchPort
+	if rf, ok := ret.Get(0).(func(string) ovsdb.SwitchPort); ok {
+		r0 = rf(name)
+	} else {
+		r0 = ret.Get(0).(ovsdb.SwitchPort)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(name)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ListSwitchPorts provides a mock function with given fields:
 func (_m *Client) ListSwitchPorts() ([]ovsdb.SwitchPort, error) {
 	ret := _m.Called()
@@ -222,4 +243,18 @@ func (_m *Client) OpenFlowPorts() (map[string]int, error) {
 	}
 
 	return r0, r1
+}
+
+// UpdateSwitchPortAddresses provides a mock function with given fields: name, addresses
+func (_m *Client) UpdateSwitchPortAddresses(name string, addresses []string) error {
+	ret := _m.Called(name, addresses)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, []string) error); ok {
+		r0 = rf(name, addresses)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }

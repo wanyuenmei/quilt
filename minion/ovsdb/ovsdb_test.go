@@ -198,6 +198,70 @@ func TestDeleteSwitchPort(t *testing.T) {
 	api.AssertExpectations(t)
 }
 
+func TestListSwitchPort(t *testing.T) {
+	t.Parallel()
+
+	anErr := errors.New("err")
+	api := new(mockTransact)
+	odb := Client(client{api})
+
+	api.On("Transact", mock.Anything, mock.Anything).Return(nil, anErr).Once()
+	_, err := odb.ListSwitchPort("name")
+	assert.EqualError(t, err, "transaction error: listing switch ports: err")
+
+	r := map[string]interface{}{
+		"_uuid": []interface{}{"a", "b"},
+		"name":  "name",
+		"type":  "",
+		"options": []interface{}{"map", []interface{}{
+			[]interface{}{"foo", "bar"},
+		}},
+		"addresses": []interface{}{"set", []interface{}{"addresses"}},
+	}
+	api.On("Transact", "OVN_Northbound", []ovs.Operation{{
+		Op:    "select",
+		Table: "Logical_Switch_Port",
+		Where: newCondition("name", "==", "name"),
+	}}).Return([]ovs.OperationResult{{
+		Rows: []map[string]interface{}{r}}}, nil).Once()
+
+	lport, err := odb.ListSwitchPort("name")
+	assert.NoError(t, err)
+	assert.Equal(t, SwitchPort{
+		uuid:      ovs.UUID{GoUUID: "b"},
+		Name:      "name",
+		Options:   map[string]string{"foo": "bar"},
+		Addresses: []string{"addresses"},
+	}, lport)
+}
+
+func TestUpdateSwitchPortAddresses(t *testing.T) {
+	t.Parallel()
+
+	anErr := errors.New("err")
+	api := new(mockTransact)
+	odb := Client(client{api})
+
+	api.On("Transact", mock.Anything, mock.Anything).Return(nil, anErr).Once()
+	err := odb.UpdateSwitchPortAddresses("lport", []string{"addresses"})
+	assert.EqualError(t, err, "transaction error: updating switch port lport: err")
+
+	api.On("Transact", "OVN_Northbound", []ovs.Operation{{
+		Op:    "update",
+		Table: "Logical_Switch_Port",
+		Where: newCondition("name", "==", "lport"),
+		Row: map[string]interface{}{
+			"addresses": newOvsSet([]string{"addresses"}),
+		},
+	}}).Return([]ovs.OperationResult{{
+		Rows: nil}}, nil).Once()
+
+	err = odb.UpdateSwitchPortAddresses("lport", []string{"addresses"})
+	assert.NoError(t, err)
+
+	api.AssertExpectations(t)
+}
+
 func TestListACLs(t *testing.T) {
 	t.Parallel()
 
