@@ -84,35 +84,35 @@ func updateLogicalSwitch(ovsdbClient ovsdb.Client, containers []db.Container) {
 		return
 	}
 
-	dbcKey := func(val interface{}) interface{} {
-		return val.(db.Container).IP
-	}
-	portKey := func(val interface{}) interface{} {
-		return val.(ovsdb.SwitchPort).Name
-	}
-
-	_, ovsps, dbcs := join.HashJoin(ovsdb.SwitchPortSlice(lports),
-		db.ContainerSlice(containers), portKey, dbcKey)
-
-	for _, dbcIface := range dbcs {
-		dbc := dbcIface.(db.Container)
-		lport := ovsdb.SwitchPort{
+	expPorts := []ovsdb.SwitchPort{}
+	for _, dbc := range containers {
+		expPorts = append(expPorts, ovsdb.SwitchPort{
 			Name: dbc.IP,
 			// OVN represents network interfaces with the empty string.
 			Type:      "",
 			Addresses: []string{ipdef.IPStrToMac(dbc.IP) + " " + dbc.IP},
-		}
+		})
+	}
+
+	key := func(intf interface{}) interface{} {
+		return intf.(ovsdb.SwitchPort).Name
+	}
+	_, toAdd, toDel := join.HashJoin(ovsdb.SwitchPortSlice(expPorts),
+		ovsdb.SwitchPortSlice(lports), key, key)
+
+	for _, intf := range toAdd {
+		lport := intf.(ovsdb.SwitchPort)
 		err := ovsdbClient.CreateSwitchPort(lSwitch, lport)
 		if err != nil {
 			log.WithError(err).Warnf(
-				"Failed to create logical switch port: %s", dbc.IP)
+				"Failed to create logical switch port: %s", lport.Name)
 		} else {
-			log.Infof("New logical switch port: %s", dbc.IP)
+			log.Infof("New logical switch port: %s", lport.Name)
 		}
 	}
 
-	for _, ovsp := range ovsps {
-		lport := ovsp.(ovsdb.SwitchPort)
+	for _, intf := range toDel {
+		lport := intf.(ovsdb.SwitchPort)
 		if err := ovsdbClient.DeleteSwitchPort(lSwitch, lport); err != nil {
 			log.WithError(err).Warnf(
 				"Failed to delete logical switch port: %s", lport.Name)
