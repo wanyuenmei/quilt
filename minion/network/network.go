@@ -60,6 +60,11 @@ func runMaster(conn db.Conn) {
 	}
 	defer ovsdbClient.Disconnect()
 
+	updateLogicalSwitch(ovsdbClient, containers)
+	updateACLs(ovsdbClient, connections, labels)
+}
+
+func updateLogicalSwitch(ovsdbClient ovsdb.Client, containers []db.Container) {
 	switchExists, err := ovsdbClient.LogicalSwitchExists(lSwitch)
 	if err != nil {
 		log.WithError(err).Error("Failed to check existence of logical switch")
@@ -115,6 +120,4 @@ func runMaster(conn db.Conn) {
 			log.Infof("Delete logical switch port: %s", lport.Name)
 		}
 	}
-
-	updateACLs(ovsdbClient, connections, labels)
 }
