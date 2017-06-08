@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 )
 
@@ -129,6 +130,9 @@ func FromFile(filename string) (Stitch, error) {
 	if err != nil {
 		return Stitch{}, errors.New(stderr.String())
 	}
+	// If there wasn't an error, still print stderr, in case there were any
+	// warnings or other non-fatal errors.
+	fmt.Fprint(os.Stderr, stderr.String())
 
 	return FromJSON(string(out))
 }
