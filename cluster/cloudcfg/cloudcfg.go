@@ -8,6 +8,8 @@ import (
 
 	"github.com/quilt/quilt/db"
 	"github.com/quilt/quilt/version"
+
+	log "github.com/Sirupsen/logrus"
 )
 
 const (
@@ -30,11 +32,13 @@ func Ubuntu(keys []string, role db.Role) string {
 		UbuntuVersion string
 		SSHKeys       string
 		Role          string
+		LogLevel      string
 	}{
 		QuiltImage:    img,
 		UbuntuVersion: "xenial",
 		SSHKeys:       strings.Join(keys, "\n"),
 		Role:          string(role),
+		LogLevel:      log.GetLevel().String(),
 	})
 	if err != nil {
 		panic(err)
