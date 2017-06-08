@@ -26,8 +26,7 @@ import (
 const DefaultRegion string = "sfo1"
 
 // Regions supported by the Digital Ocean API
-var Regions = []string{"ams1", "ams2", "ams3", "blr1", "fra1", "lon1", "nyc1", "nyc2",
-	"nyc3", "sfo1", "sfo2", "sgp1", "tor1"}
+var Regions = []string{"nyc1", "nyc2", "lon1", "sfo1", "sfo2"}
 
 var apiKeyPath = ".digitalocean/key"
 
