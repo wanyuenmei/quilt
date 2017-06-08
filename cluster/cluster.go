@@ -3,6 +3,7 @@ package cluster
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -432,14 +433,32 @@ func syncDB(cms []machine.Machine, dbms []db.Machine) syncDBResult {
 	return ret
 }
 
+type listResponse struct {
+	inst     instance
+	machines []machine.Machine
+	err      error
+}
+
 func (clst cluster) get() ([]machine.Machine, error) {
-	var cloudMachines []machine.Machine
+	var wg sync.WaitGroup
+	cloudMachinesChan := make(chan listResponse, len(clst.providers))
 	for inst, p := range clst.providers {
-		providerMachines, err := p.List()
-		if err != nil {
-			return []machine.Machine{}, fmt.Errorf("list %s: %s", inst, err)
+		wg.Add(1)
+		go func(inst instance, p provider) {
+			defer wg.Done()
+			machines, err := p.List()
+			cloudMachinesChan <- listResponse{inst, machines, err}
+		}(inst, p)
+	}
+	wg.Wait()
+	close(cloudMachinesChan)
+
+	var cloudMachines []machine.Machine
+	for res := range cloudMachinesChan {
+		if res.err != nil {
+			return nil, fmt.Errorf("list %s: %s", res.inst, res.err)
 		}
-		cloudMachines = append(cloudMachines, providerMachines...)
+		cloudMachines = append(cloudMachines, res.machines...)
 	}
 	return cloudMachines, nil
 }
