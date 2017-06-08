@@ -30,7 +30,7 @@ global._quiltDeployment = new Deployment({});
 // of the network connections (connections to other services are referenced by
 // the name of the service, but since the public internet is not a service,
 // we need a special label for it).
-var publicInternetLabel = "public";
+var publicInternetLabel = 'public';
 
 // Global unique ID counter.
 var uniqueIDCounter = 0;
@@ -45,7 +45,7 @@ function Deployment(deploymentOpts) {
     deploymentOpts = deploymentOpts || {};
 
     this.maxPrice = deploymentOpts.maxPrice || 0;
-    this.namespace = deploymentOpts.namespace || "default-namespace";
+    this.namespace = deploymentOpts.namespace || 'default-namespace';
     this.adminACL = deploymentOpts.adminACL || [];
 
     this.machines = [];
@@ -57,7 +57,7 @@ function Deployment(deploymentOpts) {
 }
 
 function omitSSHKey(key, value) {
-    if (key == "sshKeys") {
+    if (key == 'sshKeys') {
         return undefined;
     }
     return value;
@@ -72,7 +72,7 @@ function uniqueID() {
 // and Machines.
 function key(obj) {
     var keyObj = obj.clone();
-    keyObj._refID = "";
+    keyObj._refID = '';
     return stringify(keyObj, { replacer: omitSSHKey });
 }
 
@@ -258,7 +258,7 @@ function Service(name, containers) {
 
 // Get the Quilt hostname that represents the entire service.
 Service.prototype.hostname = function() {
-    return this.name + ".q";
+    return this.name + '.q';
 };
 
 // Get a list of Quilt hostnames that address the containers within the service.
@@ -266,7 +266,7 @@ Service.prototype.children = function() {
     var i;
     var res = [];
     for (i = 1; i < this.containers.length + 1; i++) {
-        res.push(i + "." + this.name + ".q");
+        res.push(i + '.' + this.name + '.q');
     }
     return res;
 };
@@ -300,13 +300,13 @@ Service.prototype.deploy = function(deployment) {
 };
 
 Service.prototype.connect = function(range, to) {
-    console.warn("Warning: connect is deprecated; switch to using " +
-        "allowFrom. If you previously used a.connect(5, b), you should " +
-        "now use b.allowFrom(a, 5).");
+    console.warn('Warning: connect is deprecated; switch to using ' +
+        'allowFrom. If you previously used a.connect(5, b), you should ' +
+        'now use b.allowFrom(a, 5).');
     if (!(to === publicInternet || to instanceof Service)) {
-        throw new Error("Services can only connect to other services. " +
-            "Check that you're connecting to a service, and not to a " +
-            "Container or other object.");
+        throw new Error(`Services can only connect to other services. ` +
+            `Check that you're connecting to a service, and not to a ` +
+            `Container or other object.`);
     }
     to.allowFrom(this, range);
 }
@@ -317,9 +317,9 @@ Service.prototype.allowFrom = function(sourceService, portRange) {
         return this.allowFromPublic(range);
     }
     if (!(sourceService instanceof Service)) {
-        throw new Error("Services can only connect to other services. " +
-            "Check that you're allowing connections from a service, and " +
-            "not from a Container or other object.");
+        throw new Error(`Services can only connect to other services. ` +
+            `Check that you're allowing connections from a service, and ` +
+            `not from a Container or other object.`);
     }
     this.allowedInboundConnections.push(
         new Connection(sourceService, portRange));
@@ -330,9 +330,9 @@ Service.prototype.allowFrom = function(sourceService, portRange) {
 // the allowOutboundPublic and allowFromPublic functions.
 var publicInternet = {
     connect: function(range, to) {
-        console.warn("Warning: connect is deprecated; switch to using " +
-            "allowFrom. Instead of publicInternet.connect(port, service), " +
-            "use service.allowFrom(publicInternet, port).");
+        console.warn('Warning: connect is deprecated; switch to using ' +
+            'allowFrom. Instead of publicInternet.connect(port, service), ' +
+            'use service.allowFrom(publicInternet, port).');
         to.allowFromPublic(range);
     },
     allowFrom: function(sourceService, portRange) {
@@ -345,8 +345,8 @@ var publicInternet = {
 
 // Allow outbound traffic from the service to public internet.
 Service.prototype.connectToPublic = function(range) {
-    console.warn("Warning: connectToPublic is deprecated; switch to using " +
-        "allowOutboundPublic.");
+    console.warn('Warning: connectToPublic is deprecated; switch to using ' +
+        'allowOutboundPublic.');
     this.allowOutboundPublic(range);
 }
 
@@ -361,8 +361,8 @@ Service.prototype.allowOutboundPublic = function(range) {
 
 // Allow inbound traffic from public internet to the service.
 Service.prototype.connectFromPublic = function(range) {
-    console.warn("Warning: connectFromPublic is deprecated; switch to " +
-        "allowFromPublic");
+    console.warn('Warning: connectFromPublic is deprecated; switch to ' +
+        'allowFromPublic');
     this.allowFromPublic(range);
 }
 
@@ -421,11 +421,11 @@ Service.prototype.getQuiltPlacements = function() {
             targetLabel: that.name,
             exclusive: placement.exclusive,
 
-            otherLabel: placement.otherLabel || "",
-            provider: placement.provider || "",
-            size: placement.size || "",
-            region: placement.region || "",
-            floatingIp: placement.floatingIp || ""
+            otherLabel: placement.otherLabel || '',
+            provider: placement.provider || '',
+            size: placement.size || '',
+            region: placement.region || '',
+            floatingIp: placement.floatingIp || ''
         });
     });
     return placements;
@@ -448,11 +448,11 @@ function boxRange(x) {
     if (x === undefined) {
         return new Range(0, 0);
     }
-    if (typeof x === "number") {
+    if (typeof x === 'number') {
         return new Range(x, x);
     }
     if (!(x instanceof Range)) {
-        throw new Error("Input argument must be a number or a Range")
+        throw new Error('Input argument must be a number or a Range')
     }
     return x
 }
@@ -460,11 +460,11 @@ function boxRange(x) {
 function Machine(optionalArgs) {
     this._refID = uniqueID();
 
-    this.provider = optionalArgs.provider || "";
-    this.role = optionalArgs.role || "";
-    this.region = optionalArgs.region || "";
-    this.size = optionalArgs.size || "";
-    this.floatingIp = optionalArgs.floatingIp || "";
+    this.provider = optionalArgs.provider || '';
+    this.role = optionalArgs.role || '';
+    this.region = optionalArgs.region || '';
+    this.size = optionalArgs.size || '';
+    this.floatingIp = optionalArgs.floatingIp || '';
     this.diskSize = optionalArgs.diskSize || 0;
     this.sshKeys = optionalArgs.sshKeys || [];
     this.cpu = boxRange(optionalArgs.cpu);
@@ -492,11 +492,11 @@ Machine.prototype.withRole = function(role) {
 };
 
 Machine.prototype.asWorker = function() {
-    return this.withRole("Worker");
+    return this.withRole('Worker');
 };
 
 Machine.prototype.asMaster = function() {
-    return this.withRole("Master");
+    return this.withRole('Master');
 };
 
 // Create n new machines with the same attributes.
@@ -578,16 +578,16 @@ Container.prototype.setHostname = function(h) {
 
 Container.prototype.getHostname = function() {
     if (this.hostname === undefined) {
-        throw new Error("no hostname");
+        throw new Error('no hostname');
     }
-    return this.hostname + ".q";
+    return this.hostname + '.q';
 };
 
-var enough = { form: "enough" };
-var between = invariantType("between");
-var neighbor = invariantType("reachDirect");
-var reachableACL = invariantType("reachACL");
-var reachable = invariantType("reach");
+var enough = { form: 'enough' };
+var between = invariantType('between');
+var neighbor = invariantType('reachDirect');
+var reachableACL = invariantType('reachACL');
+var reachable = invariantType('reach');
 
 function Assertion(invariant, desired) {
     this.form = invariant.form;

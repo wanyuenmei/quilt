@@ -132,7 +132,7 @@ describe('Bindings', function () {
         });
         it('preemptible attribute', function () {
             deployment.deploy(new Machine({
-              provider: "Amazon",
+              provider: 'Amazon',
               preemptible: true
             }).asMaster());
             checkMachines([{
