@@ -10,7 +10,7 @@ import (
 	"github.com/quilt/quilt/minion/docker"
 )
 
-func TestRunMaster(t *testing.T) {
+func TestSyncImages(t *testing.T) {
 	md, dk := docker.NewMock()
 	conn := db.New()
 
@@ -27,7 +27,7 @@ func TestRunMaster(t *testing.T) {
 		view.Commit(im)
 		return nil
 	})
-	runOnce(conn, dk)
+	syncImages(conn, dk)
 	assert.Equal(t, md.Built, map[docker.BuildImageOptions]struct{}{},
 		"should not attempt to build on worker")
 
@@ -38,7 +38,7 @@ func TestRunMaster(t *testing.T) {
 		view.Commit(m)
 		return nil
 	})
-	runOnce(conn, dk)
+	syncImages(conn, dk)
 
 	images := getImages(conn)
 	assert.Len(t, images, 1)
@@ -47,7 +47,7 @@ func TestRunMaster(t *testing.T) {
 
 	// Test ignoring already-built image.
 	md.ResetBuilt()
-	runOnce(conn, dk)
+	syncImages(conn, dk)
 
 	images = getImages(conn)
 	assert.Len(t, images, 1)

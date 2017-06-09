@@ -26,16 +26,19 @@ restart containers running the custom image.
 4) The workers pull and run the image just like any other image.
 */
 
-// Run builds Docker images according to the Image table.
+// Run builds Docker images according to the Image table if the minion's Role is
+// Master, and does nothing otherwise.
 func Run(conn db.Conn, dk docker.Client) {
 	bootWait()
 
 	for range conn.TriggerTick(30, db.ImageTable).C {
-		runOnce(conn, dk)
+		syncImages(conn, dk)
 	}
 }
 
-func runOnce(conn db.Conn, dk docker.Client) {
+// syncImages checks the Image table for any images that have not yet been
+// built, and builds them.
+func syncImages(conn db.Conn, dk docker.Client) {
 	self := conn.MinionSelf()
 	if self.Role != db.Master {
 		return
@@ -79,6 +82,7 @@ func updateRegistry(dk docker.Client, img db.Image) (string, error) {
 	return id, err
 }
 
+// bootWait blocks until the registry is ready to be pushed to.
 func bootWait() {
 	for {
 		_, err := http.Get("http://localhost:5000")
