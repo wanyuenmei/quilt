@@ -14,28 +14,11 @@ func TestSyncImages(t *testing.T) {
 	md, dk := docker.NewMock()
 	conn := db.New()
 
-	// Test only run on masters.
+	// Test building an image.
 	conn.Txn(db.AllTables...).Run(func(view db.Database) error {
-		m := view.InsertMinion()
-		m.Self = true
-		m.Role = db.Worker
-		m.PrivateIP = "8.8.8.8"
-		view.Commit(m)
-
 		im := view.InsertImage()
 		im.Name = "image"
 		view.Commit(im)
-		return nil
-	})
-	syncImages(conn, dk)
-	assert.Equal(t, md.Built, map[docker.BuildImageOptions]struct{}{},
-		"should not attempt to build on worker")
-
-	// Test building an image.
-	conn.Txn(db.AllTables...).Run(func(view db.Database) error {
-		m := view.SelectFromMinion(nil)[0]
-		m.Role = db.Master
-		view.Commit(m)
 		return nil
 	})
 	syncImages(conn, dk)

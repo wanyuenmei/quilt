@@ -29,8 +29,11 @@ restart containers running the custom image.
 // Run builds Docker images according to the Image table if the minion's Role is
 // Master, and does nothing otherwise.
 func Run(conn db.Conn, dk docker.Client) {
-	bootWait()
+	if conn.MinionSelf().Role != db.Master {
+		return
+	}
 
+	bootWait()
 	for range conn.TriggerTick(30, db.ImageTable).C {
 		syncImages(conn, dk)
 	}
@@ -39,11 +42,6 @@ func Run(conn db.Conn, dk docker.Client) {
 // syncImages checks the Image table for any images that have not yet been
 // built, and builds them.
 func syncImages(conn db.Conn, dk docker.Client) {
-	self := conn.MinionSelf()
-	if self.Role != db.Master {
-		return
-	}
-
 	var toBuild []db.Image
 	conn.Txn(db.ImageTable).Run(func(view db.Database) error {
 		toBuild = view.SelectFromImage(func(img db.Image) bool {
