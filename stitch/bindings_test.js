@@ -419,6 +419,15 @@ describe('Bindings', function () {
             expect(connections).to.have.lengthOf(expected.length)
                 .and.containSubset(expected);
         };
+        it('autobox port ranges', function () {
+            bar.allowFrom(foo, 80);
+            checkConnections([{
+                from: 'foo',
+                to: 'bar',
+                minPort: 80,
+                maxPort: 80,
+            }]);
+        });
         it('port', function () {
             bar.allowFrom(foo, new Port(80));
             checkConnections([{

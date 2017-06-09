@@ -312,9 +312,9 @@ Service.prototype.connect = function(range, to) {
 }
 
 Service.prototype.allowFrom = function(sourceService, portRange) {
-    range = boxRange(portRange);
+    portRange = boxRange(portRange);
     if (sourceService === publicInternet) {
-        return this.allowFromPublic(range);
+        return this.allowFromPublic(portRange);
     }
     if (!(sourceService instanceof Service)) {
         throw new Error(`Services can only connect to other services. ` +
