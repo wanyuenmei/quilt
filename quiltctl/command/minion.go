@@ -68,14 +68,11 @@ func (mCmd *Minion) Run() int {
 }
 
 func (mCmd *Minion) run() error {
-
 	role, err := db.ParseRole(mCmd.role)
-
 	if err != nil || role == db.None {
 		return errors.New("no or improper role specified")
 	}
 
 	minion.Run(role, mCmd.inboundPubIntf, mCmd.outboundPubIntf)
-
 	return nil
 }
