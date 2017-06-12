@@ -99,7 +99,7 @@ func New(lAddr string) (Client, error) {
 		pbClient:   pbClient,
 		cc:         cc,
 		serverHost: host,
-	}, err
+	}, nil
 }
 
 func query(pbClient pb.APIClient, table db.TableType) (interface{}, error) {
