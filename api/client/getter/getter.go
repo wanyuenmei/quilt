@@ -29,14 +29,7 @@ type clientGetterImpl struct {
 }
 
 func (getter addrClientGetterImpl) Client(host string) (client.Client, error) {
-	c, err := client.New(host)
-	if err != nil {
-		return nil, daemonConnectError{
-			host:         host,
-			connectError: err,
-		}
-	}
-	return c, nil
+	return client.New(host)
 }
 
 func (getter clientGetterImpl) LeaderClient(localClient client.Client) (
@@ -129,16 +122,4 @@ func getPublicIP(c client.Client, privateIP string) (string, error) {
 	}
 
 	return "", fmt.Errorf("no machine with private IP %s", privateIP)
-}
-
-// daemonConnectError represents when we are unable to connect to the Quilt daemon.
-type daemonConnectError struct {
-	host         string
-	connectError error
-}
-
-func (err daemonConnectError) Error() string {
-	return fmt.Sprintf("Unable to connect to the Quilt daemon at %s: %s. "+
-		"Is the quilt daemon running? If not, you can start it with "+
-		"`quilt daemon`.", err.host, err.connectError.Error())
 }

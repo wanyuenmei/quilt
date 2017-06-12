@@ -90,6 +90,12 @@ func New(lAddr string) (Client, error) {
 	cc, err := grpc.Dial(addr, grpc.WithDialer(dialer), grpc.WithInsecure(),
 		grpc.WithBlock(), grpc.WithTimeout(connectTimeout))
 	if err != nil {
+		if err == context.DeadlineExceeded {
+			err = daemonTimeoutError{
+				host:         lAddr,
+				connectError: err,
+			}
+		}
 		return nil, err
 	}
 
@@ -236,4 +242,17 @@ func (c clientImpl) Version() (string, error) {
 
 func (c clientImpl) Host() string {
 	return c.serverHost
+}
+
+// daemonTimeoutError represents when we are unable to connect to the Quilt
+// daemon because of a timeout.
+type daemonTimeoutError struct {
+	host         string
+	connectError error
+}
+
+func (err daemonTimeoutError) Error() string {
+	return fmt.Sprintf("Unable to connect to the Quilt daemon at %s: %s. "+
+		"Is the quilt daemon running? If not, you can start it with "+
+		"`quilt daemon`.", err.host, err.connectError.Error())
 }
