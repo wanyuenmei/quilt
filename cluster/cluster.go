@@ -34,19 +34,19 @@ type provider interface {
 // Store the providers in a variable so we can change it in the tests
 var allProviders = []db.Provider{db.Amazon, db.DigitalOcean, db.Google, db.Vagrant}
 
-type instance struct {
+type launchLoc struct {
 	provider db.Provider
 	region   string
 }
 
-func (inst instance) String() string {
-	return fmt.Sprintf("%s-%s", inst.provider, inst.region)
+func (loc launchLoc) String() string {
+	return fmt.Sprintf("%s-%s", loc.provider, loc.region)
 }
 
 type cluster struct {
 	namespace string
 	conn      db.Conn
-	providers map[instance]provider
+	providers map[launchLoc]provider
 }
 
 var myIP = util.MyIP
@@ -96,12 +96,12 @@ func newCluster(conn db.Conn, namespace string) *cluster {
 	clst := &cluster{
 		namespace: namespace,
 		conn:      conn,
-		providers: make(map[instance]provider),
+		providers: make(map[launchLoc]provider),
 	}
 
 	for _, p := range allProviders {
 		for _, r := range validRegions(p) {
-			if _, err := clst.getProvider(instance{p, r}); err != nil {
+			if _, err := clst.getProvider(launchLoc{p, r}); err != nil {
 				log.Debugf("Failed to connect to provider %s in %s: %s",
 					p, r, err)
 			}
@@ -119,8 +119,8 @@ func (clst cluster) runOnce() {
 	 * - Compute a diff.
 	 * - Update the cloud provider accordingly.
 	 *
-	 * Updating the cloud provider may have consequences (creating machines for
-	 * instances) that should be reflected in the database.  Therefore, if updates
+	 * Updating the cloud provider may have consequences (creating machines, for
+	 * example) that should be reflected in the database.  Therefore, if updates
 	 * are necessary the code loops so that database can be updated before the next
 	 * runOnce() call.  Once the loop as converged, it then updates the cluster ACLs
 	 * before finally exiting. */
@@ -166,13 +166,13 @@ func (clst cluster) updateCloud(machines []machine.Machine, act action) {
 		Infof("Attempt to %s machines.", actionString)
 
 	noFailures := true
-	groupedMachines := groupBy(machines)
-	for i, providerMachines := range groupedMachines {
-		providerInst, err := clst.getProvider(i)
+	groupedMachines := groupByLoc(machines)
+	for loc, providerMachines := range groupedMachines {
+		providerInst, err := clst.getProvider(loc)
 		if err != nil {
 			noFailures = false
 			log.Warnf("Provider %s is unavailable in %s: %s",
-				i.provider, i.region, err)
+				loc.provider, loc.region, err)
 			continue
 		}
 
@@ -190,14 +190,14 @@ func (clst cluster) updateCloud(machines []machine.Machine, act action) {
 			switch act {
 			case boot:
 				log.WithError(err).Warnf(
-					"Unable to boot machines on %s.", i.provider)
+					"Unable to boot machines on %s.", loc)
 			case stop:
 				log.WithError(err).Warnf(
-					"Unable to stop machines on %s", i.provider)
+					"Unable to stop machines on %s", loc)
 			case updateIPs:
 				log.WithError(err).Warnf(
 					"Unable to update floating IPs on %s",
-					i.provider)
+					loc)
 			}
 		}
 	}
@@ -322,7 +322,7 @@ func (clst cluster) syncACLs(adminACLs []string, appACLs []db.PortRange,
 	}
 
 	// Providers with at least one machine.
-	prvdrSet := map[instance]struct{}{}
+	prvdrSet := map[launchLoc]struct{}{}
 	for _, m := range machines {
 		if m.PublicIP != "" {
 			// XXX: Look into the minimal set of necessary ports.
@@ -332,20 +332,20 @@ func (clst cluster) syncACLs(adminACLs []string, appACLs []db.PortRange,
 				MaxPort: 65535,
 			})
 		}
-		prvdrSet[instance{m.Provider, m.Region}] = struct{}{}
+		prvdrSet[launchLoc{m.Provider, m.Region}] = struct{}{}
 	}
 
-	for inst, prvdr := range clst.providers {
+	for loc, prvdr := range clst.providers {
 		// For providers with no specified machines, we remove all ACLs.
 		// Otherwise we set acls to what's specified.
 		var setACLs []acl.ACL
-		if _, ok := prvdrSet[inst]; ok {
+		if _, ok := prvdrSet[loc]; ok {
 			setACLs = acls
 		}
 
 		if err := prvdr.SetACLs(setACLs); err != nil {
 			log.WithError(err).Warnf("Could not update ACLs on %s in %s.",
-				inst.provider, inst.region)
+				loc.provider, loc.region)
 		}
 	}
 }
@@ -434,7 +434,7 @@ func syncDB(cms []machine.Machine, dbms []db.Machine) syncDBResult {
 }
 
 type listResponse struct {
-	inst     instance
+	loc      launchLoc
 	machines []machine.Machine
 	err      error
 }
@@ -442,13 +442,13 @@ type listResponse struct {
 func (clst cluster) get() ([]machine.Machine, error) {
 	var wg sync.WaitGroup
 	cloudMachinesChan := make(chan listResponse, len(clst.providers))
-	for inst, p := range clst.providers {
+	for loc, p := range clst.providers {
 		wg.Add(1)
-		go func(inst instance, p provider) {
+		go func(loc launchLoc, p provider) {
 			defer wg.Done()
 			machines, err := p.List()
-			cloudMachinesChan <- listResponse{inst, machines, err}
-		}(inst, p)
+			cloudMachinesChan <- listResponse{loc, machines, err}
+		}(loc, p)
 	}
 	wg.Wait()
 	close(cloudMachinesChan)
@@ -456,31 +456,31 @@ func (clst cluster) get() ([]machine.Machine, error) {
 	var cloudMachines []machine.Machine
 	for res := range cloudMachinesChan {
 		if res.err != nil {
-			return nil, fmt.Errorf("list %s: %s", res.inst, res.err)
+			return nil, fmt.Errorf("list %s: %s", res.loc, res.err)
 		}
 		cloudMachines = append(cloudMachines, res.machines...)
 	}
 	return cloudMachines, nil
 }
 
-func (clst cluster) getProvider(inst instance) (provider, error) {
-	p, ok := clst.providers[inst]
+func (clst cluster) getProvider(loc launchLoc) (provider, error) {
+	p, ok := clst.providers[loc]
 	if ok {
 		return p, nil
 	}
 
-	p, err := newProvider(inst.provider, clst.namespace, inst.region)
+	p, err := newProvider(loc.provider, clst.namespace, loc.region)
 	if err == nil {
-		clst.providers[inst] = p
+		clst.providers[loc] = p
 	}
 	return p, err
 }
 
-func groupBy(machines []machine.Machine) map[instance][]machine.Machine {
-	machineMap := map[instance][]machine.Machine{}
+func groupByLoc(machines []machine.Machine) map[launchLoc][]machine.Machine {
+	machineMap := map[launchLoc][]machine.Machine{}
 	for _, m := range machines {
-		i := instance{m.Provider, m.Region}
-		machineMap[i] = append(machineMap[i], m)
+		loc := launchLoc{m.Provider, m.Region}
+		machineMap[loc] = append(machineMap[loc], m)
 	}
 
 	return machineMap

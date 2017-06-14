@@ -390,7 +390,7 @@ func TestSync(t *testing.T) {
 		expected assertion) {
 
 		clst.runOnce()
-		inst := instance{provider, region}
+		inst := launchLoc{provider, region}
 		providerInst := clst.providers[inst].(*fakeProvider)
 
 		if !emptySlices(expected.boot, providerInst.bootRequests) {
@@ -646,7 +646,7 @@ func TestACLs(t *testing.T) {
 			MaxPort: 65535,
 		},
 	}
-	inst := instance{FakeAmazon, testRegion}
+	inst := launchLoc{FakeAmazon, testRegion}
 	actual := clst.providers[inst].(*fakeProvider).aclRequests
 	assert.Equal(t, exp, actual)
 }
@@ -662,7 +662,7 @@ func TestUpdateCluster(t *testing.T) {
 	assert.NotNil(t, clst)
 	assert.Equal(t, "ns1", clst.namespace)
 
-	inst := instance{FakeAmazon, testRegion}
+	inst := launchLoc{FakeAmazon, testRegion}
 	amzn := clst.providers[inst].(*fakeProvider)
 	assert.Empty(t, amzn.bootRequests)
 	assert.Empty(t, amzn.stopRequests)
@@ -792,7 +792,7 @@ func TestMultiRegionDeploy(t *testing.T) {
 
 func TestGetError(t *testing.T) {
 	_, err := cluster{
-		providers: map[instance]provider{
+		providers: map[launchLoc]provider{
 			{db.Amazon, "us-west-1"}: &fakeProvider{
 				listError: errors.New("err"),
 			},
