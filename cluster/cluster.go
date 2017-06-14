@@ -121,9 +121,9 @@ func (clst cluster) runOnce() {
 	 *
 	 * Updating the cloud provider may have consequences (creating machines, for
 	 * example) that should be reflected in the database.  Therefore, if updates
-	 * are necessary the code loops so that database can be updated before the next
-	 * runOnce() call.  Once the loop as converged, it then updates the cluster ACLs
-	 * before finally exiting. */
+	 * are necessary, the code loops a second time so that the database can be
+	 * updated before the next runOnce() call.
+	 */
 	for i := 0; i < 2; i++ {
 		jr, err := clst.join()
 		if err != nil {
