@@ -9,27 +9,19 @@ import (
 	log "github.com/Sirupsen/logrus"
 
 	"github.com/quilt/quilt/api"
-	"github.com/quilt/quilt/api/client/getter"
+	"github.com/quilt/quilt/api/client"
 )
 
 var connectionRegex = regexp.MustCompile(`Registering worker (\d+\.\d+\.\d+\.\d+:\d+)`)
 
 func main() {
-	clientGetter := getter.New()
-
-	clnt, err := clientGetter.Client(api.DefaultSocket)
+	clnt, err := client.New(api.DefaultSocket)
 	if err != nil {
 		log.WithError(err).Fatal("FAILED, couldn't get quiltctl client.")
 	}
 	defer clnt.Close()
 
-	leader, err := clientGetter.LeaderClient(clnt)
-	if err != nil {
-		log.WithError(err).Fatal("FAILED, couldn't get leader client.")
-	}
-	defer leader.Close()
-
-	containers, err := leader.QueryContainers()
+	containers, err := clnt.QueryContainers()
 	if err != nil {
 		log.WithError(err).Fatal("FAILED, couldn't query containers.")
 	}

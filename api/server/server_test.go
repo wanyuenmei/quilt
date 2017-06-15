@@ -1,11 +1,16 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"golang.org/x/net/context"
 
+	"github.com/quilt/quilt/api"
+	"github.com/quilt/quilt/api/client"
+	"github.com/quilt/quilt/api/client/mocks"
 	"github.com/quilt/quilt/api/pb"
 	"github.com/quilt/quilt/db"
 	"github.com/quilt/quilt/stitch"
@@ -20,7 +25,23 @@ func checkQuery(t *testing.T, s server, table db.TableType, exp string) {
 	assert.Equal(t, exp, reply.TableContents, "Wrong query response")
 }
 
-func TestMachineResponse(t *testing.T) {
+func TestQueryErrors(t *testing.T) {
+	// Invalid table type.
+	_, err := server{}.Query(context.Background(),
+		&pb.DBQuery{Table: string(db.HostnameTable)})
+	assert.EqualError(t, err, "unrecognized table: db.Hostname")
+
+	// Error getting the leader client.
+	newLeaderClient = func(_ []db.Machine) (client.Client, error) {
+		return nil, errors.New("get leader error")
+	}
+	s := server{db.New(), true}
+	_, err = s.Query(context.Background(),
+		&pb.DBQuery{Table: string(db.ContainerTable)})
+	assert.EqualError(t, err, "get leader error")
+}
+
+func TestQueryMachinesDaemon(t *testing.T) {
 	t.Parallel()
 
 	conn := db.New()
@@ -41,10 +62,10 @@ func TestMachineResponse(t *testing.T) {
 		`"Preemptible":false,"CloudID":"","PublicIP":"8.8.8.8",` +
 		`"PrivateIP":"9.9.9.9","Connected":false}]`
 
-	checkQuery(t, server{conn}, db.MachineTable, exp)
+	checkQuery(t, server{conn, true}, db.MachineTable, exp)
 }
 
-func TestContainerResponse(t *testing.T) {
+func TestQueryContainersCluster(t *testing.T) {
 	t.Parallel()
 
 	conn := db.New()
@@ -63,7 +84,59 @@ func TestContainerResponse(t *testing.T) {
 		`"Labels":["labelA","labelB"],"Created":"0001-01-01T00:00:00Z",` +
 		`"Image":"image"}]`
 
-	checkQuery(t, server{conn}, db.ContainerTable, exp)
+	checkQuery(t, server{conn, false}, db.ContainerTable, exp)
+}
+
+func TestQueryContainersDaemon(t *testing.T) {
+	newClient = func(host string) (client.Client, error) {
+		switch host {
+		case api.RemoteAddress("9.9.9.9"):
+			return &mocks.Client{
+				ContainerReturn: []db.Container{
+					{
+						StitchID: "onWorker",
+						Image:    "shouldIgnore",
+						DockerID: "dockerID",
+					},
+				},
+			}, nil
+		default:
+			t.Fatalf("Unexpected call to getClient with host %s",
+				host)
+		}
+		panic("unreached")
+	}
+
+	newLeaderClient = func(_ []db.Machine) (client.Client, error) {
+		return &mocks.Client{
+			ContainerReturn: []db.Container{
+				{
+					StitchID: "notScheduled",
+					Image:    "notScheduled",
+				},
+				{
+					StitchID: "onWorker",
+					Image:    "onWorker",
+				},
+			},
+		}, nil
+	}
+
+	conn := db.New()
+	conn.Txn(db.MachineTable).Run(func(view db.Database) error {
+		m := view.InsertMachine()
+		m.PublicIP = "9.9.9.9"
+		m.Role = db.Worker
+		view.Commit(m)
+
+		return nil
+	})
+
+	exp := `[{"StitchID":"notScheduled","Created":"0001-01-01T00:00:00Z",` +
+		`"Image":"notScheduled"},{"StitchID":"onWorker",` +
+		`"DockerID":"dockerID","Created":"0001-01-01T00:00:00Z",` +
+		`"Image":"onWorker"}]`
+	checkQuery(t, server{conn, true}, db.ContainerTable, exp)
 }
 
 func TestBadDeployment(t *testing.T) {
@@ -184,4 +257,59 @@ func TestVagrantDeployment(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, exp, actual)
+}
+
+func TestUpdateLeaderContainerAttrs(t *testing.T) {
+	t.Parallel()
+
+	created := time.Now()
+
+	lContainers := []db.Container{
+		{
+			StitchID: "1",
+		},
+	}
+
+	wContainers := []db.Container{
+		{
+			StitchID: "1",
+			Created:  created,
+		},
+	}
+
+	// Test update a matching container.
+	expect := wContainers
+	result := updateLeaderContainerAttrs(lContainers, wContainers)
+	assert.Equal(t, expect, result)
+
+	// Test container in leader, not in worker.
+	newContainer := db.Container{
+		StitchID: "2",
+	}
+	lContainers = append(lContainers, newContainer)
+	expect = append(expect, newContainer)
+	result = updateLeaderContainerAttrs(lContainers, wContainers)
+	assert.Equal(t, expect, result)
+
+	// Test if wContainers empty.
+	lContainers = wContainers
+	wContainers = []db.Container{}
+	expect = lContainers
+	result = updateLeaderContainerAttrs(lContainers, wContainers)
+	assert.Equal(t, expect, result)
+
+	// Test if wContainers and lContainers empty.
+	lContainers = []db.Container{}
+	expect = nil
+	result = updateLeaderContainerAttrs(lContainers, wContainers)
+	assert.Equal(t, expect, result)
+
+	// Test a deployed Dockerfile.
+	lContainers = []db.Container{{StitchID: "1", Image: "image"}}
+	wContainers = []db.Container{
+		{StitchID: "1", Image: "8.8.8.8/image", Created: created},
+	}
+	expect = []db.Container{{StitchID: "1", Image: "image", Created: created}}
+	result = updateLeaderContainerAttrs(lContainers, wContainers)
+	assert.Equal(t, expect, result)
 }

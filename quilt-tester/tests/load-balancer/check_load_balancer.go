@@ -7,7 +7,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 
 	"github.com/quilt/quilt/api"
-	"github.com/quilt/quilt/api/client/getter"
+	"github.com/quilt/quilt/api/client"
 	"github.com/quilt/quilt/db"
 )
 
@@ -17,19 +17,13 @@ const (
 )
 
 func main() {
-	c, err := getter.New().Client(api.DefaultSocket)
+	c, err := client.New(api.DefaultSocket)
 	if err != nil {
 		log.WithError(err).Fatal("FAILED, couldn't get local client")
 	}
 	defer c.Close()
 
-	leaderClient, err := getter.New().LeaderClient(c)
-	if err != nil {
-		log.WithError(err).Fatal("FAILED, couldn't get leader client")
-	}
-	defer leaderClient.Close()
-
-	containers, err := leaderClient.QueryContainers()
+	containers, err := c.QueryContainers()
 	if err != nil {
 		log.WithError(err).Fatal("FAILED, couldn't get containers")
 	}

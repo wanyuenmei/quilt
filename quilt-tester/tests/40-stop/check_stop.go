@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/quilt/quilt/api"
-	"github.com/quilt/quilt/api/client/getter"
+	"github.com/quilt/quilt/api/client"
 	"github.com/quilt/quilt/minion/supervisor/images"
 
 	log "github.com/Sirupsen/logrus"
@@ -21,7 +21,7 @@ func main() {
 	log.Info("Sleeping thirty seconds for `quilt stop -containers` to take effect")
 	time.Sleep(30 * time.Second)
 
-	c, err := getter.New().Client(api.DefaultSocket)
+	c, err := client.New(api.DefaultSocket)
 	if err != nil {
 		log.WithError(err).Fatal("FAILED, couldn't get quiltctl client")
 	}

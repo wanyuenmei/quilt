@@ -10,10 +10,8 @@ import (
 
 	units "github.com/docker/go-units"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 
-	"github.com/quilt/quilt/api"
-	clientMock "github.com/quilt/quilt/api/client/mocks"
+	"github.com/quilt/quilt/api/client/mocks"
 	"github.com/quilt/quilt/db"
 )
 
@@ -38,221 +36,25 @@ func TestPsFlags(t *testing.T) {
 func TestPsErrors(t *testing.T) {
 	t.Parallel()
 
-	var cmd *Ps
-	var mockGetter *clientMock.Getter
-	var mockClient, mockLeaderClient *clientMock.Client
-
 	mockErr := errors.New("error")
 
-	// Error querying machines
-	mockGetter = new(clientMock.Getter)
-	mockClient = &clientMock.Client{MachineErr: mockErr}
-	mockGetter.On("LeaderClient", mock.Anything).Return(nil, mockErr)
-
-	cmd = &Ps{false, mockGetter, &connectionHelper{client: mockClient}}
-	assert.EqualError(t, cmd.run(), "unable to query machines: error")
-	mockGetter.AssertExpectations(t)
-
-	// Error connecting to leader
-	mockGetter = new(clientMock.Getter)
-	mockClient = new(clientMock.Client)
-	mockGetter.On("LeaderClient", mock.Anything).Return(nil, mockErr)
-
-	cmd = &Ps{false, mockGetter, &connectionHelper{client: mockClient}}
-	assert.NoError(t, cmd.run())
-	mockGetter.AssertExpectations(t)
-
 	// Error querying containers
-	mockGetter = new(clientMock.Getter)
-	mockClient = new(clientMock.Client)
-	mockLeaderClient = &clientMock.Client{ContainerErr: mockErr}
-	mockGetter.On("LeaderClient", mock.Anything).Return(mockLeaderClient, nil)
-
-	cmd = &Ps{false, mockGetter, &connectionHelper{client: mockClient}}
+	mockClient := &mocks.Client{ContainerErr: mockErr}
+	cmd := &Ps{false, &connectionHelper{client: mockClient}}
 	assert.EqualError(t, cmd.run(), "unable to query containers: error")
-	mockGetter.AssertExpectations(t)
 
 	// Error querying connections from LeaderClient
-	mockGetter = new(clientMock.Getter)
-	mockClient = new(clientMock.Client)
-	mockLeaderClient = &clientMock.Client{ConnectionErr: mockErr}
-	mockGetter.On("LeaderClient", mock.Anything).Return(mockLeaderClient, nil)
-
-	cmd = &Ps{false, mockGetter, &connectionHelper{client: mockClient}}
+	mockClient = &mocks.Client{ConnectionErr: mockErr}
+	cmd = &Ps{false, &connectionHelper{client: mockClient}}
 	assert.EqualError(t, cmd.run(), "unable to query connections: error")
-	mockGetter.AssertExpectations(t)
-
-	// Error querying containers in queryWorkers(), but fine for Leader.
-	mockGetter = new(clientMock.Getter)
-	mockClient = &clientMock.Client{
-		MachineReturn: []db.Machine{
-			{
-				PublicIP: "1.2.3.4",
-				Role:     db.Worker,
-			},
-		},
-		ContainerErr: mockErr,
-	}
-	mockLeaderClient = new(clientMock.Client)
-	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
-	mockGetter.On("LeaderClient", mock.Anything).Return(mockLeaderClient, nil)
-
-	cmd = &Ps{false, mockGetter, &connectionHelper{client: mockClient}}
-	assert.Equal(t, 0, cmd.Run())
-	mockGetter.AssertExpectations(t)
 }
 
 func TestPsSuccess(t *testing.T) {
 	t.Parallel()
 
-	mockGetter := new(clientMock.Getter)
-	mockClient := new(clientMock.Client)
-	mockLeaderClient := new(clientMock.Client)
-
-	mockGetter.On("LeaderClient", mock.Anything).Return(mockLeaderClient, nil)
-
-	cmd := &Ps{false, mockGetter, &connectionHelper{client: mockClient}}
+	mockClient := new(mocks.Client)
+	cmd := &Ps{false, &connectionHelper{client: mockClient}}
 	assert.Equal(t, 0, cmd.Run())
-	mockGetter.AssertExpectations(t)
-}
-
-func TestQueryWorkersSuccess(t *testing.T) {
-	t.Parallel()
-
-	containers := []db.Container{
-		{
-			StitchID: "1",
-		},
-	}
-
-	machines := []db.Machine{
-		{
-			PublicIP: "1.2.3.4",
-			Role:     db.Worker,
-		},
-	}
-
-	mockGetter := new(clientMock.Getter)
-	mockClient := &clientMock.Client{
-		ContainerReturn: containers,
-	}
-	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
-
-	cmd := &Ps{false, mockGetter, &connectionHelper{}}
-	result := cmd.queryWorkers(machines)
-	assert.Equal(t, containers, result)
-	mockGetter.AssertExpectations(t)
-}
-
-func TestQueryWorkersFailure(t *testing.T) {
-	t.Parallel()
-
-	containers := []db.Container{
-		{
-			StitchID: "1",
-		},
-	}
-
-	machines := []db.Machine{
-		{
-			PublicIP: "1.2.3.4",
-			Role:     db.Worker,
-		},
-		{
-			PublicIP: "5.6.7.8",
-			Role:     db.Worker,
-		},
-	}
-
-	mockErr := errors.New("error")
-
-	// Getting Worker Machine Client fails. Still query non-failing machine.
-	mockClient := &clientMock.Client{
-		ContainerReturn: containers,
-	}
-	mockGetter := new(clientMock.Getter)
-	mockGetter.On("Client", api.RemoteAddress("1.2.3.4")).Return(nil, mockErr)
-	mockGetter.On("Client", api.RemoteAddress("5.6.7.8")).Return(mockClient, nil)
-
-	cmd := &Ps{false, mockGetter, &connectionHelper{}}
-	result := cmd.queryWorkers(machines)
-	assert.Equal(t, containers, result)
-	mockGetter.AssertExpectations(t)
-
-	// Worker Machine client throws error.
-	// Still get container from non-failing machine.
-	mockGetter = new(clientMock.Getter)
-	failingClient := &clientMock.Client{
-		ContainerErr: mockErr,
-	}
-	mockGetter.On("Client", api.RemoteAddress("1.2.3.4")).Return(failingClient, nil)
-	mockGetter.On("Client", api.RemoteAddress("5.6.7.8")).Return(mockClient, nil)
-
-	cmd = &Ps{false, mockGetter, &connectionHelper{}}
-	result = cmd.queryWorkers(machines)
-	assert.Equal(t, containers, result)
-	mockGetter.AssertExpectations(t)
-}
-
-func TestUpdateContainers(t *testing.T) {
-	t.Parallel()
-
-	created := time.Now()
-
-	lContainers := []db.Container{
-		{
-			StitchID: "1",
-		},
-	}
-
-	wContainers := []db.Container{
-		{
-			StitchID: "1",
-			Created:  created,
-		},
-	}
-
-	// Test update a matching container.
-	expect := wContainers
-	result := updateContainers(lContainers, wContainers)
-	assert.Equal(t, expect, result)
-
-	// Test container in leader, not in worker.
-	newContainer := db.Container{
-		StitchID: "2",
-	}
-	lContainers = append(lContainers, newContainer)
-	expect = append(expect, newContainer)
-	result = updateContainers(lContainers, wContainers)
-	assert.Equal(t, expect, result)
-
-	// Test if lContainers empty.
-	lContainers = []db.Container{}
-	expect = wContainers
-	result = updateContainers(lContainers, wContainers)
-	assert.Equal(t, expect, result)
-
-	// Test if wContainers empty.
-	lContainers = wContainers
-	wContainers = []db.Container{}
-	expect = lContainers
-	result = updateContainers(lContainers, wContainers)
-	assert.Equal(t, expect, result)
-
-	// Test if both empty.
-	lContainers = []db.Container{}
-	expect = []db.Container{}
-	result = updateContainers(lContainers, wContainers)
-	assert.Equal(t, expect, result)
-
-	// Test a deployed Dockerfile.
-	lContainers = []db.Container{{StitchID: "1", Image: "image"}}
-	wContainers = []db.Container{
-		{StitchID: "1", Image: "8.8.8.8/image", Created: created},
-	}
-	expect = []db.Container{{StitchID: "1", Image: "image", Created: created}}
-	result = updateContainers(lContainers, wContainers)
-	assert.Equal(t, expect, result)
 }
 
 func TestMachineOutput(t *testing.T) {

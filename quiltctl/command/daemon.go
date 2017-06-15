@@ -57,7 +57,7 @@ func (dCmd *Daemon) Run() int {
 	log.WithField("version", version.Version).Info("Starting Quilt daemon")
 	conn := db.New()
 	go engine.Run(conn)
-	go server.Run(conn, dCmd.host)
+	go server.Run(conn, dCmd.host, true)
 	cluster.Run(conn)
 	return 0
 }

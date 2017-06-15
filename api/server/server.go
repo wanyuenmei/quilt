@@ -7,10 +7,12 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/quilt/quilt/api"
+	"github.com/quilt/quilt/api/client"
 	"github.com/quilt/quilt/api/pb"
 	"github.com/quilt/quilt/db"
 	"github.com/quilt/quilt/stitch"
@@ -25,17 +27,23 @@ import (
 
 type server struct {
 	conn db.Conn
+
+	// The API server runs in two locations:  on minions in the cluster, and on
+	// the daemon. When the server is running on the daemon, we automatically
+	// proxy certain Queries to the cluster because the daemon doesn't track
+	// those tables (e.g. Container, Connection, Label).
+	runningOnDaemon bool
 }
 
 // Run accepts incoming `quiltctl` connections and responds to them.
-func Run(conn db.Conn, listenAddr string) error {
+func Run(conn db.Conn, listenAddr string, runningOnDaemon bool) error {
 	proto, addr, err := api.ParseListenAddress(listenAddr)
 	if err != nil {
 		return err
 	}
 
 	var sock net.Listener
-	apiServer := server{conn}
+	apiServer := server{conn, runningOnDaemon}
 	for {
 		sock, err = net.Listen(proto, addr)
 
@@ -64,23 +72,24 @@ func Run(conn db.Conn, listenAddr string) error {
 	return nil
 }
 
+// Query runs in two modes: daemon, or local. If in local mode, Query simply
+// returns the requested table from its local database. If in daemon mode,
+// Query proxies certain table requests (e.g. Container and Connection) to the
+// cluster. This is necessary because some tables are only used on the minions,
+// and aren't synced back to the daemon.
 func (s server) Query(cts context.Context, query *pb.DBQuery) (*pb.QueryReply, error) {
 	var rows interface{}
-	switch db.TableType(query.Table) {
-	case db.MachineTable:
-		rows = s.conn.SelectFromMachine(nil)
-	case db.ContainerTable:
-		rows = s.conn.SelectFromContainer(nil)
-	case db.EtcdTable:
-		rows = s.conn.SelectFromEtcd(nil)
-	case db.ConnectionTable:
-		rows = s.conn.SelectFromConnection(nil)
-	case db.LabelTable:
-		rows = s.conn.SelectFromLabel(nil)
-	case db.ClusterTable:
-		rows = s.conn.SelectFromCluster(nil)
-	default:
-		return nil, fmt.Errorf("unrecognized table: %s", query.Table)
+	var err error
+
+	table := db.TableType(query.Table)
+	if s.runningOnDaemon {
+		rows, err = queryFromDaemon(table, s.conn)
+	} else {
+		rows, err = queryLocal(table, s.conn)
+	}
+
+	if err != nil {
+		return nil, err
 	}
 
 	json, err := json.Marshal(rows)
@@ -89,6 +98,52 @@ func (s server) Query(cts context.Context, query *pb.DBQuery) (*pb.QueryReply, e
 	}
 
 	return &pb.QueryReply{TableContents: string(json)}, nil
+}
+
+func queryLocal(table db.TableType, conn db.Conn) (interface{}, error) {
+	switch table {
+	case db.MachineTable:
+		return conn.SelectFromMachine(nil), nil
+	case db.ContainerTable:
+		return conn.SelectFromContainer(nil), nil
+	case db.EtcdTable:
+		return conn.SelectFromEtcd(nil), nil
+	case db.ConnectionTable:
+		return conn.SelectFromConnection(nil), nil
+	case db.LabelTable:
+		return conn.SelectFromLabel(nil), nil
+	case db.ClusterTable:
+		return conn.SelectFromCluster(nil), nil
+	default:
+		return nil, fmt.Errorf("unrecognized table: %s", table)
+	}
+}
+
+func queryFromDaemon(table db.TableType, conn db.Conn) (
+	interface{}, error) {
+
+	switch table {
+	case db.MachineTable, db.ClusterTable:
+		return queryLocal(table, conn)
+	}
+
+	var leaderClient client.Client
+	leaderClient, err := newLeaderClient(conn.SelectFromMachine(nil))
+	if err != nil {
+		return nil, err
+	}
+	defer leaderClient.Close()
+
+	switch table {
+	case db.ContainerTable:
+		return getClusterContainers(conn, leaderClient)
+	case db.ConnectionTable:
+		return leaderClient.QueryConnections()
+	case db.LabelTable:
+		return leaderClient.QueryLabels()
+	default:
+		return nil, fmt.Errorf("unrecognized table: %s", table)
+	}
 }
 
 func (s server) Deploy(cts context.Context, deployReq *pb.DeployRequest) (
@@ -137,3 +192,87 @@ func (s server) Version(_ context.Context, _ *pb.VersionRequest) (
 	*pb.VersionReply, error) {
 	return &pb.VersionReply{Version: version.Version}, nil
 }
+
+func getClusterContainers(conn db.Conn, leaderClient client.Client) (interface{}, error) {
+	leaderContainers, err := leaderClient.QueryContainers()
+	if err != nil {
+		return nil, err
+	}
+
+	workerContainers, err := queryWorkers(conn.SelectFromMachine(nil))
+	if err != nil {
+		return nil, err
+	}
+
+	return updateLeaderContainerAttrs(leaderContainers, workerContainers), nil
+}
+
+type queryContainersResponse struct {
+	containers []db.Container
+	err        error
+}
+
+// queryWorkers gets a client for all worker machines and returns a list of
+// `db.Container`s on these machines.
+func queryWorkers(machines []db.Machine) ([]db.Container, error) {
+	var wg sync.WaitGroup
+	queryResponses := make(chan queryContainersResponse, len(machines))
+	for _, m := range machines {
+		if m.PublicIP == "" || m.Role != db.Worker {
+			continue
+		}
+
+		wg.Add(1)
+		go func(m db.Machine) {
+			defer wg.Done()
+			var qContainers []db.Container
+			client, err := newClient(api.RemoteAddress(m.PublicIP))
+			if err == nil {
+				defer client.Close()
+				qContainers, err = client.QueryContainers()
+			}
+			queryResponses <- queryContainersResponse{qContainers, err}
+		}(m)
+	}
+
+	wg.Wait()
+	close(queryResponses)
+
+	var containers []db.Container
+	for resp := range queryResponses {
+		if resp.err != nil {
+			return nil, resp.err
+		}
+		containers = append(containers, resp.containers...)
+	}
+	return containers, nil
+}
+
+// updateLeaderContainerAttrs updates the containers described by the leader with
+// the worker-only attributes.
+func updateLeaderContainerAttrs(lContainers []db.Container, wContainers []db.Container) (
+	allContainers []db.Container) {
+
+	// Map StitchID to db.Container for a hash join.
+	cMap := make(map[string]db.Container)
+	for _, wc := range wContainers {
+		cMap[wc.StitchID] = wc
+	}
+
+	// If we see a leader container matching a worker container in the map, then
+	// we use the container already in the map (worker container is fresher).
+	// Otherwise, we add the leader container to our list.
+	for _, lc := range lContainers {
+		if wc, ok := cMap[lc.StitchID]; ok {
+			lc.Created = wc.Created
+			lc.DockerID = wc.DockerID
+		}
+		allContainers = append(allContainers, lc)
+	}
+	return allContainers
+}
+
+// client.New and client.Leader are saved in variables to facilitate
+// injecting test clients for unit testing.
+var newClient = client.New
+var newLeaderClient = client.Leader

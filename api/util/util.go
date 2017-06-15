@@ -3,18 +3,11 @@ package util
 import (
 	"fmt"
 
-	"github.com/quilt/quilt/api/client"
 	"github.com/quilt/quilt/db"
 )
 
-// GetContainer retrieves the container tracked by the given client with the
-// given stitchID.
-func GetContainer(c client.Client, stitchID string) (db.Container, error) {
-	containers, err := c.QueryContainers()
-	if err != nil {
-		return db.Container{}, err
-	}
-
+// GetContainer retrieves the container with the given stitchID.
+func GetContainer(containers []db.Container, stitchID string) (db.Container, error) {
 	var choice *db.Container
 	for _, c := range containers {
 		if len(stitchID) > len(c.StitchID) ||
@@ -37,4 +30,15 @@ func GetContainer(c client.Client, stitchID string) (db.Container, error) {
 	}
 
 	return db.Container{}, fmt.Errorf("no container with stitchID %q", stitchID)
+}
+
+// GetPublicIP returns the public IP for the machine with the given private IP.
+func GetPublicIP(machines []db.Machine, privateIP string) (string, error) {
+	for _, m := range machines {
+		if m.PrivateIP == privateIP {
+			return m.PublicIP, nil
+		}
+	}
+
+	return "", fmt.Errorf("no machine with private IP %s", privateIP)
 }

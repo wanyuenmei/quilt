@@ -448,10 +448,6 @@ func TestDebug(t *testing.T) {
 			MachineReturn:   test.machines,
 			ContainerReturn: test.containers,
 		}
-
-		mockClientGetter := new(mocks.Getter)
-		mockClientGetter.On("Client", mock.Anything).Return(mockLocalClient, nil)
-		testCmd.clientGetter = mockClientGetter
 		testCmd.connectionHelper = &connectionHelper{
 			client: mockLocalClient,
 		}

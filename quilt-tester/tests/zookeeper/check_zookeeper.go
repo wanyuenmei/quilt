@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/quilt/quilt/api"
-	"github.com/quilt/quilt/api/client/getter"
+	"github.com/quilt/quilt/api/client"
 	"github.com/quilt/quilt/db"
 
 	log "github.com/Sirupsen/logrus"
@@ -14,20 +14,13 @@ import (
 )
 
 func main() {
-	clientGetter := getter.New()
-
-	clnt, err := clientGetter.Client(api.DefaultSocket)
+	clnt, err := client.New(api.DefaultSocket)
 	if err != nil {
 		log.WithError(err).Fatal("FAILED, couldn't get quiltctl client")
 	}
 	defer clnt.Close()
 
-	leader, err := clientGetter.LeaderClient(clnt)
-	if err != nil {
-		log.WithError(err).Fatal("FAILED, couldn't get leader client")
-	}
-
-	containers, err := leader.QueryContainers()
+	containers, err := clnt.QueryContainers()
 	if err != nil {
 		log.WithError(err).Fatal("FAILED, couldn't query containers")
 	}

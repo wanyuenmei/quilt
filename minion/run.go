@@ -54,7 +54,8 @@ func Run(role db.Role, inboundPubIntf, outboundPubIntf string) {
 	go etcd.Run(conn)
 	go syncAuthorizedKeys(conn)
 
-	go apiServer.Run(conn, fmt.Sprintf("tcp://0.0.0.0:%d", api.DefaultRemotePort))
+	go apiServer.Run(conn, fmt.Sprintf("tcp://0.0.0.0:%d", api.DefaultRemotePort),
+		false)
 
 	loopLog := util.NewEventTimer("Minion-Update")
 

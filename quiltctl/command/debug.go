@@ -14,9 +14,6 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 
-	"github.com/quilt/quilt/api"
-	"github.com/quilt/quilt/api/client"
-	"github.com/quilt/quilt/api/client/getter"
 	"github.com/quilt/quilt/db"
 	"github.com/quilt/quilt/minion/supervisor/images"
 	"github.com/quilt/quilt/quiltctl/ssh"
@@ -42,8 +39,7 @@ type Debug struct {
 	tar        bool
 	ids        []string
 
-	clientGetter client.Getter
-	sshGetter    ssh.Getter
+	sshGetter ssh.Getter
 
 	*connectionHelper
 }
@@ -104,7 +100,6 @@ var (
 // NewDebugCommand creates a new Debug command instance.
 func NewDebugCommand() *Debug {
 	return &Debug{
-		clientGetter:     getter.New(),
 		sshGetter:        ssh.New,
 		connectionHelper: &connectionHelper{},
 	}
@@ -193,27 +188,14 @@ func (dCmd Debug) Run() int {
 	}
 
 	ipMap := map[string]string{}
-	containers := []db.Container{}
 	for _, m := range machines {
 		ipMap[m.PrivateIP] = m.PublicIP
-		if m.Role != db.Worker || m.PublicIP == "" {
-			continue
-		}
+	}
 
-		cli, err := dCmd.clientGetter.Client(api.RemoteAddress(m.PublicIP))
-		if err != nil {
-			log.Error(err)
-			return 1
-		}
-		defer cli.Close()
-
-		conts, err := cli.QueryContainers()
-		if err != nil {
-			log.Error(err)
-			return 1
-		}
-
-		containers = append(containers, conts...)
+	containers, err := dCmd.client.QueryContainers()
+	if err != nil {
+		log.Error(err)
+		return 1
 	}
 
 	dCmd.machines = dCmd.machines || dCmd.all

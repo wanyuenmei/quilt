@@ -193,8 +193,9 @@ func TestSSH(t *testing.T) {
 				privateKey: "key",
 				target:     "tgt",
 			},
+			machines: []db.Machine{{PrivateIP: "priv", PublicIP: "host"}},
 			containers: []db.Container{
-				{StitchID: "tgt", DockerID: "dockerID"},
+				{Minion: "priv", StitchID: "tgt", DockerID: "dockerID"},
 			},
 			expAllocatePTY: true,
 			expHost:        "host",
@@ -207,8 +208,9 @@ func TestSSH(t *testing.T) {
 				target:     "tgt",
 				args:       []string{"foo", "bar"},
 			},
+			machines: []db.Machine{{PrivateIP: "priv", PublicIP: "host"}},
 			containers: []db.Container{
-				{StitchID: "tgt", DockerID: "dockerID"},
+				{Minion: "priv", StitchID: "tgt", DockerID: "dockerID"},
 			},
 			expHost:    "host",
 			expRunArgs: "docker exec  dockerID foo bar",
@@ -221,8 +223,9 @@ func TestSSH(t *testing.T) {
 				args:        []string{"foo", "bar"},
 				allocatePTY: true,
 			},
+			machines: []db.Machine{{PrivateIP: "priv", PublicIP: "host"}},
 			containers: []db.Container{
-				{StitchID: "tgt", DockerID: "dockerID"},
+				{Minion: "priv", StitchID: "tgt", DockerID: "dockerID"},
 			},
 			expAllocatePTY: true,
 			expHost:        "host",
@@ -247,18 +250,11 @@ func TestSSH(t *testing.T) {
 				Return(nil)
 		}
 
-		mockLocalClient := &mocks.Client{
-			MachineReturn: test.machines,
-		}
-		mockContainerClient := &mocks.Client{
+		mockClient := &mocks.Client{
+			MachineReturn:   test.machines,
 			ContainerReturn: test.containers,
-			HostReturn:      test.expHost,
 		}
-		mockClientGetter := new(mocks.Getter)
-		mockClientGetter.On("ContainerClient", mock.Anything, mock.Anything).
-			Return(mockContainerClient, nil)
-		testCmd.clientGetter = mockClientGetter
-		testCmd.connectionHelper = &connectionHelper{client: mockLocalClient}
+		testCmd.connectionHelper = &connectionHelper{client: mockClient}
 
 		assert.Equal(t, 0, testCmd.Run())
 		mockSSHClient.AssertExpectations(t)
@@ -270,14 +266,8 @@ func TestAmbiguousID(t *testing.T) {
 		MachineReturn:   []db.Machine{{StitchID: "foo"}},
 		ContainerReturn: []db.Container{{StitchID: "foo"}},
 	}
-	mockClientGetter := new(mocks.Getter)
-	mockClientGetter.On("Client", mock.Anything).Return(mockClient, nil)
-	mockClientGetter.On("ContainerClient", mock.Anything, mock.Anything).
-		Return(mockClient, nil)
-
 	testCmd := SSH{
 		connectionHelper: &connectionHelper{client: mockClient},
-		clientGetter:     mockClientGetter,
 		target:           "foo",
 	}
 	assert.Equal(t, 1, testCmd.Run())
@@ -288,14 +278,8 @@ func TestNoMatch(t *testing.T) {
 		MachineReturn:   []db.Machine{{StitchID: "foo"}},
 		ContainerReturn: []db.Container{{StitchID: "foo"}},
 	}
-	mockClientGetter := new(mocks.Getter)
-	mockClientGetter.On("Client", mock.Anything).Return(mockClient, nil)
-	mockClientGetter.On("ContainerClient", mock.Anything, mock.Anything).
-		Return(mockClient, nil)
-
 	testCmd := SSH{
 		connectionHelper: &connectionHelper{client: mockClient},
-		clientGetter:     mockClientGetter,
 		target:           "bar",
 	}
 	assert.Equal(t, 1, testCmd.Run())
@@ -313,15 +297,9 @@ func TestSSHExitError(t *testing.T) {
 	mockLocalClient := &mocks.Client{
 		MachineReturn: []db.Machine{{StitchID: "tgt"}},
 	}
-	mockClientGetter := new(mocks.Getter)
-	mockClientGetter.On("Client", mock.Anything).Return(mockLocalClient, nil)
-	mockClientGetter.On("ContainerClient", mock.Anything, mock.Anything).
-		Return(nil, errors.New("unused"))
-
 	testCmd := SSH{
 		connectionHelper: &connectionHelper{client: mockLocalClient},
 		sshGetter:        mockSSHGetter,
-		clientGetter:     mockClientGetter,
 		target:           "tgt",
 		args:             []string{"unused"},
 	}
@@ -338,7 +316,6 @@ func TestSSHExitError(t *testing.T) {
 	testCmd = SSH{
 		connectionHelper: &connectionHelper{client: mockLocalClient},
 		sshGetter:        mockSSHGetter,
-		clientGetter:     mockClientGetter,
 		target:           "tgt",
 		args:             []string{"unused"},
 	}
@@ -356,18 +333,11 @@ func (err mockExitError) ExitStatus() int {
 }
 
 func TestSSHScheduledContainer(t *testing.T) {
-	mockClient := &mocks.Client{}
-	mockClientGetter := new(mocks.Getter)
-	mockClientGetter.On("Client", mock.Anything).Return(mockClient, nil)
-	mockClientGetter.On("ContainerClient", mock.Anything, mock.Anything).Return(
-		&mocks.Client{
-			ContainerReturn: []db.Container{{StitchID: "foo"}},
-			HostReturn:      "container",
-		}, nil)
-
+	mockClient := &mocks.Client{
+		ContainerReturn: []db.Container{{StitchID: "foo"}},
+	}
 	testCmd := SSH{
 		connectionHelper: &connectionHelper{client: mockClient},
-		clientGetter:     mockClientGetter,
 		target:           "foo",
 	}
 	assert.Equal(t, 1, testCmd.Run())

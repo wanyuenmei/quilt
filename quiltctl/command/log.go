@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/quilt/quilt/api/client"
-	"github.com/quilt/quilt/api/client/getter"
 	"github.com/quilt/quilt/quiltctl/ssh"
 
 	log "github.com/Sirupsen/logrus"
@@ -22,8 +20,7 @@ type Log struct {
 
 	target string
 
-	sshGetter    ssh.Getter
-	clientGetter client.Getter
+	sshGetter ssh.Getter
 
 	*connectionHelper
 }
@@ -32,7 +29,6 @@ type Log struct {
 func NewLogCommand() *Log {
 	return &Log{
 		sshGetter:        ssh.New,
-		clientGetter:     getter.New(),
 		connectionHelper: &connectionHelper{},
 	}
 }
@@ -78,8 +74,7 @@ func (lCmd *Log) Parse(args []string) error {
 // Run finds the target container or machine minion and outputs logs.
 func (lCmd *Log) Run() int {
 	mach, machErr := getMachine(lCmd.client, lCmd.target)
-	contHost, cont, contErr := getContainer(
-		lCmd.client, lCmd.clientGetter, lCmd.target)
+	contHost, cont, contErr := getContainer(lCmd.client, lCmd.target)
 
 	resolvedMachine := machErr == nil
 	resolvedContainer := contErr == nil

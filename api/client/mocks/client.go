@@ -6,13 +6,14 @@ import (
 
 // Client implements a mocked version of a Quilt client.
 type Client struct {
-	MachineReturn   []db.Machine
-	ContainerReturn []db.Container
-	EtcdReturn      []db.Etcd
-	ClusterReturn   []db.Cluster
-	HostReturn      string
-	DeployArg       string
-	VersionReturn   string
+	ConnectionReturn []db.Connection
+	LabelReturn      []db.Label
+	MachineReturn    []db.Machine
+	ContainerReturn  []db.Container
+	EtcdReturn       []db.Etcd
+	ClusterReturn    []db.Cluster
+	DeployArg        string
+	VersionReturn    string
 
 	MachineErr, ContainerErr, EtcdErr, ClusterErr, HostErr error
 	DeployErr, ConnectionErr, VersionErr                   error
@@ -45,15 +46,12 @@ func (c *Client) QueryEtcd() ([]db.Etcd, error) {
 // QueryConnections retrieves the connection information tracked by the
 // Quilt daemon.
 func (c *Client) QueryConnections() ([]db.Connection, error) {
-	if c.ConnectionErr != nil {
-		return nil, c.ConnectionErr
-	}
-	return nil, nil
+	return c.ConnectionReturn, c.ConnectionErr
 }
 
 // QueryLabels retrieves the label information tracked by the Quilt daemon.
 func (c *Client) QueryLabels() ([]db.Label, error) {
-	return nil, nil
+	return c.LabelReturn, nil
 }
 
 // QueryClusters retrieves cluster information tracked by the Quilt daemon.
@@ -81,9 +79,4 @@ func (c *Client) Deploy(depl string) error {
 // Version retrieves the Quilt version of the remote daemon.
 func (c *Client) Version() (string, error) {
 	return c.VersionReturn, c.VersionErr
-}
-
-// Host returns the server address the Client is connected to.
-func (c *Client) Host() string {
-	return c.HostReturn
 }

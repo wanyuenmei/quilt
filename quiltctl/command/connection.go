@@ -5,7 +5,6 @@ import (
 
 	"github.com/quilt/quilt/api"
 	"github.com/quilt/quilt/api/client"
-	"github.com/quilt/quilt/api/client/getter"
 )
 
 type connectionFlags struct {
@@ -23,14 +22,14 @@ type connectionHelper struct {
 }
 
 func (ch *connectionHelper) BeforeRun() error {
-	return ch.setupClient(getter.New())
+	return ch.setupClient(client.New)
 }
 
 func (ch *connectionHelper) AfterRun() error {
 	return ch.client.Close()
 }
 
-func (ch *connectionHelper) setupClient(clientGetter client.Getter) (err error) {
-	ch.client, err = clientGetter.Client(ch.host)
+func (ch *connectionHelper) setupClient(getter client.Getter) (err error) {
+	ch.client, err = getter(ch.host)
 	return err
 }

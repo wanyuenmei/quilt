@@ -9,7 +9,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 
 	"github.com/quilt/quilt/api"
-	"github.com/quilt/quilt/api/client/getter"
+	"github.com/quilt/quilt/api/client"
 )
 
 var machineRegex = regexp.MustCompile(`Machine-(\d+){(.+?), .*, PublicIP=(.*?),`)
@@ -17,7 +17,7 @@ var machineRegex = regexp.MustCompile(`Machine-(\d+){(.+?), .*, PublicIP=(.*?),`
 func main() {
 	printQuiltPs()
 
-	c, err := getter.New().Client(api.DefaultSocket)
+	c, err := client.New(api.DefaultSocket)
 	if err != nil {
 		log.WithError(err).Fatal("FAILED, couldn't get quiltctl client")
 	}

@@ -11,7 +11,6 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/quilt/quilt/api/client"
-	"github.com/quilt/quilt/api/client/getter"
 	"github.com/quilt/quilt/api/util"
 	"github.com/quilt/quilt/db"
 	"github.com/quilt/quilt/quiltctl/ssh"
@@ -24,8 +23,7 @@ type SSH struct {
 	allocatePTY bool
 	args        []string
 
-	clientGetter client.Getter
-	sshGetter    ssh.Getter
+	sshGetter ssh.Getter
 
 	*connectionHelper
 }
@@ -33,7 +31,6 @@ type SSH struct {
 // NewSSHCommand creates a new SSH command instance.
 func NewSSHCommand() *SSH {
 	return &SSH{
-		clientGetter:     getter.New(),
 		sshGetter:        ssh.New,
 		connectionHelper: &connectionHelper{},
 	}
@@ -86,8 +83,7 @@ func (sCmd SSH) Run() int {
 	}
 
 	mach, machErr := getMachine(sCmd.client, sCmd.target)
-	contHost, cont, contErr := getContainer(
-		sCmd.client, sCmd.clientGetter, sCmd.target)
+	contHost, cont, contErr := getContainer(sCmd.client, sCmd.target)
 
 	resolvedMachine := machErr == nil
 	resolvedContainer := contErr == nil
@@ -178,21 +174,30 @@ func getMachine(c client.Client, id string) (db.Machine, error) {
 	return *choice, nil
 }
 
-func getContainer(c client.Client, clientGetter client.Getter, id string) (
-	host string, cont db.Container, err error) {
+func getContainer(c client.Client, id string) (host string, cont db.Container,
+	err error) {
 
-	containerClient, err := clientGetter.ContainerClient(c, id)
-	if err != nil {
-		return "", db.Container{}, err
-	}
-	defer containerClient.Close()
-
-	container, err := util.GetContainer(containerClient, id)
+	containers, err := c.QueryContainers()
 	if err != nil {
 		return "", db.Container{}, err
 	}
 
-	return containerClient.Host(), container, nil
+	machines, err := c.QueryMachines()
+	if err != nil {
+		return "", db.Container{}, err
+	}
+
+	container, err := util.GetContainer(containers, id)
+	if err != nil {
+		return "", db.Container{}, err
+	}
+
+	ip, err := util.GetPublicIP(machines, container.Minion)
+	if err != nil {
+		return "", db.Container{}, err
+	}
+
+	return ip, container, nil
 }
 
 func containerExec(c ssh.Client, dockerID string, allocatePTY bool, cmd string) error {

@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 
 	"github.com/quilt/quilt/api/client/mocks"
 	"github.com/quilt/quilt/db"
@@ -107,19 +106,16 @@ func TestLog(t *testing.T) {
 	mockLocalClient := &mocks.Client{
 		MachineReturn: []db.Machine{
 			{StitchID: targetMachine, PublicIP: "machine"},
+			{PublicIP: "container", PrivateIP: "containerPriv"},
+		},
+		ContainerReturn: []db.Container{
+			{
+				StitchID: targetContainer,
+				DockerID: "foo",
+				Minion:   "containerPriv",
+			},
 		},
 	}
-	mockGetter := new(mocks.Getter)
-	mockGetter.On("ContainerClient", mock.Anything, mock.Anything).Return(
-		&mocks.Client{
-			ContainerReturn: []db.Container{
-				{
-					StitchID: targetContainer,
-					DockerID: "foo",
-				},
-			},
-			HostReturn: "container",
-		}, nil)
 
 	for _, test := range tests {
 		testCmd := test.cmd
@@ -131,7 +127,6 @@ func TestLog(t *testing.T) {
 			return mockSSHClient, nil
 		}
 		testCmd.privateKey = "key"
-		testCmd.clientGetter = mockGetter
 		testCmd.connectionHelper = &connectionHelper{client: mockLocalClient}
 
 		mockSSHClient.On("Run", false, test.expSSHCommand).Return(nil)
@@ -148,13 +143,8 @@ func TestLogAmbiguousID(t *testing.T) {
 		MachineReturn:   []db.Machine{{StitchID: "foo"}},
 		ContainerReturn: []db.Container{{StitchID: "foo"}},
 	}
-	mockClientGetter := new(mocks.Getter)
-	mockClientGetter.On("ContainerClient", mock.Anything, mock.Anything).
-		Return(mockClient, nil)
-
 	testCmd := Log{
 		connectionHelper: &connectionHelper{client: mockClient},
-		clientGetter:     mockClientGetter,
 		target:           "foo",
 	}
 	assert.Equal(t, 1, testCmd.Run())
@@ -165,30 +155,21 @@ func TestLogNoMatch(t *testing.T) {
 		MachineReturn:   []db.Machine{{StitchID: "foo"}},
 		ContainerReturn: []db.Container{{StitchID: "foo"}},
 	}
-	mockClientGetter := new(mocks.Getter)
-	mockClientGetter.On("ContainerClient", mock.Anything, mock.Anything).
-		Return(mockClient, nil)
 
 	testCmd := Log{
 		connectionHelper: &connectionHelper{client: mockClient},
-		clientGetter:     mockClientGetter,
 		target:           "bar",
 	}
 	assert.Equal(t, 1, testCmd.Run())
 }
 
 func TestLogScheduledContainer(t *testing.T) {
-	mockClient := &mocks.Client{}
-	mockClientGetter := new(mocks.Getter)
-	mockClientGetter.On("ContainerClient", mock.Anything, mock.Anything).Return(
-		&mocks.Client{
-			ContainerReturn: []db.Container{{StitchID: "foo"}},
-			HostReturn:      "container",
-		}, nil)
+	mockClient := &mocks.Client{
+		ContainerReturn: []db.Container{{StitchID: "foo"}},
+	}
 
 	testCmd := Log{
 		connectionHelper: &connectionHelper{client: mockClient},
-		clientGetter:     mockClientGetter,
 		target:           "foo",
 	}
 	assert.Equal(t, 1, testCmd.Run())

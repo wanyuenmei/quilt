@@ -15,8 +15,9 @@ import (
 	"github.com/Sirupsen/logrus"
 
 	"github.com/quilt/quilt/api"
-	"github.com/quilt/quilt/api/client/getter"
-	apiUtil "github.com/quilt/quilt/api/util"
+	"github.com/quilt/quilt/api/client"
+	"github.com/quilt/quilt/db"
+	"github.com/quilt/quilt/join"
 	"github.com/quilt/quilt/stitch"
 	"github.com/quilt/quilt/util"
 )
@@ -305,25 +306,30 @@ func waitForContainers(blueprintPath string) error {
 		return err
 	}
 
-	localClient, err := getter.New().Client(api.DefaultSocket)
+	c, err := client.New(api.DefaultSocket)
 	if err != nil {
 		return err
 	}
+	defer c.Close()
 
 	return util.WaitFor(func() bool {
-		for _, exp := range stc.Containers {
-			containerClient, err := getter.New().ContainerClient(localClient,
-				exp.ID)
-			if err != nil {
-				return false
-			}
-
-			actual, err := apiUtil.GetContainer(containerClient, exp.ID)
-			if err != nil || actual.Created.IsZero() {
-				return false
-			}
+		curr, err := c.QueryContainers()
+		if err != nil {
+			return false
 		}
-		return true
+
+		// Only match containers that have the same stitch ID, and have been
+		// booted.
+		key := func(tgtIntf, actualIntf interface{}) int {
+			tgt := tgtIntf.(stitch.Container)
+			actual := actualIntf.(db.Container)
+			if tgt.ID == actual.StitchID && !actual.Created.IsZero() {
+				return 0
+			}
+			return -1
+		}
+		_, unbooted, _ := join.Join(stc.Containers, curr, key)
+		return len(unbooted) == 0
 	}, 15*time.Second, 10*time.Minute)
 }
 
