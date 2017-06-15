@@ -49,20 +49,6 @@ func ChooseSize(provider db.Provider, ram, cpu stitch.Range, maxPrice float64) s
 	}
 }
 
-// GroupByRegion groups machines by region.
-func GroupByRegion(machines []Machine) map[string][]Machine {
-	grouped := make(map[string][]Machine)
-	for _, machine := range machines {
-		region := machine.Region
-		if _, ok := grouped[region]; !ok {
-			grouped[region] = []Machine{}
-		}
-		grouped[region] = append(grouped[region], machine)
-	}
-
-	return grouped
-}
-
 func chooseBestSize(descriptions []Description, ram, cpu stitch.Range,
 	maxPrice float64) string {
 	var best Description
