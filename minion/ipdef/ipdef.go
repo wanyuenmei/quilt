@@ -24,7 +24,7 @@ var (
 	// load balancer router. It isn't directly used for routing, but we need to
 	// ensure that nothing else allocates this IP so that the MAC does not
 	// conflict.
-	LoadBalancerIP = net.IPv4(10, 0, 0, 1)
+	LoadBalancerIP = net.IPv4(10, 0, 0, 2)
 
 	// LoadBalancerMac is the MAC address of the load balancer router.
 	LoadBalancerMac = IPToMac(LoadBalancerIP)
