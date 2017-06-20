@@ -75,13 +75,8 @@ func New(namespace, zone string) (*Cluster, error) {
 		"ubuntu-os-cloud/global/images/ubuntu-1604-xenial-v20170202")
 	clst.networkName = fmt.Sprintf("global/networks/%s", clst.ns)
 
-	if err := clst.netInit(); err != nil {
+	if err := clst.createNetwork(); err != nil {
 		log.WithError(err).Debug("failed to start up gce network")
-		return nil, err
-	}
-
-	if err := clst.fwInit(); err != nil {
-		log.WithError(err).Debug("failed to start up gce firewalls")
 		return nil, err
 	}
 
@@ -558,7 +553,7 @@ func newComputeService(configStr string) (*compute.Service, error) {
 // Initializes the network for the cluster
 //
 // XXX: Currently assumes that each cluster is entirely behind 1 network
-func (clst *Cluster) netInit() error {
+func (clst *Cluster) createNetwork() error {
 	exists, err := clst.networkExists(clst.ns)
 	if err != nil {
 		return err
@@ -582,13 +577,14 @@ func (clst *Cluster) netInit() error {
 	if err != nil {
 		return err
 	}
-	return nil
+	return clst.createInternalFirewall()
 }
 
-// Initializes the firewall for the cluster
+// Initializes the internal firewall for the cluster to allow machines to talk
+// on the private network.
 //
 // XXX: Currently assumes that each cluster is entirely behind 1 network
-func (clst *Cluster) fwInit() error {
+func (clst *Cluster) createInternalFirewall() error {
 	var ops []*compute.Operation
 
 	if exists, err := clst.firewallExists(clst.intFW); err != nil {
