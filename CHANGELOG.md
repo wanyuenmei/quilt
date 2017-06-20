@@ -12,6 +12,8 @@ boot times.
 - Fixed bug in Google provider that caused ACLs to be repeatedly added.
 - Fixed inbound connections on the Vagrant provider. In other words,
 `myService.allowFrom(publicInternet, aPort)` now works.
+- Only allocate one Google network per namespace, rather than one network for
+each region within a namespace.
 
 Release 0.1.0
 -------------

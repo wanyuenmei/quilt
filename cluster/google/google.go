@@ -66,7 +66,7 @@ func New(namespace, zone string) (*Cluster, error) {
 
 	clst := Cluster{
 		gce:       gce,
-		ns:        fmt.Sprintf("%s-%s", zone, namespace),
+		ns:        namespace,
 		ipv4Range: "192.168.0.0/16",
 		zone:      zone,
 	}
@@ -295,17 +295,45 @@ func (clst *Cluster) instanceNew(name string, size string,
 				},
 			},
 		},
+		Tags: &compute.Tags{
+			// Tag the machine with its zone so that we can create zone-scoped
+			// firewall rules.
+			Items: []string{clst.zone},
+		},
 	}
 
 	return clst.gce.InsertInstance(clst.zone, instance)
 }
 
-func (clst *Cluster) parseACLs(fws []*compute.Firewall) (acls []acl.ACL) {
-	for _, fw := range fws {
+// listFirewalls returns the firewalls managed by the cluster. Specifically,
+// it returns all firewalls that are attached to the cluster's network, and
+// apply to the managed zone.
+func (clst Cluster) listFirewalls() ([]compute.Firewall, error) {
+	firewalls, err := clst.gce.ListFirewalls()
+	if err != nil {
+		return nil, fmt.Errorf("list firewalls: %s", err)
+	}
+
+	var fws []compute.Firewall
+	for _, fw := range firewalls.Items {
 		_, nwName := path.Split(fw.Network)
 		if nwName != clst.networkName || fw.Name == clst.intFW {
 			continue
 		}
+
+		for _, tag := range fw.TargetTags {
+			if tag == clst.zone {
+				fws = append(fws, *fw)
+				break
+			}
+		}
+	}
+
+	return fws, nil
+}
+
+func (clst *Cluster) parseACLs(fws []compute.Firewall) (acls []acl.ACL) {
+	for _, fw := range fws {
 		for _, cidrIP := range fw.SourceRanges {
 			for _, allowed := range fw.Allowed {
 				for _, portsStr := range allowed.Ports {
@@ -343,12 +371,12 @@ func (clst *Cluster) parseACLs(fws []*compute.Firewall) (acls []acl.ACL) {
 
 // SetACLs adds and removes acls in `clst` so that it conforms to `acls`.
 func (clst *Cluster) SetACLs(acls []acl.ACL) error {
-	list, err := clst.gce.ListFirewalls()
+	fws, err := clst.listFirewalls()
 	if err != nil {
 		return err
 	}
 
-	currACLs := clst.parseACLs(list.Items)
+	currACLs := clst.parseACLs(fws)
 	pair, toAdd, toRemove := join.HashJoin(acl.Slice(acls), acl.Slice(currACLs),
 		nil, nil)
 
@@ -459,14 +487,14 @@ func (clst *Cluster) getCreateFirewall(minPort int, maxPort int) (
 	*compute.Firewall, error) {
 
 	ports := fmt.Sprintf("%d-%d", minPort, maxPort)
-	fwName := fmt.Sprintf("%s-%s", clst.ns, ports)
+	fwName := fmt.Sprintf("%s-%s-%s", clst.ns, clst.zone, ports)
 
 	if fw, _ := clst.getFirewall(fwName); fw != nil {
 		return fw, nil
 	}
 
 	log.WithField("name", fwName).Debug("Creating firewall")
-	op, err := clst.insertFirewall(fwName, ports, []string{"127.0.0.1/32"})
+	op, err := clst.insertFirewall(fwName, ports, []string{"127.0.0.1/32"}, true)
 	if err != nil {
 		return nil, err
 	}
@@ -494,8 +522,14 @@ func (clst *Cluster) networkExists(name string) (bool, error) {
 // This creates a firewall but does nothing else
 //
 // XXX: Assumes there is only one network
-func (clst *Cluster) insertFirewall(name, ports string, sourceRanges []string) (
-	*compute.Operation, error) {
+func (clst *Cluster) insertFirewall(name, ports string, sourceRanges []string,
+	restrictToZone bool) (*compute.Operation, error) {
+
+	var targetTags []string
+	if restrictToZone {
+		targetTags = []string{clst.zone}
+	}
+
 	firewall := &compute.Firewall{
 		Name:    name,
 		Network: networkURL(clst.networkName),
@@ -513,6 +547,7 @@ func (clst *Cluster) insertFirewall(name, ports string, sourceRanges []string) (
 			},
 		},
 		SourceRanges: sourceRanges,
+		TargetTags:   targetTags,
 	}
 
 	return clst.gce.InsertFirewall(firewall)
@@ -553,7 +588,7 @@ func newComputeService(configStr string) (*compute.Service, error) {
 //
 // XXX: Currently assumes that each cluster is entirely behind 1 network
 func (clst *Cluster) createNetwork() error {
-	exists, err := clst.networkExists(clst.ns)
+	exists, err := clst.networkExists(clst.networkName)
 	if err != nil {
 		return err
 	}
@@ -565,7 +600,7 @@ func (clst *Cluster) createNetwork() error {
 
 	log.Debug("Creating network")
 	op, err := clst.gce.InsertNetwork(&compute.Network{
-		Name:      clst.ns,
+		Name:      clst.networkName,
 		IPv4Range: clst.ipv4Range,
 	})
 	if err != nil {
@@ -593,7 +628,7 @@ func (clst *Cluster) createInternalFirewall() error {
 	} else {
 		log.Debug("creating internal firewall")
 		op, err := clst.insertFirewall(
-			clst.intFW, "1-65535", []string{clst.ipv4Range})
+			clst.intFW, "1-65535", []string{clst.ipv4Range}, false)
 		if err != nil {
 			return err
 		}

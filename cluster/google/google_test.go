@@ -1,6 +1,7 @@
 package google
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/quilt/quilt/cluster/machine"
@@ -56,6 +57,45 @@ func (s *GoogleTestSuite) TestList() {
 		PrivateIP: "y.y.y.y",
 		Size:      "type-1",
 	})
+}
+
+func (s *GoogleTestSuite) TestListFirewalls() {
+	s.clst.networkName = "network"
+	s.clst.intFW = "intFW"
+
+	s.gce.On("ListFirewalls").Return(&compute.FirewallList{
+		Items: []*compute.Firewall{
+			{
+				Network:    networkURL(s.clst.networkName),
+				Name:       "badZone",
+				TargetTags: []string{"zone-2"},
+			},
+			{
+				Network:    networkURL(s.clst.networkName),
+				Name:       "intFW",
+				TargetTags: []string{"zone-1"},
+			},
+			{
+				Network:    networkURL("ignoreMe"),
+				Name:       "badNetwork",
+				TargetTags: []string{"zone-1"},
+			},
+			{
+				Network:    networkURL(s.clst.networkName),
+				Name:       "shouldReturn",
+				TargetTags: []string{"zone-1"},
+			},
+		},
+	}, nil).Once()
+
+	fws, err := s.clst.listFirewalls()
+	s.NoError(err)
+	s.Len(fws, 1)
+	s.Equal(fws[0].Name, "shouldReturn")
+
+	s.gce.On("ListFirewalls").Return(nil, errors.New("err")).Once()
+	_, err = s.clst.listFirewalls()
+	s.EqualError(err, "list firewalls: err")
 }
 
 func TestGoogleTestSuite(t *testing.T) {
