@@ -161,7 +161,7 @@ func (clst Cluster) Boot(bootSet []machine.Machine) error {
 
 // Creates a new machine, and waits for the machine to become active.
 func (clst Cluster) createAndAttach(m machine.Machine) error {
-	cloudConfig := cloudcfg.Ubuntu(m.SSHKeys, m.Role)
+	cloudConfig := cloudcfg.Ubuntu(m.CloudCfgOpts)
 	createReq := &godo.DropletCreateRequest{
 		Name:              clst.namespace,
 		Region:            clst.region,

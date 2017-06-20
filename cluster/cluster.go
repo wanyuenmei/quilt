@@ -9,6 +9,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/quilt/quilt/cluster/acl"
 	"github.com/quilt/quilt/cluster/amazon"
+	"github.com/quilt/quilt/cluster/cloudcfg"
 	"github.com/quilt/quilt/cluster/digitalocean"
 	"github.com/quilt/quilt/cluster/foreman"
 	"github.com/quilt/quilt/cluster/google"
@@ -413,9 +414,13 @@ func syncDB(cms []joinMachine, dbms []db.Machine) syncDBResult {
 			Machine: machine.Machine{
 				Size:        m.Size,
 				DiskSize:    m.DiskSize,
-				SSHKeys:     m.SSHKeys,
 				Preemptible: m.Preemptible,
-				Role:        m.Role,
+				CloudCfgOpts: cloudcfg.Options{
+					SSHKeys: m.SSHKeys,
+					MinionOpts: cloudcfg.MinionOptions{
+						Role: m.Role,
+					},
+				},
 			},
 			provider: m.Provider,
 			region:   m.Region,

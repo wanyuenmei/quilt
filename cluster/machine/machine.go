@@ -3,6 +3,7 @@ package machine
 import (
 	"fmt"
 
+	"github.com/quilt/quilt/cluster/cloudcfg"
 	"github.com/quilt/quilt/db"
 	"github.com/quilt/quilt/stitch"
 )
@@ -26,8 +27,9 @@ type Machine struct {
 	Preemptible bool
 	Size        string
 	DiskSize    int
-	SSHKeys     []string
-	Role        db.Role
+
+	// Used only during Boot.
+	CloudCfgOpts cloudcfg.Options
 }
 
 // ChooseSize returns an acceptable machine size for the given provider that fits the

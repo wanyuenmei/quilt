@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/quilt/quilt/cluster/acl"
+	"github.com/quilt/quilt/cluster/cloudcfg"
 	"github.com/quilt/quilt/cluster/machine"
 	"github.com/quilt/quilt/db"
 	"github.com/quilt/quilt/join"
@@ -88,8 +89,8 @@ func (p *fakeProvider) Boot(bootSet []machine.Machine) error {
 		// We simulate this by setting the role of the machine returned by
 		// `List()` to be None, and only return the correct role in
 		// `getMachineRole`.
-		p.roles[toBoot.PublicIP] = toBoot.Role
-		toBoot.Role = db.None
+		p.roles[toBoot.PublicIP] = toBoot.CloudCfgOpts.MinionOpts.Role
+		toBoot.CloudCfgOpts.MinionOpts.Role = db.None
 
 		p.machines[idStr] = toBoot
 		p.bootRequests = append(p.bootRequests, bootRequest{size: toBoot.Size,
@@ -169,11 +170,25 @@ func TestSyncDB(t *testing.T) {
 	dbMaster := db.Machine{Provider: FakeAmazon, Role: db.Master}
 	cmMasterList := joinMachine{provider: FakeAmazon, role: db.Master}
 	cmMasterBoot := joinMachine{provider: FakeAmazon,
-		Machine: machine.Machine{Role: db.Master}}
+		Machine: machine.Machine{
+			CloudCfgOpts: cloudcfg.Options{
+				MinionOpts: cloudcfg.MinionOptions{
+					Role: db.Master,
+				},
+			},
+		},
+	}
 	dbWorker := db.Machine{Provider: FakeAmazon, Role: db.Worker}
 	cmWorkerList := joinMachine{provider: FakeAmazon, role: db.Worker}
 	cmWorkerBoot := joinMachine{provider: FakeAmazon,
-		Machine: machine.Machine{Role: db.Worker}}
+		Machine: machine.Machine{
+			CloudCfgOpts: cloudcfg.Options{
+				MinionOpts: cloudcfg.MinionOptions{
+					Role: db.Worker,
+				},
+			},
+		},
+	}
 
 	cmNoIP := joinMachine{provider: FakeAmazon, Machine: machine.Machine{ID: "id"}}
 	cmWithIP := joinMachine{

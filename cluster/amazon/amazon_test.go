@@ -412,35 +412,38 @@ func TestBoot(t *testing.T) {
 	amazonCluster := newAmazon(testNamespace, DefaultRegion)
 	amazonCluster.client = mc
 
+	cloudCfgOpts := cloudcfg.Options{
+		MinionOpts: cloudcfg.MinionOptions{Role: db.Master},
+	}
 	err := amazonCluster.Boot([]machine.Machine{
 		{
-			Size:        "m4.large",
-			DiskSize:    32,
-			Role:        db.Master,
-			Preemptible: true,
+			Size:         "m4.large",
+			DiskSize:     32,
+			CloudCfgOpts: cloudCfgOpts,
+			Preemptible:  true,
 		},
 		{
-			Size:        "m4.large",
-			DiskSize:    32,
-			Role:        db.Master,
-			Preemptible: true,
+			Size:         "m4.large",
+			DiskSize:     32,
+			CloudCfgOpts: cloudCfgOpts,
+			Preemptible:  true,
 		},
 		{
-			Size:        "m4.large",
-			DiskSize:    32,
-			Role:        db.Master,
-			Preemptible: false,
+			Size:         "m4.large",
+			DiskSize:     32,
+			CloudCfgOpts: cloudCfgOpts,
+			Preemptible:  false,
 		},
 		{
-			Size:        "m4.large",
-			DiskSize:    32,
-			Role:        db.Master,
-			Preemptible: false,
+			Size:         "m4.large",
+			DiskSize:     32,
+			CloudCfgOpts: cloudCfgOpts,
+			Preemptible:  false,
 		},
 	})
 	assert.Nil(t, err)
 
-	cfg := cloudcfg.Ubuntu(nil, db.Master)
+	cfg := cloudcfg.Ubuntu(cloudCfgOpts)
 	mc.AssertCalled(t, "RequestSpotInstances",
 		&ec2.RequestSpotInstancesInput{
 			SpotPrice: aws.String(spotPrice),

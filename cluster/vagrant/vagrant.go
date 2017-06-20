@@ -63,7 +63,7 @@ func (clst Cluster) Boot(bootSet []machine.Machine) error {
 func bootMachine(m machine.Machine) error {
 	id := uuid.NewV4().String()
 
-	err := initMachine(cloudcfg.Ubuntu(m.SSHKeys, m.Role), m.Size, id)
+	err := initMachine(cloudcfg.Ubuntu(m.CloudCfgOpts), m.Size, id)
 	if err == nil {
 		err = up(id)
 	}
