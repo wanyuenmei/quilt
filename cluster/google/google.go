@@ -3,6 +3,7 @@ package google
 import (
 	"errors"
 	"fmt"
+	"path"
 	"reflect"
 	"strconv"
 	"strings"
@@ -304,7 +305,8 @@ func (clst *Cluster) instanceNew(name string, size string,
 
 func (clst *Cluster) parseACLs(fws []*compute.Firewall) (acls []acl.ACL) {
 	for _, fw := range fws {
-		if fw.Network != clst.networkName || fw.Name == clst.intFW {
+		_, nwName := path.Split(fw.Network)
+		if nwName != clst.networkName || fw.Name == clst.intFW {
 			continue
 		}
 		for _, cidrIP := range fw.SourceRanges {
