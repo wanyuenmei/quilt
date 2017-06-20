@@ -12,6 +12,7 @@ LINE_LENGTH_EXCLUDE=./api/pb/pb.pb.go \
 		    ./minion/ovsdb/mock_transact.go \
 		    ./minion/ovsdb/mocks/Client.go \
 		    ./minion/pb/pb.pb.go \
+		    ./quilt-tester/tests/zookeeper/vendor/% \
 		    ./stitch/bindings.js.go
 
 REPO = quilt
@@ -53,6 +54,7 @@ COV_SKIP= /api/client/mocks \
 	  /minion/ovsdb/mocks \
 	  /minion/network/mocks \
 	  /quiltctl/testutils \
+	  /quilt-tester/% \
 	  /scripts \
 	  /scripts/format \
 	  /scripts/blueprints-tester \

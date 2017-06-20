@@ -86,14 +86,16 @@ func main() {
 			fmt.Println(res.container)
 			if len(res.pingUnauthorized) != 0 {
 				failed = true
-				fmt.Println(".. FAILED, could ping unauthorized containers")
+				fmt.Println(
+					".. FAILED, could ping unauthorized containers")
 				for _, unauthorized := range res.pingUnauthorized {
 					fmt.Printf(".... %s\n", unauthorized)
 				}
 			}
 			if len(res.pingUnreachable) != 0 {
 				failed = true
-				fmt.Println(".. FAILED, couldn't ping authorized containers")
+				fmt.Println(
+					".. FAILED, couldn't ping authorized containers")
 				for _, unreachable := range res.pingUnreachable {
 					fmt.Printf(".... %s\n", unreachable)
 				}
@@ -365,9 +367,11 @@ func (tester networkTester) test(container db.Container) testResult {
 
 		err := l.err
 		if err == nil {
-			err = fmt.Errorf("%s => %s (expected %s)", l.hostname, l.ip, expIP)
+			err = fmt.Errorf("%s => %s (expected %s)",
+				l.hostname, l.ip, expIP)
 		}
-		dnsIncorrect = append(dnsIncorrect, testFailure{l.hostname, err, l.cmdTime})
+		dnsIncorrect = append(dnsIncorrect,
+			testFailure{l.hostname, err, l.cmdTime})
 	}
 
 	return testResult{

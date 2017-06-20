@@ -115,9 +115,11 @@ func (t *tester) generateTestSuites(testRoot string) error {
 			switch {
 			case strings.HasSuffix(file.Name(), ".js"):
 				blueprint = path
-				if err := updateNamespace(blueprint, t.namespace); err != nil {
+				err := updateNamespace(blueprint, t.namespace)
+				if err != nil {
 					l.infoln(fmt.Sprintf(
-						"Error updating namespace for %s.", blueprint))
+						"Error updating namespace for %s.",
+						blueprint))
 					l.errorln(err.Error())
 					return err
 				}
@@ -127,9 +129,9 @@ func (t *tester) generateTestSuites(testRoot string) error {
 			}
 		}
 		newSuite := testSuite{
-			name: filepath.Base(testSuiteFolder),
+			name:      filepath.Base(testSuiteFolder),
 			blueprint: "./" + blueprint,
-			test: test,
+			test:      test,
 		}
 		t.testSuites = append(t.testSuites, &newSuite)
 	}
@@ -251,7 +253,8 @@ func (ts *testSuite) run() error {
 	}()
 	defer func() {
 		logsPath := filepath.Join(os.Getenv("WORKSPACE"), ts.name+"_debug_logs")
-		cmd := exec.Command("quilt", "debug-logs", "-tar=false", "-o="+logsPath, "-all")
+		cmd := exec.Command("quilt", "debug-logs", "-tar=false",
+			"-o="+logsPath, "-all")
 		stdout, stderr, err := execCmd(cmd, "DEBUG LOGS")
 		if err != nil {
 			l.errorln(fmt.Sprintf("Debug logs encountered an error:"+

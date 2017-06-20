@@ -56,7 +56,8 @@ func test(containers []db.Container) bool {
 		key := "/" + uuid.NewV4().String()
 		expData[key] = uuid.NewV4().String()
 
-		fmt.Printf("Writing %s to key %s from %s\n", expData[key], key, c.StitchID)
+		fmt.Printf("Writing %s to key %s from %s\n",
+			expData[key], key, c.StitchID)
 		out, err := exec.Command("quilt", "ssh", c.StitchID,
 			"bin/zkCli.sh", "create", key, expData[key]).CombinedOutput()
 		if err != nil {
@@ -68,7 +69,8 @@ func test(containers []db.Container) bool {
 
 	for _, c := range containers {
 		for key, val := range expData {
-			fmt.Printf("Getting key %s from %s: expect %s\n", key, c.StitchID, val)
+			fmt.Printf("Getting key %s from %s: expect %s\n",
+				key, c.StitchID, val)
 			out, err := exec.Command("quilt", "ssh", c.StitchID,
 				"bin/zkCli.sh", "get", key).CombinedOutput()
 			if err != nil || !strings.Contains(string(out), val) {

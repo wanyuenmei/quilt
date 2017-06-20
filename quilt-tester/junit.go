@@ -8,12 +8,16 @@ import (
 	"github.com/Sirupsen/logrus"
 )
 
+// JUnitReport defines the XML output schema for a Jenkins job (which in our case
+// is running a set of integration tests).
 type JUnitReport struct {
 	XMLName     xml.Name `xml:"testsuite"`
 	NumTests    int      `xml:"tests,attr"`
 	TestResults []TestCase
 }
 
+// TestCase defines the XML output schema for a test case, i.e. a quilt-tester
+// test suite.
 type TestCase struct {
 	XMLName     xml.Name  `xml:"testcase"`
 	Name        string    `xml:"name,attr"`

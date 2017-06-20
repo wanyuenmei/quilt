@@ -44,7 +44,8 @@ func main() {
 			loadBalancedContainers = append(loadBalancedContainers, c)
 		}
 	}
-	log.WithField("expected unique responses", len(loadBalancedContainers)).Info("Starting fetching..")
+	log.WithField("expected unique responses", len(loadBalancedContainers)).
+		Info("Starting fetching..")
 
 	if fetcherID == "" {
 		log.Fatal("FAILED, couldn't find fetcher")

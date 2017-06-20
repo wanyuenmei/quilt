@@ -52,7 +52,8 @@ func main() {
 	err = util.WaitFor(func() bool {
 		logs, err := exec.Command("quilt", "logs", id).CombinedOutput()
 		if err != nil {
-			log.WithError(err).Fatal("FAILED, Unable to get Spark master logs.")
+			log.WithError(err).Fatal(
+				"FAILED, Unable to get Spark master logs.")
 			return false
 		}
 

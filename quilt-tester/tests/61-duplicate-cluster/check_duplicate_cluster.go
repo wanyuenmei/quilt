@@ -67,7 +67,8 @@ func main() {
 		// Each cluster's workers should connect only to its own master.
 		logsStr := string(logs)
 		workerSet := map[string]struct{}{}
-		for _, wkMatch := range connectionRegex.FindAllStringSubmatch(logsStr, -1) {
+		connectionMatches := connectionRegex.FindAllStringSubmatch(logsStr, -1)
+		for _, wkMatch := range connectionMatches {
 			workerSet[wkMatch[1]] = struct{}{}
 		}
 		if workerCount := len(workerSet); workerCount != totalWorkers/2 {

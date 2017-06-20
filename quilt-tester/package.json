@@ -1,0 +1,16 @@
+{
+  "name": "@quilt/tester-dependencies",
+  "version": "0.0.1",
+  "license": "MIT",
+  "dependencies": {
+    "@quilt/elasticsearch": "quilt/elasticsearch",
+    "@quilt/etcd": "quilt/etcd",
+    "@quilt/haproxy": "quilt/haproxy",
+    "@quilt/mongo": "quilt/mongo",
+    "@quilt/nginx": "quilt/nginx",
+    "@quilt/nodejs": "quilt/nodejs",
+    "@quilt/quilt": "quilt/quilt",
+    "@quilt/spark": "quilt/spark",
+    "@quilt/zookeeper": "quilt/zookeeper"
+  }
+}
