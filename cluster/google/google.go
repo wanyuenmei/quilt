@@ -73,7 +73,7 @@ func New(namespace, zone string) (*Cluster, error) {
 	clst.intFW = fmt.Sprintf("%s-internal", clst.ns)
 	clst.imgURL = fmt.Sprintf("%s/%s", computeBaseURL,
 		"ubuntu-os-cloud/global/images/ubuntu-1604-xenial-v20170202")
-	clst.networkName = fmt.Sprintf("global/networks/%s", clst.ns)
+	clst.networkName = clst.ns
 
 	if err := clst.createNetwork(); err != nil {
 		log.WithError(err).Debug("failed to start up gce network")
@@ -286,7 +286,7 @@ func (clst *Cluster) instanceNew(name string, size string,
 						Name: ephemeralIPName,
 					},
 				},
-				Network: clst.networkName,
+				Network: networkURL(clst.networkName),
 			},
 		},
 		Metadata: &compute.Metadata{
@@ -499,7 +499,7 @@ func (clst *Cluster) insertFirewall(name, ports string, sourceRanges []string) (
 	*compute.Operation, error) {
 	firewall := &compute.Firewall{
 		Name:    name,
-		Network: clst.networkName,
+		Network: networkURL(clst.networkName),
 		Allowed: []*compute.FirewallAllowed{
 			{
 				IPProtocol: "tcp",
@@ -533,7 +533,7 @@ func (clst *Cluster) firewallPatch(name string,
 	ips []string) (*compute.Operation, error) {
 	firewall := &compute.Firewall{
 		Name:         name,
-		Network:      clst.networkName,
+		Network:      networkURL(clst.networkName),
 		SourceRanges: ips,
 	}
 
@@ -605,6 +605,10 @@ func (clst *Cluster) createInternalFirewall() error {
 		return err
 	}
 	return nil
+}
+
+func networkURL(networkName string) string {
+	return fmt.Sprintf("global/networks/%s", networkName)
 }
 
 func groupACLsByPorts(acls []acl.ACL) map[acl.ACL][]string {
