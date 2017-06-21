@@ -18,7 +18,7 @@ func TestVersionFlags(t *testing.T) {
 	err := parseHelper(cmd, []string{"-H", expHost})
 
 	assert.NoError(t, err)
-	assert.Equal(t, expHost, cmd.common.host)
+	assert.Equal(t, expHost, cmd.host)
 }
 
 func TestGetDaemonVersion(t *testing.T) {
@@ -32,7 +32,7 @@ func TestGetDaemonVersion(t *testing.T) {
 
 	actual, err := Version{
 		clientGetter: mockGetter,
-		common:       &commonFlags{},
+		commonFlags:  &commonFlags{},
 	}.getDaemonVersion()
 	assert.NoError(t, err)
 	assert.Equal(t, "mockVersion", actual)
@@ -40,7 +40,7 @@ func TestGetDaemonVersion(t *testing.T) {
 	mockLocalClient.VersionErr = assert.AnError
 	_, err = Version{
 		clientGetter: mockGetter,
-		common:       &commonFlags{},
+		commonFlags:  &commonFlags{},
 	}.getDaemonVersion()
 	assert.NotNil(t, err)
 
@@ -48,7 +48,7 @@ func TestGetDaemonVersion(t *testing.T) {
 	mockGetter.On("Client", mock.Anything).Return(nil, assert.AnError)
 	_, err = Version{
 		clientGetter: mockGetter,
-		common:       &commonFlags{},
+		commonFlags:  &commonFlags{},
 	}.getDaemonVersion()
 	assert.NotNil(t, err)
 }

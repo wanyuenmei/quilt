@@ -24,9 +24,10 @@ type SSH struct {
 	allocatePTY bool
 	args        []string
 
-	common       *commonFlags
 	clientGetter client.Getter
 	sshGetter    ssh.Getter
+
+	*commonFlags
 }
 
 // NewSSHCommand creates a new SSH command instance.
@@ -34,7 +35,7 @@ func NewSSHCommand() *SSH {
 	return &SSH{
 		clientGetter: getter.New(),
 		sshGetter:    ssh.New,
-		common:       &commonFlags{},
+		commonFlags:  &commonFlags{},
 	}
 }
 
@@ -53,7 +54,7 @@ quilt ssh 8879fd2dbcee echo foo
 
 // InstallFlags sets up parsing for command line flags.
 func (sCmd *SSH) InstallFlags(flags *flag.FlagSet) {
-	sCmd.common.InstallFlags(flags)
+	sCmd.commonFlags.InstallFlags(flags)
 	flags.StringVar(&sCmd.privateKey, "i", "",
 		"the private key to use to connect to the host")
 	flags.BoolVar(&sCmd.allocatePTY, "t", false,
@@ -84,7 +85,7 @@ func (sCmd SSH) Run() int {
 		return 1
 	}
 
-	c, err := sCmd.clientGetter.Client(sCmd.common.host)
+	c, err := sCmd.clientGetter.Client(sCmd.host)
 	if err != nil {
 		log.Error(err)
 		return 1

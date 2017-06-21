@@ -136,9 +136,9 @@ func TestDebug(t *testing.T) {
 		// Check that all logs are fetched.
 		{
 			cmd: Debug{
-				tar:    false,
-				all:    true,
-				common: &commonFlags{},
+				tar:         false,
+				all:         true,
+				commonFlags: &commonFlags{},
 			},
 			machines: []db.Machine{
 				{
@@ -169,10 +169,10 @@ func TestDebug(t *testing.T) {
 		// Check that all logs are fetched with -machines and -containers.
 		{
 			cmd: Debug{
-				tar:        false,
-				machines:   true,
-				containers: true,
-				common:     &commonFlags{},
+				tar:         false,
+				machines:    true,
+				containers:  true,
+				commonFlags: &commonFlags{},
 			},
 			machines: []db.Machine{
 				{
@@ -196,9 +196,9 @@ func TestDebug(t *testing.T) {
 		// Check that just container logs are fetched.
 		{
 			cmd: Debug{
-				tar:        false,
-				containers: true,
-				common:     &commonFlags{},
+				tar:         false,
+				containers:  true,
+				commonFlags: &commonFlags{},
 			},
 			machines: []db.Machine{
 				{
@@ -221,9 +221,9 @@ func TestDebug(t *testing.T) {
 		// Check that just machine logs are fetched.
 		{
 			cmd: Debug{
-				tar:      false,
-				machines: true,
-				common:   &commonFlags{},
+				tar:         false,
+				machines:    true,
+				commonFlags: &commonFlags{},
 			},
 			machines: []db.Machine{
 				{
@@ -252,9 +252,9 @@ func TestDebug(t *testing.T) {
 		// Check that we can get logs by specific stitch ids
 		{
 			cmd: Debug{
-				tar:    false,
-				ids:    []string{"2", "4", "5"},
-				common: &commonFlags{},
+				tar:         false,
+				ids:         []string{"2", "4", "5"},
+				commonFlags: &commonFlags{},
 			},
 			machines: []db.Machine{
 				{
@@ -280,9 +280,9 @@ func TestDebug(t *testing.T) {
 		// Check that we can get logs by specific stitch ids in arbitrary order
 		{
 			cmd: Debug{
-				tar:    false,
-				ids:    []string{"4", "2", "1"},
-				common: &commonFlags{},
+				tar:         false,
+				ids:         []string{"4", "2", "1"},
+				commonFlags: &commonFlags{},
 			},
 			machines: []db.Machine{
 				{
@@ -308,9 +308,9 @@ func TestDebug(t *testing.T) {
 		// Check that we error on arbitrary stitch IDs.
 		{
 			cmd: Debug{
-				tar:    false,
-				ids:    []string{"4", "2"},
-				common: &commonFlags{},
+				tar:         false,
+				ids:         []string{"4", "2"},
+				commonFlags: &commonFlags{},
 			},
 			machines: []db.Machine{
 				{
@@ -332,9 +332,9 @@ func TestDebug(t *testing.T) {
 		// Check that we error on non-existent stitch IDs.
 		{
 			cmd: Debug{
-				tar:    false,
-				ids:    []string{"6"},
-				common: &commonFlags{},
+				tar:         false,
+				ids:         []string{"6"},
+				commonFlags: &commonFlags{},
 			},
 			machines: []db.Machine{
 				{
@@ -356,9 +356,9 @@ func TestDebug(t *testing.T) {
 		// Check that containers without a minion aren't reported.
 		{
 			cmd: Debug{
-				tar:        false,
-				containers: true,
-				common:     &commonFlags{},
+				tar:         false,
+				containers:  true,
+				commonFlags: &commonFlags{},
 			},
 			machines: []db.Machine{
 				{
@@ -384,9 +384,9 @@ func TestDebug(t *testing.T) {
 		// Check that machines without an IP aren't reported.
 		{
 			cmd: Debug{
-				tar:      false,
-				machines: true,
-				common:   &commonFlags{},
+				tar:         false,
+				machines:    true,
+				commonFlags: &commonFlags{},
 			},
 			machines: []db.Machine{
 				{
@@ -413,10 +413,10 @@ func TestDebug(t *testing.T) {
 		// Check that a supplied path is respected.
 		{
 			cmd: Debug{
-				tar:     false,
-				all:     true,
-				outPath: "tmp_folder",
-				common:  &commonFlags{},
+				tar:         false,
+				all:         true,
+				outPath:     "tmp_folder",
+				commonFlags: &commonFlags{},
 			},
 			machines: []db.Machine{
 				{

@@ -16,21 +16,22 @@ type Stop struct {
 	namespace      string
 	onlyContainers bool
 
-	common       *commonFlags
 	clientGetter client.Getter
+
+	*commonFlags
 }
 
 // NewStopCommand creates a new Stop command instance.
 func NewStopCommand() *Stop {
 	return &Stop{
 		clientGetter: getter.New(),
-		common:       &commonFlags{},
+		commonFlags:  &commonFlags{},
 	}
 }
 
 // InstallFlags sets up parsing for command line flags.
 func (sCmd *Stop) InstallFlags(flags *flag.FlagSet) {
-	sCmd.common.InstallFlags(flags)
+	sCmd.commonFlags.InstallFlags(flags)
 
 	flags.StringVar(&sCmd.namespace, "namespace", "",
 		"the namespace to stop")
@@ -61,7 +62,7 @@ func (sCmd *Stop) Parse(args []string) error {
 
 // Run stops the given namespace.
 func (sCmd *Stop) Run() int {
-	c, err := sCmd.clientGetter.Client(sCmd.common.host)
+	c, err := sCmd.clientGetter.Client(sCmd.host)
 	if err != nil {
 		log.Error(err)
 		return 1

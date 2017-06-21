@@ -26,7 +26,7 @@ func TestPsFlags(t *testing.T) {
 	err := parseHelper(cmd, []string{"-H", expHost})
 
 	assert.NoError(t, err)
-	assert.Equal(t, expHost, cmd.common.host)
+	assert.Equal(t, expHost, cmd.host)
 
 	cmd = NewPsCommand()
 	err = parseHelper(cmd, []string{"-no-trunc"})
@@ -48,7 +48,7 @@ func TestPsErrors(t *testing.T) {
 	mockGetter = new(clientMock.Getter)
 	mockGetter.On("Client", mock.Anything).Return(nil, mockErr)
 
-	cmd = &Ps{false, &commonFlags{}, mockGetter}
+	cmd = &Ps{false, mockGetter, &commonFlags{}}
 	assert.EqualError(t, cmd.run(), "error connecting to quilt daemon: error")
 	mockGetter.AssertExpectations(t)
 
@@ -58,7 +58,7 @@ func TestPsErrors(t *testing.T) {
 	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
 	mockGetter.On("LeaderClient", mock.Anything).Return(nil, mockErr)
 
-	cmd = &Ps{false, &commonFlags{}, mockGetter}
+	cmd = &Ps{false, mockGetter, &commonFlags{}}
 	assert.EqualError(t, cmd.run(), "unable to query machines: error")
 	mockGetter.AssertExpectations(t)
 
@@ -68,7 +68,7 @@ func TestPsErrors(t *testing.T) {
 	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
 	mockGetter.On("LeaderClient", mock.Anything).Return(nil, mockErr)
 
-	cmd = &Ps{false, &commonFlags{}, mockGetter}
+	cmd = &Ps{false, mockGetter, &commonFlags{}}
 	assert.NoError(t, cmd.run())
 	mockGetter.AssertExpectations(t)
 
@@ -79,7 +79,7 @@ func TestPsErrors(t *testing.T) {
 	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
 	mockGetter.On("LeaderClient", mock.Anything).Return(mockLeaderClient, nil)
 
-	cmd = &Ps{false, &commonFlags{}, mockGetter}
+	cmd = &Ps{false, mockGetter, &commonFlags{}}
 	assert.EqualError(t, cmd.run(), "unable to query containers: error")
 	mockGetter.AssertExpectations(t)
 
@@ -90,7 +90,7 @@ func TestPsErrors(t *testing.T) {
 	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
 	mockGetter.On("LeaderClient", mock.Anything).Return(mockLeaderClient, nil)
 
-	cmd = &Ps{false, &commonFlags{}, mockGetter}
+	cmd = &Ps{false, mockGetter, &commonFlags{}}
 	assert.EqualError(t, cmd.run(), "unable to query connections: error")
 	mockGetter.AssertExpectations(t)
 
@@ -109,7 +109,7 @@ func TestPsErrors(t *testing.T) {
 	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
 	mockGetter.On("LeaderClient", mock.Anything).Return(mockLeaderClient, nil)
 
-	cmd = &Ps{false, &commonFlags{}, mockGetter}
+	cmd = &Ps{false, mockGetter, &commonFlags{}}
 	assert.Equal(t, 0, cmd.Run())
 	mockGetter.AssertExpectations(t)
 }
@@ -124,7 +124,7 @@ func TestPsSuccess(t *testing.T) {
 	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
 	mockGetter.On("LeaderClient", mock.Anything).Return(mockLeaderClient, nil)
 
-	cmd := &Ps{false, &commonFlags{}, mockGetter}
+	cmd := &Ps{false, mockGetter, &commonFlags{}}
 	assert.Equal(t, 0, cmd.Run())
 	mockGetter.AssertExpectations(t)
 }
@@ -151,7 +151,7 @@ func TestQueryWorkersSuccess(t *testing.T) {
 	}
 	mockGetter.On("Client", mock.Anything).Return(mockClient, nil)
 
-	cmd := &Ps{false, &commonFlags{}, mockGetter}
+	cmd := &Ps{false, mockGetter, &commonFlags{}}
 	result := cmd.queryWorkers(machines)
 	assert.Equal(t, containers, result)
 	mockGetter.AssertExpectations(t)
@@ -187,7 +187,7 @@ func TestQueryWorkersFailure(t *testing.T) {
 	mockGetter.On("Client", api.RemoteAddress("1.2.3.4")).Return(nil, mockErr)
 	mockGetter.On("Client", api.RemoteAddress("5.6.7.8")).Return(mockClient, nil)
 
-	cmd := &Ps{false, &commonFlags{}, mockGetter}
+	cmd := &Ps{false, mockGetter, &commonFlags{}}
 	result := cmd.queryWorkers(machines)
 	assert.Equal(t, containers, result)
 	mockGetter.AssertExpectations(t)
@@ -201,7 +201,7 @@ func TestQueryWorkersFailure(t *testing.T) {
 	mockGetter.On("Client", api.RemoteAddress("1.2.3.4")).Return(failingClient, nil)
 	mockGetter.On("Client", api.RemoteAddress("5.6.7.8")).Return(mockClient, nil)
 
-	cmd = &Ps{false, &commonFlags{}, mockGetter}
+	cmd = &Ps{false, mockGetter, &commonFlags{}}
 	result = cmd.queryWorkers(machines)
 	assert.Equal(t, containers, result)
 	mockGetter.AssertExpectations(t)

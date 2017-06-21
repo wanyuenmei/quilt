@@ -13,14 +13,15 @@ import (
 
 // Version prints the Quilt version information.
 type Version struct {
-	common       *commonFlags
 	clientGetter client.Getter
+
+	*commonFlags
 }
 
 // NewVersionCommand creates a new Version command instance.
 func NewVersionCommand() *Version {
 	return &Version{
-		common:       &commonFlags{},
+		commonFlags:  &commonFlags{},
 		clientGetter: getter.New(),
 	}
 }
@@ -30,7 +31,7 @@ Show the Quilt version information.`
 
 // InstallFlags sets up parsing for command line flags.
 func (vCmd *Version) InstallFlags(flags *flag.FlagSet) {
-	vCmd.common.InstallFlags(flags)
+	vCmd.commonFlags.InstallFlags(flags)
 	flags.Usage = func() {
 		fmt.Println(versionUsage)
 	}
@@ -56,7 +57,7 @@ func (vCmd *Version) Run() int {
 }
 
 func (vCmd Version) getDaemonVersion() (string, error) {
-	client, err := vCmd.clientGetter.Client(vCmd.common.host)
+	client, err := vCmd.clientGetter.Client(vCmd.host)
 	if err != nil {
 		return "", err
 	}

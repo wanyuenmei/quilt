@@ -27,21 +27,22 @@ const truncLength = 30
 // Ps contains the options for querying machines and containers.
 type Ps struct {
 	noTruncate   bool
-	common       *commonFlags
 	clientGetter client.Getter
+
+	*commonFlags
 }
 
 // NewPsCommand creates a new Ps command instance.
 func NewPsCommand() *Ps {
 	return &Ps{
-		common:       &commonFlags{},
+		commonFlags:  &commonFlags{},
 		clientGetter: getter.New(),
 	}
 }
 
 // InstallFlags sets up parsing for command line flags
 func (pCmd *Ps) InstallFlags(flags *flag.FlagSet) {
-	pCmd.common.InstallFlags(flags)
+	pCmd.commonFlags.InstallFlags(flags)
 	flags.BoolVar(&pCmd.noTruncate, "no-trunc", false, "do not truncate container"+
 		" command output")
 	flags.Usage = func() {
@@ -68,7 +69,7 @@ func (pCmd *Ps) Run() int {
 }
 
 func (pCmd *Ps) run() error {
-	localClient, err := pCmd.clientGetter.Client(pCmd.common.host)
+	localClient, err := pCmd.clientGetter.Client(pCmd.host)
 	if err != nil {
 		return fmt.Errorf("error connecting to quilt daemon: %s", err)
 	}

@@ -25,21 +25,22 @@ type Run struct {
 	stitch string
 	force  bool
 
-	common       *commonFlags
 	clientGetter client.Getter
+
+	*commonFlags
 }
 
 // NewRunCommand creates a new Run command instance.
 func NewRunCommand() *Run {
 	return &Run{
-		common:       &commonFlags{},
+		commonFlags:  &commonFlags{},
 		clientGetter: getter.New(),
 	}
 }
 
 // InstallFlags sets up parsing for command line flags.
 func (rCmd *Run) InstallFlags(flags *flag.FlagSet) {
-	rCmd.common.InstallFlags(flags)
+	rCmd.commonFlags.InstallFlags(flags)
 
 	flags.StringVar(&rCmd.stitch, "stitch", "", "the stitch to run")
 	flags.BoolVar(&rCmd.force, "f", false, "deploy without confirming changes")
@@ -81,7 +82,7 @@ func (rCmd *Run) Run() int {
 	}
 	deployment := compiled.String()
 
-	c, err := rCmd.clientGetter.Client(rCmd.common.host)
+	c, err := rCmd.clientGetter.Client(rCmd.host)
 	if err != nil {
 		log.Error(err)
 		return 1

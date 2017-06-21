@@ -133,7 +133,7 @@ func TestLog(t *testing.T) {
 		}
 		testCmd.privateKey = "key"
 		testCmd.clientGetter = mockGetter
-		testCmd.common = &commonFlags{}
+		testCmd.commonFlags = &commonFlags{}
 
 		mockSSHClient.On("Run", false, test.expSSHCommand).Return(nil)
 		mockSSHClient.On("Close").Return(nil)
@@ -155,7 +155,7 @@ func TestLogAmbiguousID(t *testing.T) {
 		Return(mockClient, nil)
 
 	testCmd := Log{
-		common:       &commonFlags{},
+		commonFlags:  &commonFlags{},
 		clientGetter: mockClientGetter,
 		target:       "foo",
 	}
@@ -173,7 +173,7 @@ func TestLogNoMatch(t *testing.T) {
 		Return(mockClient, nil)
 
 	testCmd := Log{
-		common:       &commonFlags{},
+		commonFlags:  &commonFlags{},
 		clientGetter: mockClientGetter,
 		target:       "bar",
 	}
@@ -191,7 +191,7 @@ func TestLogScheduledContainer(t *testing.T) {
 		}, nil)
 
 	testCmd := Log{
-		common:       &commonFlags{},
+		commonFlags:  &commonFlags{},
 		clientGetter: mockClientGetter,
 		target:       "foo",
 	}

@@ -163,9 +163,9 @@ func TestSSH(t *testing.T) {
 		// Machine with login shell.
 		{
 			cmd: SSH{
-				common:     &commonFlags{},
-				privateKey: "key",
-				target:     "tgt",
+				commonFlags: &commonFlags{},
+				privateKey:  "key",
+				target:      "tgt",
 			},
 			machines:    []db.Machine{{StitchID: "tgt", PublicIP: "host"}},
 			expHost:     "host",
@@ -174,10 +174,10 @@ func TestSSH(t *testing.T) {
 		// Machine with exec command.
 		{
 			cmd: SSH{
-				common:     &commonFlags{},
-				privateKey: "key",
-				target:     "tgt",
-				args:       []string{"foo", "bar"},
+				commonFlags: &commonFlags{},
+				privateKey:  "key",
+				target:      "tgt",
+				args:        []string{"foo", "bar"},
 			},
 			machines:   []db.Machine{{StitchID: "tgt", PublicIP: "host"}},
 			expHost:    "host",
@@ -186,9 +186,9 @@ func TestSSH(t *testing.T) {
 		// Container with login shell.
 		{
 			cmd: SSH{
-				common:     &commonFlags{},
-				privateKey: "key",
-				target:     "tgt",
+				commonFlags: &commonFlags{},
+				privateKey:  "key",
+				target:      "tgt",
 			},
 			containers: []db.Container{
 				{StitchID: "tgt", DockerID: "dockerID"},
@@ -200,10 +200,10 @@ func TestSSH(t *testing.T) {
 		// Container with exec.
 		{
 			cmd: SSH{
-				common:     &commonFlags{},
-				privateKey: "key",
-				target:     "tgt",
-				args:       []string{"foo", "bar"},
+				commonFlags: &commonFlags{},
+				privateKey:  "key",
+				target:      "tgt",
+				args:        []string{"foo", "bar"},
 			},
 			containers: []db.Container{
 				{StitchID: "tgt", DockerID: "dockerID"},
@@ -214,7 +214,7 @@ func TestSSH(t *testing.T) {
 		// Container with exec and PTY.
 		{
 			cmd: SSH{
-				common:      &commonFlags{},
+				commonFlags: &commonFlags{},
 				privateKey:  "key",
 				target:      "tgt",
 				args:        []string{"foo", "bar"},
@@ -275,7 +275,7 @@ func TestAmbiguousID(t *testing.T) {
 		Return(mockClient, nil)
 
 	testCmd := SSH{
-		common:       &commonFlags{},
+		commonFlags:  &commonFlags{},
 		clientGetter: mockClientGetter,
 		target:       "foo",
 	}
@@ -293,7 +293,7 @@ func TestNoMatch(t *testing.T) {
 		Return(mockClient, nil)
 
 	testCmd := SSH{
-		common:       &commonFlags{},
+		commonFlags:  &commonFlags{},
 		clientGetter: mockClientGetter,
 		target:       "bar",
 	}
@@ -318,7 +318,7 @@ func TestSSHExitError(t *testing.T) {
 		Return(nil, errors.New("unused"))
 
 	testCmd := SSH{
-		common:       &commonFlags{},
+		commonFlags:  &commonFlags{},
 		sshGetter:    mockSSHGetter,
 		clientGetter: mockClientGetter,
 		target:       "tgt",
@@ -335,7 +335,7 @@ func TestSSHExitError(t *testing.T) {
 	mockSSHClient.On("Run", mock.Anything, mock.Anything).Return(errors.New("error"))
 
 	testCmd = SSH{
-		common:       &commonFlags{},
+		commonFlags:  &commonFlags{},
 		sshGetter:    mockSSHGetter,
 		clientGetter: mockClientGetter,
 		target:       "tgt",
@@ -365,7 +365,7 @@ func TestSSHScheduledContainer(t *testing.T) {
 		}, nil)
 
 	testCmd := SSH{
-		common:       &commonFlags{},
+		commonFlags:  &commonFlags{},
 		clientGetter: mockClientGetter,
 		target:       "foo",
 	}

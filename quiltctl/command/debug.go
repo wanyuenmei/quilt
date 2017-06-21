@@ -42,9 +42,10 @@ type Debug struct {
 	tar        bool
 	ids        []string
 
-	common       *commonFlags
 	clientGetter client.Getter
 	sshGetter    ssh.Getter
+
+	*commonFlags
 }
 
 type logTarget struct {
@@ -105,7 +106,7 @@ func NewDebugCommand() *Debug {
 	return &Debug{
 		clientGetter: getter.New(),
 		sshGetter:    ssh.New,
-		common:       &commonFlags{},
+		commonFlags:  &commonFlags{},
 	}
 }
 
@@ -144,7 +145,7 @@ quilt debug-logs -i ~/.ssh/quilt 09ed35808a0b
 
 // InstallFlags sets up parsing for command line flags.
 func (dCmd *Debug) InstallFlags(flags *flag.FlagSet) {
-	dCmd.common.InstallFlags(flags)
+	dCmd.commonFlags.InstallFlags(flags)
 	flags.StringVar(&dCmd.privateKey, "i", "",
 		"the private key to use to connect to the host")
 	flags.StringVar(&dCmd.outPath, "o", "",
@@ -185,7 +186,7 @@ func (dCmd Debug) Run() int {
 		return 1
 	}
 
-	c, err := dCmd.clientGetter.Client(dCmd.common.host)
+	c, err := dCmd.clientGetter.Client(dCmd.host)
 	if err != nil {
 		log.Error(err)
 		return 1
@@ -265,7 +266,7 @@ func (dCmd Debug) downloadLogs(targets []logTarget) int {
 	var errno int
 	for _, cmd := range daemonCmds {
 		file := filepath.Join(rootDir, cmd.name)
-		fmtCmd := fmt.Sprintf(cmd.cmd, dCmd.common.host)
+		fmtCmd := fmt.Sprintf(cmd.cmd, dCmd.host)
 		qCmd := execCmd("quilt", strings.Fields(fmtCmd)...)
 		log.Debugf("Gathering `quilt %s` output", fmtCmd)
 		if result, err := qCmd.CombinedOutput(); err != nil {

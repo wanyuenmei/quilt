@@ -24,7 +24,8 @@ type Log struct {
 
 	sshGetter    ssh.Getter
 	clientGetter client.Getter
-	common       *commonFlags
+
+	*commonFlags
 }
 
 // NewLogCommand creates a new Log command instance.
@@ -32,7 +33,7 @@ func NewLogCommand() *Log {
 	return &Log{
 		sshGetter:    ssh.New,
 		clientGetter: getter.New(),
-		common:       &commonFlags{},
+		commonFlags:  &commonFlags{},
 	}
 }
 
@@ -50,7 +51,7 @@ quilt logs -f 09ed35808a0b
 
 // InstallFlags sets up parsing for command line flags.
 func (lCmd *Log) InstallFlags(flags *flag.FlagSet) {
-	lCmd.common.InstallFlags(flags)
+	lCmd.commonFlags.InstallFlags(flags)
 
 	flags.StringVar(&lCmd.privateKey, "i", "",
 		"the private key to use to connect to the host")
@@ -76,7 +77,7 @@ func (lCmd *Log) Parse(args []string) error {
 
 // Run finds the target container or machine minion and outputs logs.
 func (lCmd *Log) Run() int {
-	c, err := lCmd.clientGetter.Client(lCmd.common.host)
+	c, err := lCmd.clientGetter.Client(lCmd.host)
 	if err != nil {
 		log.Error(err)
 		return 1
