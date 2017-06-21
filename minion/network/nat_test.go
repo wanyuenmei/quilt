@@ -21,28 +21,28 @@ func TestUpdateNATErrors(t *testing.T) {
 	ipt := &mocks.IPTables{}
 	anErr := errors.New("err")
 
-	getPublicInterface = func() (string, error) {
+	getDefaultRouteIntf = func() (string, error) {
 		return "", anErr
 	}
-	assert.NotNil(t, updateNAT(ipt, nil, nil))
+	assert.NotNil(t, updateNAT(ipt, nil, nil, "", ""))
 
 	ipt = &mocks.IPTables{}
 	ipt.On("AppendUnique", mock.Anything, mock.Anything, mock.Anything).Return(anErr)
-	getPublicInterface = func() (string, error) {
+	getDefaultRouteIntf = func() (string, error) {
 		return "eth0", nil
 	}
-	assert.NotNil(t, updateNAT(ipt, nil, nil))
+	assert.NotNil(t, updateNAT(ipt, nil, nil, "", ""))
 
 	ipt = &mocks.IPTables{}
 	ipt.On("AppendUnique", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	ipt.On("List", mock.Anything, mock.Anything).Return(nil, anErr)
-	assert.NotNil(t, updateNAT(ipt, nil, nil))
+	assert.NotNil(t, updateNAT(ipt, nil, nil, "", ""))
 
 	ipt = &mocks.IPTables{}
 	ipt.On("AppendUnique", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	ipt.On("List", "nat", "PREROUTING").Return(nil, nil)
 	ipt.On("List", "nat", "POSTROUTING").Return(nil, anErr)
-	assert.NotNil(t, updateNAT(ipt, nil, nil))
+	assert.NotNil(t, updateNAT(ipt, nil, nil, "", ""))
 }
 
 func TestPreroutingRules(t *testing.T) {
@@ -264,7 +264,7 @@ func TestRuleKey(t *testing.T) {
 	assert.Nil(t, ruleKey("malformed"))
 }
 
-func TestGetPublicInterface(t *testing.T) {
+func TestGetDefaultRouteIntf(t *testing.T) {
 	routeList = func(link netlink.Link, family int) ([]netlink.Route, error) {
 		return nil, errors.New("not implemented")
 	}
@@ -277,7 +277,7 @@ func TestGetPublicInterface(t *testing.T) {
 		return nil, errors.New("unknown")
 	}
 
-	res, err := getPublicInterfaceImpl()
+	res, err := getDefaultRouteIntfImpl()
 	assert.Empty(t, res)
 	assert.EqualError(t, err, "route list: not implemented")
 
@@ -285,22 +285,38 @@ func TestGetPublicInterface(t *testing.T) {
 	routeList = func(link netlink.Link, family int) ([]netlink.Route, error) {
 		return routes, nil
 	}
-	res, err = getPublicInterfaceImpl()
+	res, err = getDefaultRouteIntfImpl()
 	assert.Empty(t, res)
 	assert.EqualError(t, err, "missing default route")
 
 	routes = []netlink.Route{{Dst: &ipdef.QuiltSubnet}}
-	res, err = getPublicInterfaceImpl()
+	res, err = getDefaultRouteIntfImpl()
 	assert.Empty(t, res)
 	assert.EqualError(t, err, "missing default route")
 
 	routes = []netlink.Route{{LinkIndex: 2}}
-	res, err = getPublicInterfaceImpl()
+	res, err = getDefaultRouteIntfImpl()
 	assert.Empty(t, res)
 	assert.EqualError(t, err, "default route missing interface: unknown")
 
 	routes = []netlink.Route{{LinkIndex: 5}}
-	res, err = getPublicInterfaceImpl()
+	res, err = getDefaultRouteIntfImpl()
 	assert.Equal(t, "link name", res)
 	assert.NoError(t, err)
+}
+
+func TestPickIntfs(t *testing.T) {
+	getDefaultRouteIntf = func() (string, error) {
+		return "default", nil
+	}
+
+	resInbound, resOutbound, err := pickIntfs("inbound", "outbound")
+	assert.NoError(t, err)
+	assert.Equal(t, "inbound", resInbound)
+	assert.Equal(t, "outbound", resOutbound)
+
+	resInbound, resOutbound, err = pickIntfs("inbound", "")
+	assert.NoError(t, err)
+	assert.Equal(t, "inbound", resInbound)
+	assert.Equal(t, "default", resOutbound)
 }

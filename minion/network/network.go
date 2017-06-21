@@ -22,8 +22,8 @@ const (
 )
 
 // Run blocks implementing the network services.
-func Run(conn db.Conn) {
-	go runNat(conn)
+func Run(conn db.Conn, inboundPubIntf, outboundPubIntf string) {
+	go runNat(conn, inboundPubIntf, outboundPubIntf)
 	go runDNS(conn)
 	go runUpdateIPs(conn)
 

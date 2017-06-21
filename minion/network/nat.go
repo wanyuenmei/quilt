@@ -24,7 +24,7 @@ type IPTables interface {
 	List(string, string) ([]string, error)
 }
 
-func runNat(conn db.Conn) {
+func runNat(conn db.Conn, inboundPubIntf, outboundPubIntf string) {
 	tables := []db.TableType{db.ContainerTable, db.ConnectionTable, db.MinionTable}
 	for range conn.TriggerTick(30, tables...).C {
 		minion := conn.MinionSelf()
@@ -43,10 +43,36 @@ func runNat(conn db.Conn) {
 			continue
 		}
 
-		if err := updateNAT(ipt, containers, connections); err != nil {
+		err = updateNAT(ipt, containers, connections, inboundPubIntf,
+			outboundPubIntf)
+		if err != nil {
 			log.WithError(err).Error("Failed to update NAT rules")
 		}
 	}
+}
+
+// pickIntfs converts the command line arguments for NAT interfaces to the names
+// that should actually be used in the iptables rules.
+// If an interface is not specificied (i.e. the empty string is supplied), we use
+// the interface associated with the default route.
+func pickIntfs(inboundPubIntf, outboundPubIntf string) (string, string, error) {
+	var defaultRouteIntf string
+	var err error
+	if inboundPubIntf == "" || outboundPubIntf == "" {
+		defaultRouteIntf, err = getDefaultRouteIntf()
+		if err != nil {
+			return "", "", fmt.Errorf("get default interface: %s", err)
+		}
+	}
+
+	if inboundPubIntf == "" {
+		inboundPubIntf = defaultRouteIntf
+	}
+	if outboundPubIntf == "" {
+		outboundPubIntf = defaultRouteIntf
+	}
+
+	return inboundPubIntf, outboundPubIntf, nil
 }
 
 // updateNAT sets up iptables rules of three categories:
@@ -58,23 +84,23 @@ func runNat(conn db.Conn) {
 // "postrouting rules" are responsible for routing traffic from containers
 // to the public internet. They overwrite any pre-existing or outdated rules.
 func updateNAT(ipt IPTables, containers []db.Container,
-	connections []db.Connection) error {
+	connections []db.Connection, inboundPubIntf, outboundPubIntf string) (err error) {
 
-	publicInterface, err := getPublicInterface()
+	inboundPubIntf, outboundPubIntf, err = pickIntfs(inboundPubIntf, outboundPubIntf)
 	if err != nil {
-		return fmt.Errorf("get public interface: %s", err)
+		return err
 	}
 
 	if err := setDefaultRules(ipt); err != nil {
 		return err
 	}
 
-	prerouting := preroutingRules(publicInterface, containers, connections)
+	prerouting := preroutingRules(inboundPubIntf, containers, connections)
 	if err := syncChain(ipt, "nat", "PREROUTING", prerouting); err != nil {
 		return err
 	}
 
-	postrouting := postroutingRules(publicInterface, containers, connections)
+	postrouting := postroutingRules(outboundPubIntf, containers, connections)
 	return syncChain(ipt, "nat", "POSTROUTING", postrouting)
 }
 
@@ -265,8 +291,8 @@ func setDefaultRules(ipt IPTables) error {
 	return nil
 }
 
-// getPublicInterfaceImpl gets the interface with the default route.
-func getPublicInterfaceImpl() (string, error) {
+// getDefaultRouteIntfImpl gets the interface with the default route.
+func getDefaultRouteIntfImpl() (string, error) {
 	routes, err := routeList(nil, 0)
 	if err != nil {
 		return "", fmt.Errorf("route list: %s", err)
@@ -294,4 +320,4 @@ func getPublicInterfaceImpl() (string, error) {
 
 var routeList = netlink.RouteList
 var linkByIndex = netlink.LinkByIndex
-var getPublicInterface = getPublicInterfaceImpl
+var getDefaultRouteIntf = getDefaultRouteIntfImpl

@@ -55,12 +55,16 @@ type Options struct {
 
 // MinionOptions defines the command line flags the minion should be invoked with.
 type MinionOptions struct {
-	Role db.Role
+	Role            db.Role
+	InboundPubIntf  string
+	OutboundPubIntf string
 }
 
 func (opts MinionOptions) String() string {
 	optsMap := map[string]string{
-		"role": string(opts.Role),
+		"role":              string(opts.Role),
+		"inbound-pub-intf":  opts.InboundPubIntf,
+		"outbound-pub-intf": opts.OutboundPubIntf,
 	}
 
 	var optsList []string

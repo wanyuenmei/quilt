@@ -23,7 +23,7 @@ import (
 )
 
 // Run blocks executing the minion.
-func Run(role db.Role) {
+func Run(role db.Role, inboundPubIntf, outboundPubIntf string) {
 	// XXX Uncomment the following line to run the profiler
 	//runProfiler(5 * time.Minute)
 
@@ -49,7 +49,7 @@ func Run(role db.Role) {
 
 	go minionServerRun(conn)
 	go scheduler.Run(conn, dk)
-	go network.Run(conn)
+	go network.Run(conn, inboundPubIntf, outboundPubIntf)
 	go registry.Run(conn, dk)
 	go etcd.Run(conn)
 	go syncAuthorizedKeys(conn)

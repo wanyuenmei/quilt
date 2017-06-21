@@ -17,7 +17,8 @@ import (
 
 // Minion contains the options for running the Quilt minion.
 type Minion struct {
-	role string
+	role                            string
+	inboundPubIntf, outboundPubIntf string
 }
 
 // NewMinionCommand creates a new Minion command instance.
@@ -28,6 +29,10 @@ func NewMinionCommand() *Minion {
 // InstallFlags sets up parsing for command line flags.
 func (mCmd *Minion) InstallFlags(flags *flag.FlagSet) {
 	flags.StringVar(&mCmd.role, "role", "", "the role of this quilt minion")
+	flags.StringVar(&mCmd.inboundPubIntf, "inbound-pub-intf", "",
+		"the interface on which to allow inbound traffic")
+	flags.StringVar(&mCmd.outboundPubIntf, "outbound-pub-intf", "",
+		"the interface on which to allow outbound traffic")
 
 	flags.Usage = func() {
 		fmt.Println("usage: quilt minion [-role=<role>]")
@@ -60,7 +65,7 @@ func (mCmd *Minion) run() error {
 		return errors.New("no or improper role specified")
 	}
 
-	minion.Run(role)
+	minion.Run(role, mCmd.inboundPubIntf, mCmd.outboundPubIntf)
 
 	return nil
 }

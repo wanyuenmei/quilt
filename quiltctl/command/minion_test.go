@@ -11,12 +11,18 @@ func TestMinionFlags(t *testing.T) {
 	t.Parallel()
 
 	expRole := "Worker"
+	expInboundPubIntf := "inbound"
+	expOutboundPubIntf := "outbound"
 
 	cmd := NewMinionCommand()
-	err := parseHelper(cmd, []string{"-role", expRole})
+	err := parseHelper(cmd, []string{"-role", expRole,
+		"-inbound-pub-intf", expInboundPubIntf,
+		"--outbound-pub-intf", expOutboundPubIntf})
 
 	assert.NoError(t, err)
 	assert.Equal(t, expRole, cmd.role)
+	assert.Equal(t, expInboundPubIntf, cmd.inboundPubIntf)
+	assert.Equal(t, expOutboundPubIntf, cmd.outboundPubIntf)
 }
 
 func TestMinionFailure(t *testing.T) {
