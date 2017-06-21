@@ -439,11 +439,10 @@ func TestUpdateFloatingIPs(t *testing.T) {
 		[]machine.Machine{},
 		[]machine.Machine{
 			{ID: "1", FloatingIP: "ip"},
+			{ID: "2", FloatingIP: "ip2"},
 		},
 	)
-	assert.EqualError(t, err, "no machines match desired: "+
-		"[{ID:1 PublicIP: PrivateIP: FloatingIP:ip Preemptible:false "+
-		"Size: DiskSize:0 SSHKeys:[] Provider: Region: Role:}]")
+	assert.EqualError(t, err, "no matching IDs: 1, 2")
 
 	err = clst.syncFloatingIPs(
 		[]machine.Machine{{ID: "NAN"}},

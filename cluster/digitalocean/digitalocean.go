@@ -207,7 +207,11 @@ func (clst Cluster) syncFloatingIPs(curr, targets []machine.Machine) error {
 		machine.Slice(curr), machine.Slice(targets), idKey, idKey)
 
 	if len(unmatchedDesired) != 0 {
-		return fmt.Errorf("no machines match desired: %+v", unmatchedDesired)
+		var unmatchedIDs []string
+		for _, m := range unmatchedDesired {
+			unmatchedIDs = append(unmatchedIDs, m.(machine.Machine).ID)
+		}
+		return fmt.Errorf("no matching IDs: %s", strings.Join(unmatchedIDs, ", "))
 	}
 
 	for _, pair := range pairs {
