@@ -281,15 +281,6 @@ func (clst cluster) join() (joinResult, error) {
 				dbm.Connected = false
 			}
 
-			// If we overwrite the machine's size before the machine has
-			// fully booted, the Stitch will flip it back immediately.
-			if m.Size != "" {
-				dbm.Size = m.Size
-			}
-			if m.DiskSize != 0 {
-				dbm.DiskSize = m.DiskSize
-			}
-			dbm.Provider = m.Provider
 			view.Commit(dbm)
 		}
 		return nil
