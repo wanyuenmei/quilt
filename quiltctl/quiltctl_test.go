@@ -3,6 +3,8 @@ package quiltctl
 import (
 	"flag"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type testCommand struct {
@@ -27,14 +29,8 @@ func (tCmd *testCommand) InstallFlags(flags *flag.FlagSet) {
 }
 
 func (tCmd *testCommand) Run() int {
-	if tCmd.flagArg != expFlagArg {
-		tCmd.t.Errorf("Bad argument value for testCommand: expected %s, got %s",
-			expFlagArg, tCmd.flagArg)
-	}
-	if tCmd.posArg != expPosArg {
-		tCmd.t.Errorf("Bad argument value for testCommand: expected %s, got %s",
-			expPosArg, tCmd.posArg)
-	}
+	assert.Equal(tCmd.t, expFlagArg, tCmd.flagArg)
+	assert.Equal(tCmd.t, expPosArg, tCmd.posArg)
 	return 0
 }
 
@@ -43,10 +39,7 @@ func TestArgumentParsing(t *testing.T) {
 
 	subcommand, err := parseSubcommand("test", &testCommand{t: t},
 		[]string{"-arg", expFlagArg, expPosArg})
-	if err != nil {
-		t.Errorf("Unexpected error: %s\n", err.Error())
-		return
-	}
+	assert.NoError(t, err)
 
 	subcommand.Run()
 }
