@@ -6,11 +6,6 @@ import (
 	"github.com/quilt/quilt/api"
 )
 
-type flagParser interface {
-	// InstallFlags sets up parsing for command line flags.
-	InstallFlags(*flag.FlagSet)
-}
-
 type commonFlags struct {
 	host string
 }

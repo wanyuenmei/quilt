@@ -1,9 +1,14 @@
 package command
 
+import (
+	"flag"
+)
+
 // SubCommand defines the conversion between the user CLI flags and
 // functionality within the code.
 type SubCommand interface {
-	flagParser
+	// InstallFlags sets up parsing for command line flags.
+	InstallFlags(*flag.FlagSet)
 
 	// The function to run once the flags have been parsed. The return value
 	// is the exit code.
