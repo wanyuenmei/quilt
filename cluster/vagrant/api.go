@@ -15,6 +15,7 @@ import (
 	"github.com/quilt/quilt/util"
 )
 
+const inboundPublicInterface = "enp0s8"
 const vagrantCmd = "vagrant"
 const shCmd = "sh"
 const cloudConfigPath = "/user-data"
@@ -106,8 +107,9 @@ func destroy(id string) error {
 }
 
 func publicIP(id string) (string, error) {
-	ip, stderr, err := shell(id,
-		`vagrant ssh -c "ip -f inet addr show enp0s8 | grep -Po 'inet \K[\d.]+'"`)
+	ip, stderr, err := shell(id, fmt.Sprintf(
+		`vagrant ssh -c "ip -f inet addr show %s | grep -Po 'inet \K[\d.]+'"`,
+		inboundPublicInterface))
 	if err != nil {
 		log.Errorf("Failed to parse Vagrant machine IP: %s", string(stderr))
 		return "", err

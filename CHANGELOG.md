@@ -10,6 +10,8 @@ boot times.
 - Load balancing.
 - Upgraded to the latest Docker engine version (17.05.0).
 - Fixed bug in Google provider that caused ACLs to be repeatedly added.
+- Fixed inbound connections on the Vagrant provider. In other words,
+`myService.allowFrom(publicInternet, aPort)` now works.
 
 Release 0.1.0
 -------------
