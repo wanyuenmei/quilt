@@ -35,7 +35,11 @@ type server struct {
 	runningOnDaemon bool
 }
 
-// Run accepts incoming `quiltctl` connections and responds to them.
+// Run starts a server that responds to `quiltctl` connections. It runs on both
+// the daemon and on the minion. The server provides various client-relevant
+// methods, such as starting deployments, and querying the state of the system.
+// This is in contrast to the minion server (minion/pb/pb.proto), which facilitates
+// the actual deployment.
 func Run(conn db.Conn, listenAddr string, runningOnDaemon bool) error {
 	proto, addr, err := api.ParseListenAddress(listenAddr)
 	if err != nil {
