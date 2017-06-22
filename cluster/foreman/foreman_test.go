@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/quilt/quilt/cluster/machine"
 	"github.com/quilt/quilt/db"
 	"github.com/quilt/quilt/minion/pb"
 )
@@ -148,15 +147,7 @@ func TestBootEtcd(t *testing.T) {
 		clients.clients["w1-pub"].mc.EtcdMembers)
 }
 
-func TestGetMachineRoles(t *testing.T) {
-	machines := []machine.Machine{
-		{
-			PublicIP: "1.1.1.1",
-		},
-		{
-			PublicIP: "2.2.2.2",
-		},
-	}
+func TestGetMachineRole(t *testing.T) {
 	workerMinion := minion{
 		config: pb.MinionConfig{
 			Role: pb.MinionConfig_WORKER,
@@ -166,9 +157,8 @@ func TestGetMachineRoles(t *testing.T) {
 		"1.1.1.1": &workerMinion,
 	}
 
-	updatedMachines := GetMachineRoles(machines)
-	assert.Equal(t, db.Role(db.Worker), updatedMachines[0].Role)
-	assert.Equal(t, db.Role(db.None), updatedMachines[1].Role)
+	assert.Equal(t, db.Role(db.Worker), GetMachineRole("1.1.1.1"))
+	assert.Equal(t, db.Role(db.None), GetMachineRole("none"))
 
 	minions = map[string]*minion{}
 }

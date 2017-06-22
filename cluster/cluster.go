@@ -258,7 +258,7 @@ func (clst cluster) join() (joinResult, error) {
 		}
 
 		res.machines = view.SelectFromMachine(nil)
-		cloudMachines = foreman.GetMachineRoles(cloudMachines)
+		cloudMachines = getMachineRoles(cloudMachines)
 
 		dbResult := syncDB(cloudMachines, res.machines)
 		res.boot = dbResult.boot
@@ -470,6 +470,14 @@ func (clst cluster) getProvider(loc launchLoc) (provider, error) {
 	return p, err
 }
 
+func getMachineRoles(machines []machine.Machine) (withRoles []machine.Machine) {
+	for _, m := range machines {
+		m.Role = getMachineRole(m.PublicIP)
+		withRoles = append(withRoles, m)
+	}
+	return withRoles
+}
+
 func groupByLoc(machines []machine.Machine) map[launchLoc][]machine.Machine {
 	machineMap := map[launchLoc][]machine.Machine{}
 	for _, m := range machines {
@@ -513,3 +521,4 @@ func validRegionsImpl(p db.Provider) []string {
 // Stored in variables so they may be mocked out
 var newProvider = newProviderImpl
 var validRegions = validRegionsImpl
+var getMachineRole = foreman.GetMachineRole

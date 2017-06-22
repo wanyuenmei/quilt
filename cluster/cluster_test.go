@@ -41,6 +41,7 @@ type ipRequest struct {
 type fakeProvider struct {
 	namespace   string
 	machines    map[string]machine.Machine
+	roles       map[string]db.Role
 	idCounter   int
 	cloudConfig string
 
@@ -54,24 +55,6 @@ type fakeProvider struct {
 
 func fakeValidRegions(p db.Provider) []string {
 	return []string{testRegion}
-}
-
-func newFakeProvider(p db.Provider, namespace, region string) (provider, error) {
-	var ret fakeProvider
-	ret.namespace = namespace
-	ret.machines = make(map[string]machine.Machine)
-	ret.clearLogs()
-
-	switch p {
-	case FakeAmazon:
-		ret.cloudConfig = amazonCloudConfig
-	case FakeVagrant:
-		ret.cloudConfig = vagrantCloudConfig
-	default:
-		panic("Unreached")
-	}
-
-	return &ret, nil
 }
 
 func (p *fakeProvider) clearLogs() {
@@ -94,12 +77,22 @@ func (p *fakeProvider) List() ([]machine.Machine, error) {
 }
 
 func (p *fakeProvider) Boot(bootSet []machine.Machine) error {
-	for _, bootSet := range bootSet {
+	for _, toBoot := range bootSet {
 		p.idCounter++
 		idStr := strconv.Itoa(p.idCounter)
-		bootSet.ID = idStr
-		p.machines[idStr] = bootSet
-		p.bootRequests = append(p.bootRequests, bootRequest{size: bootSet.Size,
+		toBoot.ID = idStr
+		toBoot.PublicIP = idStr
+
+		// A machine's role is `None` until the minion boots, at which
+		// `getMachineRoles` will populate this field with the correct role.
+		// We simulate this by setting the role of the machine returned by
+		// `List()` to be None, and only return the correct role in
+		// `getMachineRole`.
+		p.roles[toBoot.PublicIP] = toBoot.Role
+		toBoot.Role = db.None
+
+		p.machines[idStr] = toBoot
+		p.bootRequests = append(p.bootRequests, bootRequest{size: toBoot.Size,
 			cloudConfig: p.cloudConfig})
 	}
 
@@ -826,9 +819,38 @@ func setNamespace(conn db.Conn, ns string) {
 }
 
 func mock() {
-	newProvider = newFakeProvider
+	var instantiatedProviders []fakeProvider
+	newProvider = func(p db.Provider, namespace, region string) (provider, error) {
+		ret := fakeProvider{
+			namespace: namespace,
+			machines:  make(map[string]machine.Machine),
+			roles:     make(map[string]db.Role),
+		}
+		ret.clearLogs()
+
+		switch p {
+		case FakeAmazon:
+			ret.cloudConfig = amazonCloudConfig
+		case FakeVagrant:
+			ret.cloudConfig = vagrantCloudConfig
+		default:
+			panic("Unreached")
+		}
+
+		instantiatedProviders = append(instantiatedProviders, ret)
+		return &ret, nil
+	}
+
 	validRegions = fakeValidRegions
 	allProviders = []db.Provider{FakeAmazon, FakeVagrant}
+	getMachineRole = func(ip string) db.Role {
+		for _, prvdr := range instantiatedProviders {
+			if role, ok := prvdr.roles[ip]; ok {
+				return role
+			}
+		}
+		return db.None
+	}
 }
 
 func emptySlices(slice1 interface{}, slice2 interface{}) bool {

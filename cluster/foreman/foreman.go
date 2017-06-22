@@ -9,7 +9,6 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/quilt/quilt/cluster/machine"
 	"github.com/quilt/quilt/db"
 	"github.com/quilt/quilt/minion/pb"
 
@@ -133,20 +132,13 @@ func RunOnce(conn db.Conn) {
 	})
 }
 
-// GetMachineRoles uses the minion map to find the associated minion with
-// the machine, according to the foreman's last update cycle. The role of the
-// minion is then added to the machine.Machine struct, and the updated slice is
-// returned.
-func GetMachineRoles(machines []machine.Machine) []machine.Machine {
-	var updatedMachines []machine.Machine
-	for _, m := range machines {
-		min, ok := minions[m.PublicIP]
-		if ok {
-			m.Role = db.PBToRole(min.config.Role)
-		}
-		updatedMachines = append(updatedMachines, m)
+// GetMachineRole uses the minion map to find the associated minion with
+// the IP, according to the foreman's last update cycle.
+func GetMachineRole(pubIP string) db.Role {
+	if min, ok := minions[pubIP]; ok {
+		return db.PBToRole(min.config.Role)
 	}
-	return updatedMachines
+	return db.None
 }
 
 func updateMinionMap(machines []db.Machine) {
