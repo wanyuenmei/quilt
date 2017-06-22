@@ -150,7 +150,7 @@ func (clst cluster) runOnce() {
 	}
 }
 
-func (clst cluster) updateCloud(machines []machine.Machine, act action) {
+func (clst cluster) updateCloud(machines []joinMachine, act action) {
 	if len(machines) == 0 {
 		return
 	}
@@ -220,13 +220,21 @@ func (clst cluster) updateCloud(machines []machine.Machine, act action) {
 	}
 }
 
+type joinMachine struct {
+	machine.Machine
+
+	provider db.Provider
+	region   string
+	role     db.Role
+}
+
 type joinResult struct {
 	machines []db.Machine
 	acl      db.ACL
 
-	boot      []machine.Machine
-	terminate []machine.Machine
-	updateIPs []machine.Machine
+	boot      []joinMachine
+	terminate []joinMachine
+	updateIPs []joinMachine
 }
 
 func (clst cluster) join() (joinResult, error) {
@@ -267,9 +275,9 @@ func (clst cluster) join() (joinResult, error) {
 
 		for _, pair := range dbResult.pairs {
 			dbm := pair.L.(db.Machine)
-			m := pair.R.(machine.Machine)
+			m := pair.R.(joinMachine)
 
-			if m.Role != db.None && m.Role == dbm.Role {
+			if m.role != db.None && m.role == dbm.Role {
 				dbm.CloudID = m.ID
 			}
 
@@ -346,23 +354,23 @@ func (clst cluster) syncACLs(adminACLs []string, appACLs []db.PortRange,
 
 type syncDBResult struct {
 	pairs     []join.Pair
-	boot      []machine.Machine
-	stop      []machine.Machine
-	updateIPs []machine.Machine
+	boot      []joinMachine
+	stop      []joinMachine
+	updateIPs []joinMachine
 }
 
-func syncDB(cms []machine.Machine, dbms []db.Machine) syncDBResult {
+func syncDB(cms []joinMachine, dbms []db.Machine) syncDBResult {
 	ret := syncDBResult{}
 
 	pair1, dbmis, cmis := join.Join(dbms, cms, func(l, r interface{}) int {
 		dbm := l.(db.Machine)
-		m := r.(machine.Machine)
+		m := r.(joinMachine)
 
-		if dbm.CloudID == m.ID && dbm.Provider == m.Provider &&
+		if dbm.CloudID == m.ID && dbm.Provider == m.provider &&
 			dbm.Preemptible == m.Preemptible &&
-			dbm.Region == m.Region && dbm.Size == m.Size &&
+			dbm.Region == m.region && dbm.Size == m.Size &&
 			(m.DiskSize == 0 || dbm.DiskSize == m.DiskSize) &&
-			(m.Role == db.None || dbm.Role == m.Role) {
+			(m.role == db.None || dbm.Role == m.role) {
 			return 0
 		}
 
@@ -371,19 +379,19 @@ func syncDB(cms []machine.Machine, dbms []db.Machine) syncDBResult {
 
 	pair2, dbmis, cmis := join.Join(dbmis, cmis, func(l, r interface{}) int {
 		dbm := l.(db.Machine)
-		m := r.(machine.Machine)
+		m := r.(joinMachine)
 
-		if dbm.Provider != m.Provider ||
-			dbm.Region != m.Region ||
+		if dbm.Provider != m.provider ||
+			dbm.Region != m.region ||
 			dbm.Size != m.Size ||
 			dbm.Preemptible != m.Preemptible ||
 			(m.DiskSize != 0 && dbm.DiskSize != m.DiskSize) ||
-			(m.Role != db.None && dbm.Role != m.Role) {
+			(m.role != db.None && dbm.Role != m.role) {
 			return -1
 		}
 
 		score := 10
-		if dbm.Role != db.None && m.Role != db.None && dbm.Role == m.Role {
+		if dbm.Role != db.None && m.role != db.None && dbm.Role == m.role {
 			score -= 4
 		}
 		if dbm.PublicIP == m.PublicIP && dbm.PrivateIP == m.PrivateIP {
@@ -396,25 +404,27 @@ func syncDB(cms []machine.Machine, dbms []db.Machine) syncDBResult {
 	})
 
 	for _, cm := range cmis {
-		ret.stop = append(ret.stop, cm.(machine.Machine))
+		ret.stop = append(ret.stop, cm.(joinMachine))
 	}
 
 	for _, dbm := range dbmis {
 		m := dbm.(db.Machine)
-		ret.boot = append(ret.boot, machine.Machine{
-			Size:        m.Size,
-			Provider:    m.Provider,
-			Region:      m.Region,
-			DiskSize:    m.DiskSize,
-			SSHKeys:     m.SSHKeys,
-			Preemptible: m.Preemptible,
-			Role:        m.Role,
+		ret.boot = append(ret.boot, joinMachine{
+			Machine: machine.Machine{
+				Size:        m.Size,
+				DiskSize:    m.DiskSize,
+				SSHKeys:     m.SSHKeys,
+				Preemptible: m.Preemptible,
+				Role:        m.Role,
+			},
+			provider: m.Provider,
+			region:   m.Region,
 		})
 	}
 
 	for _, pair := range append(pair1, pair2...) {
 		dbm := pair.L.(db.Machine)
-		m := pair.R.(machine.Machine)
+		m := pair.R.(joinMachine)
 
 		if dbm.CloudID == m.ID && dbm.FloatingIP != m.FloatingIP {
 			m.FloatingIP = dbm.FloatingIP
@@ -433,7 +443,7 @@ type listResponse struct {
 	err      error
 }
 
-func (clst cluster) get() ([]machine.Machine, error) {
+func (clst cluster) get() ([]joinMachine, error) {
 	var wg sync.WaitGroup
 	cloudMachinesChan := make(chan listResponse, len(clst.providers))
 	for loc, p := range clst.providers {
@@ -447,12 +457,18 @@ func (clst cluster) get() ([]machine.Machine, error) {
 	wg.Wait()
 	close(cloudMachinesChan)
 
-	var cloudMachines []machine.Machine
+	var cloudMachines []joinMachine
 	for res := range cloudMachinesChan {
 		if res.err != nil {
 			return nil, fmt.Errorf("list %s: %s", res.loc, res.err)
 		}
-		cloudMachines = append(cloudMachines, res.machines...)
+		for _, m := range res.machines {
+			cloudMachines = append(cloudMachines, joinMachine{
+				Machine:  m,
+				provider: res.loc.provider,
+				region:   res.loc.region,
+			})
+		}
 	}
 	return cloudMachines, nil
 }
@@ -470,19 +486,19 @@ func (clst cluster) getProvider(loc launchLoc) (provider, error) {
 	return p, err
 }
 
-func getMachineRoles(machines []machine.Machine) (withRoles []machine.Machine) {
+func getMachineRoles(machines []joinMachine) (withRoles []joinMachine) {
 	for _, m := range machines {
-		m.Role = getMachineRole(m.PublicIP)
+		m.role = getMachineRole(m.PublicIP)
 		withRoles = append(withRoles, m)
 	}
 	return withRoles
 }
 
-func groupByLoc(machines []machine.Machine) map[launchLoc][]machine.Machine {
+func groupByLoc(machines []joinMachine) map[launchLoc][]machine.Machine {
 	machineMap := map[launchLoc][]machine.Machine{}
 	for _, m := range machines {
-		loc := launchLoc{m.Provider, m.Region}
-		machineMap[loc] = append(machineMap[loc], m)
+		loc := launchLoc{m.provider, m.region}
+		machineMap[loc] = append(machineMap[loc], m.Machine)
 	}
 
 	return machineMap

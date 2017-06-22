@@ -12,7 +12,6 @@ import (
 	"github.com/quilt/quilt/cluster/acl"
 	"github.com/quilt/quilt/cluster/cloudcfg"
 	"github.com/quilt/quilt/cluster/machine"
-	"github.com/quilt/quilt/db"
 	"github.com/quilt/quilt/join"
 
 	log "github.com/Sirupsen/logrus"
@@ -112,8 +111,6 @@ func (clst *Cluster) List() ([]machine.Machine, error) {
 			FloatingIP: floatingIP,
 			PrivateIP:  item.NetworkInterfaces[0].NetworkIP,
 			Size:       mtype,
-			Region:     clst.zone,
-			Provider:   db.Google,
 		})
 	}
 	return mList, nil
@@ -154,7 +151,7 @@ func (clst *Cluster) Stop(machines []machine.Machine) error {
 	// XXX: should probably have a better clean up routine if an error is encountered
 	var names []string
 	for _, m := range machines {
-		_, err := clst.gce.DeleteInstance(m.Region, m.ID)
+		_, err := clst.gce.DeleteInstance(clst.zone, m.ID)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"error": err,
@@ -411,7 +408,7 @@ func (clst *Cluster) SetACLs(acls []acl.ACL) error {
 // UpdateFloatingIPs updates IPs of machines by recreating their network interfaces.
 func (clst *Cluster) UpdateFloatingIPs(machines []machine.Machine) error {
 	for _, m := range machines {
-		instance, err := clst.gce.GetInstance(m.Region, m.ID)
+		instance, err := clst.gce.GetInstance(clst.zone, m.ID)
 		if err != nil {
 			return err
 		}
@@ -421,14 +418,14 @@ func (clst *Cluster) UpdateFloatingIPs(machines []machine.Machine) error {
 		// is not a seamless, zero-downtime procedure.
 		networkInterface := instance.NetworkInterfaces[0]
 		accessConfig := instance.NetworkInterfaces[0].AccessConfigs[0]
-		_, err = clst.gce.DeleteAccessConfig(m.Region, m.ID,
+		_, err = clst.gce.DeleteAccessConfig(clst.zone, m.ID,
 			accessConfig.Name, networkInterface.Name)
 		if err != nil {
 			return err
 		}
 
 		// Add new network interface.
-		_, err = clst.gce.AddAccessConfig(m.Region, m.ID,
+		_, err = clst.gce.AddAccessConfig(clst.zone, m.ID,
 			networkInterface.Name, &compute.AccessConfig{
 				Type: "ONE_TO_ONE_NAT",
 				Name: floatingIPName,

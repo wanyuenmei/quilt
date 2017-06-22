@@ -13,7 +13,6 @@ import (
 	"github.com/quilt/quilt/cluster/acl"
 	"github.com/quilt/quilt/cluster/cloudcfg"
 	"github.com/quilt/quilt/cluster/machine"
-	"github.com/quilt/quilt/db"
 	"github.com/quilt/quilt/join"
 	"github.com/quilt/quilt/util"
 
@@ -128,8 +127,6 @@ func (clst Cluster) List() (machines []machine.Machine, err error) {
 				PrivateIP:   privIP,
 				FloatingIP:  floatingIPs[d.ID],
 				Size:        d.SizeSlug,
-				Provider:    db.DigitalOcean,
-				Region:      d.Region.Slug,
 				Preemptible: false,
 			}
 			machines = append(machines, machine)
@@ -149,9 +146,6 @@ func (clst Cluster) Boot(bootSet []machine.Machine) error {
 	errChan := make(chan error, len(bootSet))
 	for _, m := range bootSet {
 		go func(m machine.Machine) {
-			if m.Region != clst.region {
-				panic("Not Reached")
-			}
 			errChan <- clst.createAndAttach(m)
 		}(m)
 	}
@@ -170,7 +164,7 @@ func (clst Cluster) createAndAttach(m machine.Machine) error {
 	cloudConfig := cloudcfg.Ubuntu(m.SSHKeys, m.Role)
 	createReq := &godo.DropletCreateRequest{
 		Name:              clst.namespace,
-		Region:            m.Region,
+		Region:            clst.region,
 		Size:              m.Size,
 		Image:             godo.DropletCreateImage{Slug: image},
 		PrivateNetworking: true,
@@ -251,10 +245,6 @@ func (clst Cluster) syncFloatingIPs(curr, targets []machine.Machine) error {
 func (clst Cluster) Stop(machines []machine.Machine) error {
 	errChan := make(chan error, len(machines))
 	for _, m := range machines {
-		if m.Region != clst.region {
-			panic("Not Reached")
-		}
-
 		go func(m machine.Machine) {
 			errChan <- clst.deleteAndWait(m.ID)
 		}(m)

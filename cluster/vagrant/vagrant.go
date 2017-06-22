@@ -8,7 +8,6 @@ import (
 	"github.com/quilt/quilt/cluster/acl"
 	"github.com/quilt/quilt/cluster/cloudcfg"
 	"github.com/quilt/quilt/cluster/machine"
-	"github.com/quilt/quilt/db"
 	"github.com/satori/go.uuid"
 )
 
@@ -98,7 +97,6 @@ func (clst Cluster) List() ([]machine.Machine, error) {
 			ID:        instanceID,
 			PublicIP:  ip,
 			PrivateIP: ip,
-			Provider:  db.Vagrant,
 			Size:      size(instanceID),
 		}
 		machines = append(machines, instance)

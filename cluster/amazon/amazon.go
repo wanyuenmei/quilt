@@ -10,7 +10,6 @@ import (
 	"github.com/quilt/quilt/cluster/acl"
 	"github.com/quilt/quilt/cluster/cloudcfg"
 	"github.com/quilt/quilt/cluster/machine"
-	"github.com/quilt/quilt/db"
 	"github.com/quilt/quilt/join"
 	"github.com/quilt/quilt/util"
 
@@ -430,8 +429,6 @@ func (clst *Cluster) List() (machines []machine.Machine, err error) {
 
 	for _, awsm := range awsMachines {
 		cm := awsm.machine
-		cm.Provider = db.Amazon
-		cm.Region = clst.region
 		cm.Preemptible = awsm.spotID != ""
 		cm.ID = awsm.spotID
 		if !cm.Preemptible {

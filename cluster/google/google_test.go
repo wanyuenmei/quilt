@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/quilt/quilt/cluster/machine"
-	"github.com/quilt/quilt/db"
 	"github.com/stretchr/testify/suite"
 
 	compute "google.golang.org/api/compute/v1"
@@ -56,8 +55,6 @@ func (s *GoogleTestSuite) TestList() {
 		PublicIP:  "x.x.x.x",
 		PrivateIP: "y.y.y.y",
 		Size:      "type-1",
-		Region:    "zone-1",
-		Provider:  db.Google,
 	})
 }
 

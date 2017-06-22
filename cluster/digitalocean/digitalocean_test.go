@@ -18,7 +18,6 @@ import (
 
 	"github.com/quilt/quilt/cluster/acl"
 	"github.com/quilt/quilt/cluster/machine"
-	"github.com/quilt/quilt/db"
 	"github.com/quilt/quilt/util"
 )
 
@@ -136,21 +135,17 @@ func TestList(t *testing.T) {
 	assert.Equal(t, machines, []machine.Machine{
 		{
 			ID:          "123",
-			Provider:    db.DigitalOcean,
 			PublicIP:    "publicIP",
 			PrivateIP:   "privateIP",
 			Size:        "size",
-			Region:      "sfo1",
 			Preemptible: false,
 		},
 		{
 			ID:          "125",
-			Provider:    db.DigitalOcean,
 			PublicIP:    "publicIP",
 			PrivateIP:   "privateIP",
 			FloatingIP:  "floatingIP",
 			Size:        "size",
-			Region:      "sfo1",
 			Preemptible: false,
 		},
 	})
@@ -202,12 +197,10 @@ func TestBoot(t *testing.T) {
 	bootSet = []machine.Machine{
 		{
 			ID:        "123",
-			Provider:  db.DigitalOcean,
 			PublicIP:  "publicIP",
 			PrivateIP: "privateIP",
 			Size:      "size",
 			DiskSize:  0,
-			Region:    "sfo1",
 		},
 	}
 
@@ -234,12 +227,10 @@ func TestBoot(t *testing.T) {
 	// Error CreateDroplet.
 	doubleBootSet := append(bootSet, machine.Machine{
 		ID:        "123",
-		Provider:  db.DigitalOcean,
 		PublicIP:  "publicIP",
 		PrivateIP: "privateIP",
 		Size:      "size",
 		DiskSize:  0,
-		Region:    "sfo1",
 	})
 	mc.On("CreateDroplet", mock.Anything).Return(nil, nil, errMock).Twice()
 	err = doClust.Boot(doubleBootSet)
@@ -263,12 +254,10 @@ func TestStop(t *testing.T) {
 	stopSet = []machine.Machine{
 		{
 			ID:        "123",
-			Provider:  db.DigitalOcean,
 			PublicIP:  "publicIP",
 			PrivateIP: "privateIP",
 			Size:      "size",
 			DiskSize:  0,
-			Region:    "sfo1",
 		},
 	}
 
@@ -293,21 +282,17 @@ func TestStop(t *testing.T) {
 	badDoubleStopSet := []machine.Machine{
 		{
 			ID:        "123a",
-			Provider:  db.DigitalOcean,
 			PublicIP:  "publicIP",
 			PrivateIP: "privateIP",
 			Size:      "size",
 			DiskSize:  0,
-			Region:    "sfo1",
 		},
 		{
 			ID:        "123a",
-			Provider:  db.DigitalOcean,
 			PublicIP:  "publicIP",
 			PrivateIP: "privateIP",
 			Size:      "size",
 			DiskSize:  0,
-			Region:    "sfo1",
 		},
 	}
 	err = doClust.Stop(badDoubleStopSet)

@@ -145,7 +145,7 @@ func TestPanicBadProvider(t *testing.T) {
 }
 
 func TestSyncDB(t *testing.T) {
-	checkSyncDB := func(cloudMachines []machine.Machine,
+	checkSyncDB := func(cloudMachines []joinMachine,
 		databaseMachines []db.Machine, expected syncDBResult) syncDBResult {
 		dbRes := syncDB(cloudMachines, databaseMachines)
 
@@ -156,104 +156,122 @@ func TestSyncDB(t *testing.T) {
 		return dbRes
 	}
 
-	var noMachines []machine.Machine
+	var noMachines []joinMachine
 	dbNoSize := db.Machine{Provider: FakeAmazon, Region: testRegion}
-	cmNoSize := machine.Machine{Provider: FakeAmazon, Region: testRegion}
+	cmNoSize := joinMachine{provider: FakeAmazon, region: testRegion}
 	dbLarge := db.Machine{Provider: FakeAmazon, Size: "m4.large", Region: testRegion}
-	cmLarge := machine.Machine{Provider: FakeAmazon, Size: "m4.large",
-		Region: testRegion}
+	cmLarge := joinMachine{
+		provider: FakeAmazon,
+		region:   testRegion,
+		Machine:  machine.Machine{Size: "m4.large"},
+	}
 
 	dbMaster := db.Machine{Provider: FakeAmazon, Role: db.Master}
-	cmMaster := machine.Machine{Provider: FakeAmazon, Role: db.Master}
+	cmMasterList := joinMachine{provider: FakeAmazon, role: db.Master}
+	cmMasterBoot := joinMachine{provider: FakeAmazon,
+		Machine: machine.Machine{Role: db.Master}}
 	dbWorker := db.Machine{Provider: FakeAmazon, Role: db.Worker}
-	cmWorker := machine.Machine{Provider: FakeAmazon, Role: db.Worker}
+	cmWorkerList := joinMachine{provider: FakeAmazon, role: db.Worker}
+	cmWorkerBoot := joinMachine{provider: FakeAmazon,
+		Machine: machine.Machine{Role: db.Worker}}
 
-	cmNoIP := machine.Machine{Provider: FakeAmazon, ID: "id"}
-	cmWithIP := machine.Machine{Provider: FakeAmazon, ID: "id", FloatingIP: "ip"}
+	cmNoIP := joinMachine{provider: FakeAmazon, Machine: machine.Machine{ID: "id"}}
+	cmWithIP := joinMachine{
+		provider: FakeAmazon,
+		Machine:  machine.Machine{ID: "id", FloatingIP: "ip"},
+	}
 	dbNoIP := db.Machine{Provider: FakeAmazon, CloudID: "id"}
 	dbWithIP := db.Machine{Provider: FakeAmazon, CloudID: "id", FloatingIP: "ip"}
 
 	// Test boot with no size
 	checkSyncDB(noMachines, []db.Machine{dbNoSize, dbNoSize}, syncDBResult{
-		boot: []machine.Machine{cmNoSize, cmNoSize},
+		boot: []joinMachine{cmNoSize, cmNoSize},
 	})
 
 	// Test boot with size
 	checkSyncDB(noMachines, []db.Machine{dbLarge, dbLarge}, syncDBResult{
-		boot: []machine.Machine{cmLarge, cmLarge},
+		boot: []joinMachine{cmLarge, cmLarge},
 	})
 
 	// Test mixed boot
 	checkSyncDB(noMachines, []db.Machine{dbNoSize, dbLarge}, syncDBResult{
-		boot: []machine.Machine{cmNoSize, cmLarge},
+		boot: []joinMachine{cmNoSize, cmLarge},
 	})
 
 	// Test partial boot
-	checkSyncDB([]machine.Machine{cmNoSize}, []db.Machine{dbNoSize, dbLarge},
+	checkSyncDB([]joinMachine{cmNoSize}, []db.Machine{dbNoSize, dbLarge},
 		syncDBResult{
-			boot: []machine.Machine{cmLarge},
+			boot: []joinMachine{cmLarge},
 		},
 	)
 
 	// Test stop
-	checkSyncDB([]machine.Machine{cmNoSize, cmNoSize}, []db.Machine{}, syncDBResult{
-		stop: []machine.Machine{cmNoSize, cmNoSize},
+	checkSyncDB([]joinMachine{cmNoSize, cmNoSize}, []db.Machine{}, syncDBResult{
+		stop: []joinMachine{cmNoSize, cmNoSize},
 	})
 
 	// Test partial stop
-	checkSyncDB([]machine.Machine{cmNoSize, cmLarge}, []db.Machine{}, syncDBResult{
-		stop: []machine.Machine{cmNoSize, cmLarge},
+	checkSyncDB([]joinMachine{cmNoSize, cmLarge}, []db.Machine{}, syncDBResult{
+		stop: []joinMachine{cmNoSize, cmLarge},
 	})
 
 	// Test assign Floating IP
-	checkSyncDB([]machine.Machine{cmNoIP}, []db.Machine{dbWithIP}, syncDBResult{
-		updateIPs: []machine.Machine{cmWithIP},
+	checkSyncDB([]joinMachine{cmNoIP}, []db.Machine{dbWithIP}, syncDBResult{
+		updateIPs: []joinMachine{cmWithIP},
 	})
 
 	// Test remove Floating IP
-	checkSyncDB([]machine.Machine{cmWithIP}, []db.Machine{dbNoIP}, syncDBResult{
-		updateIPs: []machine.Machine{cmNoIP},
+	checkSyncDB([]joinMachine{cmWithIP}, []db.Machine{dbNoIP}, syncDBResult{
+		updateIPs: []joinMachine{cmNoIP},
 	})
 
 	// Test replace Floating IP
-	cNewIP := machine.Machine{Provider: FakeAmazon, ID: "id", FloatingIP: "ip^"}
-	checkSyncDB([]machine.Machine{cNewIP}, []db.Machine{dbWithIP}, syncDBResult{
-		updateIPs: []machine.Machine{cmWithIP},
+	cNewIP := joinMachine{
+		provider: FakeAmazon,
+		Machine:  machine.Machine{ID: "id", FloatingIP: "ip^"},
+	}
+	checkSyncDB([]joinMachine{cNewIP}, []db.Machine{dbWithIP}, syncDBResult{
+		updateIPs: []joinMachine{cmWithIP},
 	})
 
 	// Test bad disk size
-	checkSyncDB([]machine.Machine{{DiskSize: 3}}, []db.Machine{{DiskSize: 4}},
+	checkSyncDB([]joinMachine{{Machine: machine.Machine{DiskSize: 3}}},
+		[]db.Machine{{DiskSize: 4}},
 		syncDBResult{
-			stop: []machine.Machine{{DiskSize: 3}},
-			boot: []machine.Machine{{DiskSize: 4}},
+			stop: []joinMachine{{Machine: machine.Machine{DiskSize: 3}}},
+			boot: []joinMachine{{Machine: machine.Machine{DiskSize: 4}}},
 		})
 
 	// Test different roles
-	checkSyncDB([]machine.Machine{cmWorker}, []db.Machine{dbMaster}, syncDBResult{
-		boot: []machine.Machine{cmMaster},
-		stop: []machine.Machine{cmWorker},
+	checkSyncDB([]joinMachine{cmWorkerList}, []db.Machine{dbMaster}, syncDBResult{
+		boot: []joinMachine{cmMasterBoot},
+		stop: []joinMachine{cmWorkerList},
 	})
 
-	checkSyncDB([]machine.Machine{cmMaster}, []db.Machine{dbWorker}, syncDBResult{
-		boot: []machine.Machine{cmWorker},
-		stop: []machine.Machine{cmMaster},
+	checkSyncDB([]joinMachine{cmMasterList}, []db.Machine{dbWorker}, syncDBResult{
+		boot: []joinMachine{cmWorkerBoot},
+		stop: []joinMachine{cmMasterList},
 	})
 
 	// Test reserved instances.
-	checkSyncDB([]machine.Machine{{Preemptible: true}},
+	checkSyncDB([]joinMachine{{Machine: machine.Machine{Preemptible: true}}},
 		[]db.Machine{{Preemptible: false}},
 		syncDBResult{
-			boot: []machine.Machine{{Preemptible: false}},
-			stop: []machine.Machine{{Preemptible: true}},
+			boot: []joinMachine{
+				{Machine: machine.Machine{Preemptible: false}},
+			},
+			stop: []joinMachine{
+				{Machine: machine.Machine{Preemptible: true}},
+			},
 		})
 
 	// Test matching role as priority over PublicIP
 	dbMaster.PublicIP = "worker"
-	cmMaster.PublicIP = "master"
+	cmMasterList.PublicIP = "master"
 	dbWorker.PublicIP = "master"
-	cmWorker.PublicIP = "worker"
+	cmWorkerList.PublicIP = "worker"
 
-	checkSyncDB([]machine.Machine{cmMaster, cmWorker},
+	checkSyncDB([]joinMachine{cmMasterList, cmWorkerList},
 		[]db.Machine{dbMaster, dbWorker},
 		syncDBResult{})
 
@@ -262,12 +280,12 @@ func TestSyncDB(t *testing.T) {
 	dbw2 := db.Machine{Provider: FakeAmazon, Role: db.Worker, PublicIP: "w2"}
 	dbw3 := db.Machine{Provider: FakeAmazon, Role: db.Worker, PublicIP: "w3"}
 
-	mw1 := machine.Machine{Provider: FakeAmazon, Role: db.Worker,
-		ID: "mw1", PublicIP: "w1"}
-	mw2 := machine.Machine{Provider: FakeAmazon, Role: db.Worker,
-		ID: "mw2", PublicIP: "w2"}
-	mw3 := machine.Machine{Provider: FakeAmazon, Role: db.Worker,
-		ID: "mw3", PublicIP: "w3"}
+	mw1 := joinMachine{provider: FakeAmazon, role: db.Worker,
+		Machine: machine.Machine{ID: "mw1", PublicIP: "w1"}}
+	mw2 := joinMachine{provider: FakeAmazon, role: db.Worker,
+		Machine: machine.Machine{ID: "mw2", PublicIP: "w2"}}
+	mw3 := joinMachine{provider: FakeAmazon, role: db.Worker,
+		Machine: machine.Machine{ID: "mw3", PublicIP: "w3"}}
 
 	pair1 := join.Pair{L: dbw1, R: mw1}
 	pair2 := join.Pair{L: dbw2, R: mw2}
@@ -279,7 +297,7 @@ func TestSyncDB(t *testing.T) {
 		pair3,
 	}
 
-	pairs := checkSyncDB([]machine.Machine{mw1, mw2, mw3},
+	pairs := checkSyncDB([]joinMachine{mw1, mw2, mw3},
 		[]db.Machine{dbw1, dbw2, dbw3},
 		syncDBResult{})
 
@@ -290,36 +308,40 @@ func TestSyncDB(t *testing.T) {
 	dbf2 := db.Machine{Provider: FakeAmazon, Role: db.Worker, PublicIP: "worker",
 		FloatingIP: "float"}
 
-	cmf1 := machine.Machine{Provider: FakeAmazon, PublicIP: "worker", ID: "worker"}
-	cmf2 := machine.Machine{Provider: FakeAmazon, PublicIP: "master", ID: "master"}
+	cmf1 := joinMachine{provider: FakeAmazon,
+		Machine: machine.Machine{PublicIP: "worker", ID: "worker"}}
+	cmf2 := joinMachine{provider: FakeAmazon,
+		Machine: machine.Machine{PublicIP: "master", ID: "master"}}
 
 	// No roles, CloudIDs not assigned, so nothing should happen
-	checkSyncDB([]machine.Machine{cmf1, cmf2},
+	checkSyncDB([]joinMachine{cmf1, cmf2},
 		[]db.Machine{dbf1, dbf2},
 		syncDBResult{})
 
-	cmf1.Role = db.Worker
+	cmf1.role = db.Worker
 
 	// One role assigned, so one CloudID to be assigned after
-	checkSyncDB([]machine.Machine{cmf1, cmf2},
+	checkSyncDB([]joinMachine{cmf1, cmf2},
 		[]db.Machine{dbf1, dbf2},
 		syncDBResult{})
 
 	dbf2.CloudID = cmf1.ID
-	cmf2.Role = db.Master
+	cmf2.role = db.Master
 
 	// Now that CloudID of machine with FloatingIP has been assigned,
 	// FloatingIP should also be assigned
-	checkSyncDB([]machine.Machine{cmf1, cmf2},
+	checkSyncDB([]joinMachine{cmf1, cmf2},
 		[]db.Machine{dbf1, dbf2},
 		syncDBResult{
-			updateIPs: []machine.Machine{
+			updateIPs: []joinMachine{
 				{
-					Provider:   FakeAmazon,
-					Role:       db.Worker,
-					PublicIP:   "worker",
-					ID:         "worker",
-					FloatingIP: "float",
+					provider: FakeAmazon,
+					role:     db.Worker,
+					Machine: machine.Machine{
+						PublicIP:   "worker",
+						ID:         "worker",
+						FloatingIP: "float",
+					},
 				},
 			},
 		})
@@ -331,16 +353,19 @@ func TestSyncDB(t *testing.T) {
 	dbm4 := db.Machine{Provider: FakeAmazon, Role: db.Worker, PublicIP: "wIP2",
 		FloatingIP: "flip2"}
 
-	m2 := machine.Machine{Provider: FakeAmazon, PublicIP: "mIP", ID: "m2"}
-	m3 := machine.Machine{Provider: FakeAmazon, PublicIP: "wIP1", ID: "m3"}
-	m4 := machine.Machine{Provider: FakeAmazon, PublicIP: "wIP2", ID: "m4"}
+	m2 := joinMachine{provider: FakeAmazon,
+		Machine: machine.Machine{PublicIP: "mIP", ID: "m2"}}
+	m3 := joinMachine{provider: FakeAmazon,
+		Machine: machine.Machine{PublicIP: "wIP1", ID: "m3"}}
+	m4 := joinMachine{provider: FakeAmazon,
+		Machine: machine.Machine{PublicIP: "wIP2", ID: "m4"}}
 
-	m2.Role = db.Worker
-	m3.Role = db.Master
-	m4.Role = db.Worker
+	m2.role = db.Worker
+	m3.role = db.Master
+	m4.role = db.Worker
 
 	// CloudIDs not assigned to db machines yet, so shouldn't update anything.
-	checkSyncDB([]machine.Machine{m2, m3, m4},
+	checkSyncDB([]joinMachine{m2, m3, m4},
 		[]db.Machine{dbm2, dbm3, dbm4},
 		syncDBResult{})
 
@@ -349,23 +374,27 @@ func TestSyncDB(t *testing.T) {
 	dbm4.CloudID = m4.ID
 
 	// CloudIDs are now assigned, so time to update floating IPs
-	checkSyncDB([]machine.Machine{m2, m3, m4},
+	checkSyncDB([]joinMachine{m2, m3, m4},
 		[]db.Machine{dbm2, dbm3, dbm4},
 		syncDBResult{
-			updateIPs: []machine.Machine{
+			updateIPs: []joinMachine{
 				{
-					Provider:   FakeAmazon,
-					Role:       db.Worker,
-					PublicIP:   "mIP",
-					ID:         "m2",
-					FloatingIP: "flip1",
+					provider: FakeAmazon,
+					role:     db.Worker,
+					Machine: machine.Machine{
+						PublicIP:   "mIP",
+						ID:         "m2",
+						FloatingIP: "flip1",
+					},
 				},
 				{
-					Provider:   FakeAmazon,
-					Role:       db.Worker,
-					PublicIP:   "wIP2",
-					ID:         "m4",
-					FloatingIP: "flip2",
+					provider: FakeAmazon,
+					role:     db.Worker,
+					Machine: machine.Machine{
+						PublicIP:   "wIP2",
+						ID:         "m4",
+						FloatingIP: "flip2",
+					},
 				},
 			},
 		})
@@ -768,10 +797,10 @@ func TestMultiRegionDeploy(t *testing.T) {
 	machinesRemaining, err := clst.get()
 	assert.NoError(t, err)
 
-	assert.NotContains(t, machinesRemaining, machine.Machine{
-		Size:     "size1",
-		Provider: FakeAmazon,
-		Region:   validRegions(FakeAmazon)[0],
+	assert.NotContains(t, machinesRemaining, joinMachine{
+		provider: FakeAmazon,
+		region:   validRegions(FakeAmazon)[0],
+		Machine:  machine.Machine{Size: "size1"},
 	})
 	cloudMachines, err := clst.get()
 	assert.NoError(t, err)

@@ -27,8 +27,6 @@ type Machine struct {
 	Size        string
 	DiskSize    int
 	SSHKeys     []string
-	Provider    db.Provider
-	Region      string
 	Role        db.Role
 }
 
