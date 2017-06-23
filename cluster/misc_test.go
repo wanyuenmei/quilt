@@ -3,6 +3,8 @@ package cluster
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/quilt/quilt/cluster/machine"
 	"github.com/quilt/quilt/db"
 )
@@ -67,27 +69,18 @@ func TestNewProviderFailure(t *testing.T) {
 }
 
 func TestGroupBy(t *testing.T) {
-	machines := []machine.Machine{
+	t.Parallel()
+
+	grouped := groupByLoc([]machine.Machine{
 		{Provider: db.Google}, {Provider: db.Amazon}, {Provider: db.Google},
 		{Provider: db.Google},
-	}
-	grouped := groupByLoc(machines)
-	m := grouped[launchLoc{db.Amazon, ""}]
-	if len(m) != 1 || m[0].Provider != machines[1].Provider {
-		t.Errorf("wrong Amazon machines: %v", m)
-	}
-	m = grouped[launchLoc{db.Google, ""}]
-	if len(m) != 3 {
-		t.Errorf("wrong Google machines: %v", m)
-	} else {
-		for _, machine := range m {
-			if machine.Provider != db.Google {
-				t.Errorf("machine provider is not Google: %v", machine)
-			}
-		}
-	}
-	m = grouped[launchLoc{db.Vagrant, ""}]
-	if len(m) != 0 {
-		t.Errorf("unexpected Vagrant machines: %v", m)
-	}
+	})
+	assert.Equal(t, map[launchLoc][]machine.Machine{
+		{db.Amazon, ""}: {{Provider: db.Amazon}},
+		{db.Google, ""}: {
+			{Provider: db.Google},
+			{Provider: db.Google},
+			{Provider: db.Google},
+		},
+	}, grouped)
 }
