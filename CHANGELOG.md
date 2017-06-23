@@ -9,6 +9,7 @@ boot times.
 - Renamed specs to blueprints.
 - Load balancing.
 - Upgraded to the latest Docker engine version (17.05.0).
+- Fixed bug in Google provider that caused ACLs to be repeatedly added.
 
 Release 0.1.0
 -------------
