@@ -296,6 +296,18 @@ func TestMachineOutput(t *testing.T) {
 	assert.Equal(t, exp, result)
 }
 
+func checkContainerOutput(t *testing.T, containers []db.Container,
+	machines []db.Machine, connections []db.Connection, truncate bool, exp string) {
+
+	var b bytes.Buffer
+	writeContainers(&b, containers, machines, connections, truncate)
+
+	/* By replacing space with underscore, we make the spaces explicit and whitespace
+	* errors easier to debug. */
+	result := strings.Replace(b.String(), " ", "_", -1)
+	assert.Equal(t, exp, result)
+}
+
 func TestContainerOutput(t *testing.T) {
 	t.Parallel()
 
@@ -314,25 +326,15 @@ func TestContainerOutput(t *testing.T) {
 			Labels:  []string{"label1"}},
 		{ID: 5, StitchID: "8", Image: "image1"},
 	}
-
 	machines := []db.Machine{
 		{StitchID: "5", PublicIP: "7.7.7.7", PrivateIP: "1.1.1.1"},
 		{StitchID: "6", PrivateIP: "2.2.2.2"},
 		{StitchID: "7", PrivateIP: ""},
 	}
-
 	connections := []db.Connection{
 		{ID: 1, From: "public", To: "label1", MinPort: 80, MaxPort: 80},
 		{ID: 2, From: "notpublic", To: "label2", MinPort: 100, MaxPort: 101},
 	}
-
-	var b bytes.Buffer
-	writeContainers(&b, containers, machines, connections, true)
-	result := string(b.Bytes())
-
-	/* By replacing space with underscore, we make the spaces explicit and whitespace
-	* errors easier to debug. */
-	result = strings.Replace(result, " ", "_", -1)
 
 	expected := `CONTAINER____MACHINE____COMMAND___________LABELS________` +
 		`____STATUS_______CREATED____PUBLIC_IP
@@ -347,8 +349,7 @@ ________________________________________________________________________________
 ____________________________________________________________________________________
 8____________7__________image1______________________________________________________
 `
-
-	assert.Equal(t, expected, result)
+	checkContainerOutput(t, containers, machines, connections, true, expected)
 
 	// Testing writeContainers with created time values.
 	mockTime := time.Now()
@@ -361,21 +362,15 @@ ________________________________________________________________________________
 			Image: "image1", Command: []string{"cmd", "1"},
 			Status: "running", Created: mockTime.UTC()},
 	}
-
 	machines = []db.Machine{}
 	connections = []db.Connection{}
 
-	var c bytes.Buffer
-	writeContainers(&c, containers, machines, connections, true)
-	result = string(c.Bytes())
 	expected = `CONTAINER____MACHINE____COMMAND_________LABELS____STATUS___` +
 		`__CREATED___________________PUBLIC_IP
 3_______________________image1_cmd_1______________running____` + mockCreatedString +
 		`____
 `
-
-	result = strings.Replace(result, " ", "_", -1)
-	assert.Equal(t, expected, result)
+	checkContainerOutput(t, containers, machines, connections, true, expected)
 
 	// Testing writeContainers with longer durations.
 	mockDuration := time.Hour
@@ -389,55 +384,41 @@ ________________________________________________________________________________
 			Image: "image1", Command: []string{"cmd", "1"},
 			Status: "running", Created: mockTime.UTC()},
 	}
-
 	machines = []db.Machine{}
 	connections = []db.Connection{}
 
-	var d bytes.Buffer
-	writeContainers(&d, containers, machines, connections, true)
-	result = string(d.Bytes())
 	expected = `CONTAINER____MACHINE____COMMAND_________LABELS____STATUS___` +
 		`__CREATED______________PUBLIC_IP
 3_______________________image1_cmd_1______________running____` + mockCreatedString +
 		`____
 `
+	checkContainerOutput(t, containers, machines, connections, true, expected)
 
-	result = strings.Replace(result, " ", "_", -1)
-	assert.Equal(t, expected, result)
+	// Test that long outputs are truncated when `truncate` is true
 	containers = []db.Container{
 		{ID: 1, StitchID: "3", Minion: "3.3.3.3", IP: "1.2.3.4",
 			Image: "image1", Command: []string{"cmd", "1", "&&", "cmd",
 				"91283403472903847293014320984723908473248-23843984"},
 			Status: "running", Created: mockTime.UTC()},
 	}
-
 	machines = []db.Machine{}
 	connections = []db.Connection{}
 
-	// Test that long outputs are truncated when `truncate` is true
-	var e bytes.Buffer
-	writeContainers(&e, containers, machines, connections, true)
-	result = string(e.Bytes())
 	expected = `CONTAINER____MACHINE____COMMAND_____________________________` +
 		`_LABELS____STATUS_____CREATED______________PUBLIC_IP
 3_______________________image1_cmd_1_&&_cmd_9128340347...______________running____` +
 		mockCreatedString + `____
 `
-	result = strings.Replace(result, " ", "_", -1)
-	assert.Equal(t, expected, result)
+	checkContainerOutput(t, containers, machines, connections, true, expected)
 
-	// Test that long outputs are not truncated when `truncate` is true
-	var f bytes.Buffer
-	writeContainers(&f, containers, machines, connections, false)
-	result = string(f.Bytes())
+	// Test that long outputs are not truncated when `truncate` is false
 	expected = `CONTAINER____MACHINE____COMMAND___________________________________` +
 		`________________________________LABELS____STATUS_____CREATED_________` +
 		`_____PUBLIC_IP
 3_______________________image1_cmd_1_&&_cmd_91283403472903847293014320984723908473248` +
 		`-23843984______________running____` + mockCreatedString + `____
 `
-	result = strings.Replace(result, " ", "_", -1)
-	assert.Equal(t, expected, result)
+	checkContainerOutput(t, containers, machines, connections, false, expected)
 }
 
 func TestContainerStr(t *testing.T) {
