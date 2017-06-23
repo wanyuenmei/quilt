@@ -5,6 +5,7 @@ Up Next
 -------------
 
 - Package the OVS kernel module for the latest DigitalOcean image to speed up
+boot times.
 - Renamed specs to blueprints.
 - Load balancing.
 - Upgraded to the latest Docker engine version (17.05.0).
