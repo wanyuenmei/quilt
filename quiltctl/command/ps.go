@@ -15,6 +15,7 @@ import (
 	"github.com/quilt/quilt/api/client"
 	"github.com/quilt/quilt/api/client/getter"
 	"github.com/quilt/quilt/db"
+	"github.com/quilt/quilt/stitch"
 	"github.com/quilt/quilt/util"
 
 	log "github.com/Sirupsen/logrus"
@@ -233,7 +234,7 @@ func writeContainers(fd io.Writer, containers []db.Container, machines []db.Mach
 
 	labelPublicPorts := map[string]string{}
 	for _, c := range connections {
-		if c.From != "public" {
+		if c.From != stitch.PublicInternetLabel {
 			continue
 		}
 
