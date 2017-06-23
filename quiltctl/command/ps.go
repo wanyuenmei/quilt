@@ -232,16 +232,17 @@ func writeContainers(fd io.Writer, containers []db.Container, machines []db.Mach
 	fmt.Fprintln(w, "CONTAINER\tMACHINE\tCOMMAND\tLABELS"+
 		"\tSTATUS\tCREATED\tPUBLIC IP")
 
-	labelPublicPorts := map[string]string{}
+	labelPublicPorts := map[string][]string{}
 	for _, c := range connections {
 		if c.From != stitch.PublicInternetLabel {
 			continue
 		}
 
-		labelPublicPorts[c.To] = fmt.Sprintf("%d", c.MinPort)
+		portStr := fmt.Sprintf("%d", c.MinPort)
 		if c.MinPort != c.MaxPort {
-			labelPublicPorts[c.To] += fmt.Sprintf("-%d", c.MaxPort)
+			portStr += fmt.Sprintf("-%d", c.MaxPort)
 		}
+		labelPublicPorts[c.To] = append(labelPublicPorts[c.To], portStr)
 	}
 
 	ipIDMap := map[string]string{}
@@ -277,7 +278,7 @@ func writeContainers(fd io.Writer, containers []db.Container, machines []db.Mach
 			publicPorts := []string{}
 			for _, label := range dbc.Labels {
 				if p, ok := labelPublicPorts[label]; ok {
-					publicPorts = append(publicPorts, p)
+					publicPorts = append(publicPorts, p...)
 				}
 			}
 

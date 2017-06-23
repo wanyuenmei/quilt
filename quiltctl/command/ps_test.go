@@ -419,6 +419,27 @@ ________________________________________________________________________________
 		`-23843984______________running____` + mockCreatedString + `____
 `
 	checkContainerOutput(t, containers, machines, connections, false, expected)
+
+	// Test writing container that has multiple labels connected to the public
+	// internet.
+	containers = []db.Container{
+		{StitchID: "3", Minion: "1.1.1.1", Image: "image1",
+			Labels: []string{"red"}},
+	}
+	machines = []db.Machine{
+		{StitchID: "5", PublicIP: "7.7.7.7", PrivateIP: "1.1.1.1"},
+	}
+	connections = []db.Connection{
+		{ID: 1, From: "public", To: "red", MinPort: 80, MaxPort: 80},
+		{ID: 2, From: "public", To: "red", MinPort: 100, MaxPort: 101},
+	}
+
+	expected = `CONTAINER____MACHINE____COMMAND____LABELS____STATUS` +
+		`_______CREATED____PUBLIC_IP
+3____________5__________image1_____red_______scheduled` +
+		`_______________7.7.7.7:[80,100-101]
+`
+	checkContainerOutput(t, containers, machines, connections, true, expected)
 }
 
 func TestContainerStr(t *testing.T) {
