@@ -40,6 +40,9 @@ type launchLoc struct {
 }
 
 func (loc launchLoc) String() string {
+	if loc.region == "" {
+		return string(loc.provider)
+	}
 	return fmt.Sprintf("%s-%s", loc.provider, loc.region)
 }
 

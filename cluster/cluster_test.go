@@ -791,6 +791,8 @@ func TestMultiRegionDeploy(t *testing.T) {
 }
 
 func TestGetError(t *testing.T) {
+	t.Parallel()
+
 	_, err := cluster{
 		providers: map[launchLoc]provider{
 			{db.Amazon, "us-west-1"}: &fakeProvider{
@@ -799,6 +801,15 @@ func TestGetError(t *testing.T) {
 		},
 	}.get()
 	assert.EqualError(t, err, "list Amazon-us-west-1: err")
+
+	_, err = cluster{
+		providers: map[launchLoc]provider{
+			{provider: db.Vagrant}: &fakeProvider{
+				listError: errors.New("err"),
+			},
+		},
+	}.get()
+	assert.EqualError(t, err, "list Vagrant: err")
 }
 
 func setNamespace(conn db.Conn, ns string) {
