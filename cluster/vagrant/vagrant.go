@@ -26,6 +26,13 @@ func New(namespace string) (*Cluster, error) {
 
 // Boot creates instances in the `clst` configured according to the `bootSet`.
 func (clst Cluster) Boot(bootSet []machine.Machine) error {
+	for _, m := range bootSet {
+		if m.Preemptible {
+			return errors.New(
+				"vagrant does not support preemptible instances")
+		}
+	}
+
 	// If any of the boot.Machine() calls fail, errChan will contain exactly one
 	// error for this function to return.
 	errChan := make(chan error, 1)
