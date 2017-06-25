@@ -23,7 +23,7 @@ func tryRunBlueprint(s blueprint) error {
 		return err
 	}
 
-	if err := run("npm", "install", s.packageJsonFolder); err != nil {
+	if err := run("npm", "install", s.packageJSONFolder); err != nil {
 		return err
 	}
 
@@ -42,7 +42,7 @@ func run(name string, args ...string) error {
 }
 
 type blueprint struct {
-	repo, packageJsonFolder, blueprintPath string
+	repo, packageJSONFolder, blueprintPath string
 }
 
 // TestBlueprints checks that the listed Quilt blueprints compile.
