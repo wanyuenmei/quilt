@@ -332,41 +332,61 @@ func (clst Cluster) listFirewalls() ([]compute.Firewall, error) {
 	return fws, nil
 }
 
-func (clst *Cluster) parseACLs(fws []compute.Firewall) (acls []acl.ACL) {
+// parseACLs parses the firewall rules contained in the given firewall into
+// `acl.ACL`s.
+// parseACLs only handles rules specified in the format that Quilt generates: it
+// does not handle all the possible rule strings supported by the Google API.
+func (clst *Cluster) parseACLs(fws []compute.Firewall) (acls []acl.ACL, err error) {
 	for _, fw := range fws {
-		for _, cidrIP := range fw.SourceRanges {
-			for _, allowed := range fw.Allowed {
-				for _, portsStr := range allowed.Ports {
-					for _, ports := range strings.Split(
-						portsStr, ",") {
+		portACLs, err := parsePorts(fw.Allowed)
+		if err != nil {
+			return nil, fmt.Errorf("parse ports of %s: %s", fw.Name, err)
+		}
 
-						portRange := strings.Split(ports, "-")
-						var minPort, maxPort int
-						switch len(portRange) {
-						case 0:
-							minPort, maxPort = 1, 65535
-						case 1:
-							port, _ := strconv.Atoi(
-								portRange[0])
-							minPort, maxPort = port, port
-						default:
-							minPort, _ = strconv.Atoi(
-								portRange[0])
-							maxPort, _ = strconv.Atoi(
-								portRange[1])
-						}
-						acls = append(acls, acl.ACL{
-							CidrIP:  cidrIP,
-							MinPort: minPort,
-							MaxPort: maxPort,
-						})
-					}
-				}
+		for _, cidrIP := range fw.SourceRanges {
+			for _, acl := range portACLs {
+				acl.CidrIP = cidrIP
+				acls = append(acls, acl)
 			}
 		}
 	}
 
-	return acls
+	return acls, nil
+}
+
+func parsePorts(allowed []*compute.FirewallAllowed) (acls []acl.ACL, err error) {
+	for _, rule := range allowed {
+		for _, portsStr := range rule.Ports {
+			portRange, err := parseInts(strings.Split(portsStr, "-"))
+			if err != nil {
+				return nil, fmt.Errorf("parse ints: %s", err)
+			}
+
+			var min, max int
+			switch len(portRange) {
+			case 1:
+				min, max = portRange[0], portRange[0]
+			case 2:
+				min, max = portRange[0], portRange[1]
+			default:
+				return nil, fmt.Errorf(
+					"unrecognized port format: %s", portsStr)
+			}
+			acls = append(acls, acl.ACL{MinPort: min, MaxPort: max})
+		}
+	}
+	return acls, nil
+}
+
+func parseInts(intStrings []string) (parsed []int, err error) {
+	for _, str := range intStrings {
+		parsedInt, err := strconv.Atoi(str)
+		if err != nil {
+			return nil, err
+		}
+		parsed = append(parsed, parsedInt)
+	}
+	return parsed, nil
 }
 
 // SetACLs adds and removes acls in `clst` so that it conforms to `acls`.
@@ -376,7 +396,11 @@ func (clst *Cluster) SetACLs(acls []acl.ACL) error {
 		return err
 	}
 
-	currACLs := clst.parseACLs(fws)
+	currACLs, err := clst.parseACLs(fws)
+	if err != nil {
+		return fmt.Errorf("parse ACLs: %s", err)
+	}
+
 	pair, toAdd, toRemove := join.HashJoin(acl.Slice(acls), acl.Slice(currACLs),
 		nil, nil)
 
