@@ -85,8 +85,6 @@ func New(namespace, zone string) (*Cluster, error) {
 
 // List the current machines in the cluster.
 func (clst *Cluster) List() ([]machine.Machine, error) {
-	// XXX: This doesn't use the instance group listing functionality because
-	// listing that way doesn't get you information about the instances
 	var mList []machine.Machine
 	list, err := clst.gce.ListInstances(clst.zone, apiOptions{
 		filter: fmt.Sprintf("description eq %s", clst.ns),
@@ -212,8 +210,6 @@ func (clst *Cluster) wait(names []string, live bool) error {
 //
 // Waits on operations, the type of which is indicated by 'domain'. All
 // operations must be of the same 'domain'
-//
-// XXX: maybe not hardcode timeout, and retry interval
 func (clst *Cluster) operationWait(ops []*compute.Operation, domain int) error {
 	if len(ops) == 0 {
 		return nil
@@ -256,9 +252,6 @@ func (clst *Cluster) operationWait(ops []*compute.Operation, domain int) error {
 // Create new GCE instance.
 //
 // Does not check if the operation succeeds.
-//
-// XXX: all kinds of hardcoded junk in here
-// XXX: currently only defines the bare minimum
 func (clst *Cluster) instanceNew(name string, size string,
 	cloudConfig string) (*compute.Operation, error) {
 	instance := &compute.Instance{
@@ -544,8 +537,6 @@ func (clst *Cluster) networkExists(name string) (bool, error) {
 }
 
 // This creates a firewall but does nothing else
-//
-// XXX: Assumes there is only one network
 func (clst *Cluster) insertFirewall(name, ports string, sourceRanges []string,
 	restrictToZone bool) (*compute.Operation, error) {
 
@@ -585,8 +576,6 @@ func (clst *Cluster) firewallExists(name string) (bool, error) {
 // Updates the firewall using PATCH semantics.
 //
 // The IP addresses must be in CIDR notation.
-// XXX: Assumes there is only one network
-// XXX: Assumes the firewall only needs to adjust the IP addrs affected
 func (clst *Cluster) firewallPatch(name string,
 	ips []string) (*compute.Operation, error) {
 	firewall := &compute.Firewall{
@@ -609,8 +598,6 @@ func newComputeService(configStr string) (*compute.Service, error) {
 }
 
 // Initializes the network for the cluster
-//
-// XXX: Currently assumes that each cluster is entirely behind 1 network
 func (clst *Cluster) createNetwork() error {
 	exists, err := clst.networkExists(clst.networkName)
 	if err != nil {
@@ -640,8 +627,6 @@ func (clst *Cluster) createNetwork() error {
 
 // Initializes the internal firewall for the cluster to allow machines to talk
 // on the private network.
-//
-// XXX: Currently assumes that each cluster is entirely behind 1 network
 func (clst *Cluster) createInternalFirewall() error {
 	var ops []*compute.Operation
 
