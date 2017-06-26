@@ -269,6 +269,7 @@ func updateLeaderContainerAttrs(lContainers []db.Container, wContainers []db.Con
 		if wc, ok := cMap[lc.StitchID]; ok {
 			lc.Created = wc.Created
 			lc.DockerID = wc.DockerID
+			lc.Status = wc.Status
 		}
 		allContainers = append(allContainers, lc)
 	}

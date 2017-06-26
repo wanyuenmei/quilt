@@ -274,6 +274,7 @@ func TestUpdateLeaderContainerAttrs(t *testing.T) {
 		{
 			StitchID: "1",
 			Created:  created,
+			Status:   "running",
 		},
 	}
 
