@@ -263,9 +263,8 @@ func updateLeaderContainerAttrs(lContainers []db.Container, wContainers []db.Con
 		cMap[wc.StitchID] = wc
 	}
 
-	// If we see a leader container matching a worker container in the map, then
-	// we use the container already in the map (worker container is fresher).
-	// Otherwise, we add the leader container to our list.
+	// If we are able to match a worker container to a leader container, then we
+	// copy the worker-only attributes to the leader view.
 	for _, lc := range lContainers {
 		if wc, ok := cMap[lc.StitchID]; ok {
 			lc.Created = wc.Created
