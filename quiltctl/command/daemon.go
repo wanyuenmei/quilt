@@ -30,7 +30,7 @@ func (dCmd *Daemon) InstallFlags(flags *flag.FlagSet) {
 	dCmd.connectionFlags.InstallFlags(flags)
 	flags.Usage = func() {
 		fmt.Println("usage: quilt daemon [-H=<daemon_host>]")
-		fmt.Println("`daemon` starts the quilt daemon, which listens for" +
+		fmt.Println("`daemon` starts the quilt daemon, which listens for " +
 			"quilt API requests")
 
 		flags.PrintDefaults()
